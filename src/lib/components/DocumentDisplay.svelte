@@ -43,7 +43,7 @@
     $: hasData = data !== null && Object.keys(data).length > 0;
 </script>
 
-<div class="border rounded-md p-4 mb-4 ml-32 mr-32 relative">
+<div class="border rounded-md p-4 mb-4 w-full relative">
     {#if hasData}
         <span class="absolute -top-1 -right-1 flex h-3 w-3">
             <span
@@ -66,13 +66,13 @@
                 on:click={downloadJson}
                 class="px-2 py-1 bg-blue-500 text-white rounded hover:bg-blue-600"
             >
-                Download JSON
+                Download
             </button>
         {/if}
     </div>
     <p>Time taken: {timeTaken !== null ? `${timeTaken}ms` : "Unknown"}</p>
     {#if isExpanded}
-        <div class="mt-2 h-[75vh] overflow-y-auto">
+        <div class="mt-2 max-h-[75vh] overflow-y-auto">
             {#if hasData}
                 <pre class="whitespace-pre-wrap">{JSON.stringify(
                         data,

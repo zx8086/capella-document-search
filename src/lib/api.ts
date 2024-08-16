@@ -1,12 +1,11 @@
 /* src/lib/api.ts */
 
-const API_BASE_URL = "https://cloudapi.cloud.couchbase.com/v4";
-const ORG_ID = "9d75c6a4-2ec3-4a6c-8574-b3842eeaa4b5";
-const PROJECT_ID = "1c249d82-f799-4b08-a8c0-18f7088e5049";
-const CLUSTER_ID = "2091944c-177f-450e-9266-9761679ebc73";
-const BUCKET_ID = "ZGVmYXVsdA==";
-const AUTH_TOKEN =
-  "bWJ1YVdPdnFqb2dwNDlOZUJlaHVUS0ZoQTRCT05wSU86QTBzUVpGQkB0NFBJaWhsRWglNGMhanlSUyVObG8xMWdVNEkjJVkhcVAwcGgyVDRBWk5oaUo1ZlRhRjdJMlpORg==";
+const API_BASE_URL = Bun.env.API_BASE_URL;
+const ORG_ID = Bun.env.ORG_ID;
+const PROJECT_ID = Bun.env.PROJECT_ID;
+const CLUSTER_ID = Bun.env.CLUSTER_ID;
+const BUCKET_ID = Bun.env.BUCKET_ID;
+const AUTH_TOKEN = Bun.env.AUTH_TOKEN;
 
 const headers = new Headers({
   Authorization: `Bearer ${AUTH_TOKEN}`,
