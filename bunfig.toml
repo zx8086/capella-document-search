@@ -1,0 +1,8 @@
+# scripts to run before `bun run`-ing a file or script
+# register plugins by adding them to this list
+# preload = ['src/instrumentation.ts']
+logLevel = "debug"
+
+[run]
+# equivalent to `bun --bun` for all `bun run` commands
+bun = true
