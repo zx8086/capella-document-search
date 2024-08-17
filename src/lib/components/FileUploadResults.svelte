@@ -1,4 +1,5 @@
 <!-- src/lib/components/FileUploadResults.svelte -->
+
 <script lang="ts">
     type DetailedResult = {
         documentKey: string;
