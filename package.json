@@ -20,11 +20,30 @@
     "svelte": "^4.2.12",
     "svelte-check": "^3.6.0",
     "tailwindcss": "^3.4.10",
-    "typescript": "^5.0.0",
+    "@types/node": "^22.1.0",
+    "@types/node-cron": "^3.0.7",
+    "bun-types": "latest",
+    "typescript": "^5.0.4",
     "vite": "^5.0.3"
   },
   "type": "module",
   "dependencies": {
+    "@elastic/ecs-winston-format": "^1.5.3",
+    "@opentelemetry/api": "^1.9.0",
+    "@opentelemetry/auto-instrumentations-node": "^0.49.1",
+    "@opentelemetry/exporter-logs-otlp-http": "^0.52.1",
+    "@opentelemetry/exporter-metrics-otlp-http": "^0.52.1",
+    "@opentelemetry/sdk-logs": "^0.52.1",
+    "@opentelemetry/sdk-metrics": "^1.25.1",
+    "@opentelemetry/sdk-node": "^0.52.1",
+    "@opentelemetry/sdk-trace-node": "^1.25.1",
+    "@opentelemetry/semantic-conventions": "^1.25.1",
+    "@opentelemetry/winston-transport": "^0.5.0",
+    "@slack/webhook": "^7.0.2",
+    "axios": "^1.7.3",
+    "node-cron": "^3.0.3",
+    "winston": "^3.14.1",
+    "winston-daily-rotate-file": "^5.0.0",
     "@apollo/client": "^3.11.4",
     "cross-fetch": "^4.0.0",
     "csv-parse": "^5.5.6",
@@ -34,6 +53,7 @@
   "trustedDependencies": [
     "@sveltejs/kit",
     "esbuild",
+    "protobufjs",
     "svelte-preprocess"
   ]
 }

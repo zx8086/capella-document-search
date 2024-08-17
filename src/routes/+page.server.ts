@@ -16,6 +16,57 @@ const client = new ApolloClient({
   cache: new InMemoryCache(),
 });
 
+// Mock collections data
+const mockCollections = [
+  { bucket: "default", scope: "prices", collection: "prices" },
+  { bucket: "default", scope: "order", collection: "archived-orders" },
+  { bucket: "default", scope: "order", collection: "archived-order-items" },
+  { bucket: "default", scope: "new_model", collection: "seasonal_assignment" },
+  { bucket: "default", scope: "new_model", collection: "product2g" },
+  { bucket: "default", scope: "new_model", collection: "variant" },
+  { bucket: "default", scope: "new_model", collection: "article" },
+  { bucket: "default", scope: "seasons", collection: "retry_notifications" },
+  { bucket: "default", scope: "seasons", collection: "delivery_dates_import" },
+  { bucket: "default", scope: "seasons", collection: "delivery_dates" },
+  { bucket: "default", scope: "seasons", collection: "dates_import" },
+  { bucket: "default", scope: "seasons", collection: "dates" },
+  {
+    bucket: "default",
+    scope: "brands_divisions",
+    collection: "retry_notifications",
+  },
+  {
+    bucket: "default",
+    scope: "brands_divisions",
+    collection: "brands_divisions",
+  },
+  { bucket: "default", scope: "eventing", collection: "metadata" },
+  { bucket: "default", scope: "media_assets", collection: "images" },
+  {
+    bucket: "default",
+    scope: "media_assets",
+    collection: "retry_notifications",
+  },
+  { bucket: "default", scope: "media_assets", collection: "look_items" },
+  { bucket: "default", scope: "styles", collection: "prepacks" },
+  {
+    bucket: "default",
+    scope: "styles",
+    collection: "retry_rich_notifications",
+  },
+  { bucket: "default", scope: "styles", collection: "distribution_curves" },
+  { bucket: "default", scope: "styles", collection: "retry_notifications" },
+  { bucket: "default", scope: "styles", collection: "eventing" },
+  { bucket: "default", scope: "styles", collection: "variant" },
+  { bucket: "default", scope: "styles", collection: "article" },
+  { bucket: "default", scope: "styles", collection: "product2g" },
+  { bucket: "default", scope: "styles_notifications", collection: "retry" },
+  { bucket: "default", scope: "styles_notifications", collection: "metadata" },
+  { bucket: "default", scope: "customer", collection: "assignments" },
+  { bucket: "default", scope: "customer", collection: "sales-organizations" },
+  { bucket: "default", scope: "customer", collection: "customers" },
+];
+
 export const actions: Actions = {
   searchDocuments: async ({ request }) => {
     try {
@@ -28,7 +79,6 @@ export const actions: Actions = {
       console.log("Keys:", keys);
 
       // Ensure collections are in the correct format
-      // @ts-ignore
       const formattedCollections = collections.map(
         ({ bucket, scope_name, collection_name }) => ({
           bucket,
@@ -69,14 +119,10 @@ export const actions: Actions = {
       };
     } catch (error) {
       console.error("Error in searchDocuments action:", error);
-      // @ts-ignore
       if (error.graphQLErrors) {
-        // @ts-ignore
         console.error("GraphQL Errors:", error.graphQLErrors);
       }
-      // @ts-ignore
       if (error.networkError) {
-        // @ts-ignore
         console.error("Network Error:", error.networkError);
       }
       return {
@@ -86,12 +132,10 @@ export const actions: Actions = {
       };
     }
   },
-
   uploadFile: async ({ request }) => {
     try {
       const data = await request.formData();
       const file = data.get("file") as File | null;
-      const collections = JSON.parse(data.get("collections") as string);
 
       if (!file) {
         throw error(400, "No file uploaded");
@@ -101,18 +145,56 @@ export const actions: Actions = {
       const content = await file.text();
       const documentKeys = content.split(",").map((key) => key.trim());
 
-      // Use the collections data to search for each document key
+      // Use the mock collections data to search for each document key
       const results = await Promise.all(
         documentKeys.map(async (key) => {
-          // Perform your search logic here using the key and collections
-          // Return the search result for each key
+          const query = gql`
+            query searchDocuments(
+              $collections: [BucketScopeCollection!]!
+              $keys: [String!]!
+            ) {
+              searchDocuments(collections: $collections, keys: $keys) {
+                bucket
+                scope
+                collection
+                data
+                timeTaken
+              }
+            }
+          `;
+
+          const response = await client.query({
+            query,
+            variables: {
+              collections: mockCollections,
+              keys: [key],
+            },
+            fetchPolicy: "no-cache",
+          });
+
+          const searchResults = response.data.searchDocuments;
+
+          // Filter out collections where the document wasn't found
+          const foundCollections = searchResults.filter(
+            (result) => result.data !== null,
+          );
+
+          return {
+            documentKey: key,
+            found: foundCollections.length > 0,
+            collections: foundCollections.map(
+              ({ bucket, scope, collection, timeTaken }) => ({
+                bucket,
+                scope,
+                collection,
+                timeTaken,
+              }),
+            ),
+          };
         }),
       );
 
-      return {
-        type: "success",
-        data: results,
-      };
+      return results;
     } catch (e) {
       console.error("Error in uploadFile action:", e);
       throw error(

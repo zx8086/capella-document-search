@@ -11,13 +11,10 @@
             timeTaken: number;
         }[];
     };
-
     type SimpleResult = {
         message: string;
     };
-
     export let results: (DetailedResult | SimpleResult)[];
-
     function isDetailedResult(
         result: DetailedResult | SimpleResult,
     ): result is DetailedResult {
@@ -71,14 +68,16 @@
                                 {/if}
                             </td>
                             <td class="px-6 py-4">
-                                <ul class="list-disc list-inside">
-                                    {#each result.collections as collection}
-                                        <li>
-                                            {collection.bucket}/{collection.scope}/{collection.collection}
-                                            (Time: {collection.timeTaken}ms)
-                                        </li>
-                                    {/each}
-                                </ul>
+                                {#if result.found}
+                                    <ul class="list-disc list-inside">
+                                        {#each result.collections as collection}
+                                            <li>
+                                                {collection.bucket}/{collection.scope}/{collection.collection}
+                                                (Time: {collection.timeTaken}ms)
+                                            </li>
+                                        {/each}
+                                    </ul>
+                                {/if}
                             </td>
                         </tr>
                     {/if}
