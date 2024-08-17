@@ -1,4 +1,4 @@
-/* src/routes/search/+page.server.ts */
+/* src/routes/+page.server.ts */
 
 import {
   ApolloClient,
