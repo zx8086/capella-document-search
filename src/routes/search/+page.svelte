@@ -179,7 +179,7 @@
     $: groupedCollections = groupCollectionsByScope(allCollections);
 </script>
 
-<div class="min-h-screen flex flex-col bg-white">
+<div class="min-h-screen flex flex-col bg-white mb-20 mt-5">
     <!-- Logo Section -->
     <div class="text-center py-4">
         <img src="/favicon.ico" alt="PVH" class="mx-auto h-16" />
@@ -238,7 +238,7 @@
                 <div class="mb-4">
                     <div class="flex justify-between items-center mb-2">
                         <h3 class="text-lg font-semibold">
-                            Select Data Collections:
+                            Select Data Scope & Collections:
                         </h3>
                         <div>
                             <button
