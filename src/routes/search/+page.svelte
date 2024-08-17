@@ -140,44 +140,65 @@
                 class="space-y-6"
             >
                 <!-- Search Bar -->
-                <fieldset class="w-full mb-4">
-                    <div class="relative">
-                        <input
-                            type="search"
-                            id="documentKey"
-                            name="documentKey"
-                            bind:value={documentKey}
-                            on:input={() => {
-                                searchPerformed = false;
-                            }}
-                            placeholder="IMAGE_04_C51_KB0KB09658PMT"
-                            class="w-full py-2 px-4 border border-gray-300 rounded-md text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        />
-                    </div>
-                </fieldset>
+                <div class="w-full flex justify-center mb-4">
+                    <fieldset class="w-2/3 max-w-2xl">
+                        <label for="documentKey" class="hidden">Search</label>
+                        <div class="relative">
+                            <span
+                                class="absolute inset-y-0 left-0 flex items-center pl-3"
+                            >
+                                <button
+                                    type="button"
+                                    title="search"
+                                    class="p-1 focus:outline-none focus:ring focus:ring-tommy-red/50 rounded-full"
+                                >
+                                    <svg
+                                        fill="currentColor"
+                                        viewBox="0 0 512 512"
+                                        class="w-4 h-4 text-gray-500"
+                                    >
+                                        <path
+                                            d="M479.6,399.716l-81.084-81.084-62.368-25.767A175.014,175.014,0,0,0,368,192c0-97.047-78.953-176-176-176S16,94.953,16,192,94.953,368,192,368a175.034,175.034,0,0,0,101.619-32.377l25.7,62.2L400.4,478.911a56,56,0,1,0,79.2-79.195ZM48,192c0-79.4,64.6-144,144-144s144,64.6,144,144S271.4,336,192,336,48,271.4,48,192ZM456.971,456.284a24.028,24.028,0,0,1-33.942,0l-76.572-76.572-23.894-57.835L380.4,345.771l76.573,76.572A24.028,24.028,0,0,1,456.971,456.284Z"
+                                        ></path>
+                                    </svg>
+                                </button>
+                            </span>
+                            <input
+                                type="search"
+                                id="documentKey"
+                                name="documentKey"
+                                bind:value={documentKey}
+                                on:input={() => {
+                                    searchPerformed = false;
+                                }}
+                                placeholder="Search for a single Document by typing in the key here..."
+                                class="w-full py-2 pl-10 pr-4 text-sm rounded-md focus:outline-none bg-white border border-gray-300 text-gray-700 focus:ring-2 focus:ring-tommy-red focus:border-tommy-red transition duration-150 ease-in-out"
+                            />
+                        </div>
+                    </fieldset>
+                </div>
 
                 <!-- Collections Section -->
                 <div class="mb-4">
                     <div class="flex justify-between items-center mb-2">
                         <h3 class="text-lg font-semibold">
-                            Select Collections:
+                            Select Data Collections:
                         </h3>
                         <div>
                             <button
                                 type="button"
                                 on:click={selectAllCollections}
-                                class="px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600 mr-2"
+                                class="px-3 py-1 bg-[#00174f] text-white rounded hover:bg-[#00174f]/80 mr-2"
                                 >Select All</button
                             >
                             <button
                                 type="button"
                                 on:click={deselectAllCollections}
-                                class="px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600"
+                                class="px-3 py-1 bg-[#00174f] text-white rounded hover:bg-[#00174f]/80"
                                 >Deselect All</button
                             >
                         </div>
                     </div>
-
                     <div
                         class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"
                     >
@@ -207,7 +228,7 @@
                                                     )}
                                             />
                                             <div
-                                                class="w-11 h-6 bg-gray-200 rounded-full peer peer-focus:ring-4 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600"
+                                                class="w-11 h-6 bg-gray-200 rounded-full peer peer-focus:ring-4 peer-focus:ring-[#551a8b]/50 dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-light-blue"
                                             ></div>
                                         </div>
                                     </label>
@@ -223,13 +244,15 @@
                     value={JSON.stringify(selectedCollections)}
                 />
 
-                <button
-                    type="submit"
-                    disabled={processing}
-                    class="w-full py-2 px-4 bg-blue-500 text-white rounded-md cursor-pointer hover:bg-blue-600"
-                >
-                    {processing ? "Searching..." : "Search"}
-                </button>
+                <div class="flex justify-center">
+                    <button
+                        type="submit"
+                        disabled={processing}
+                        class="w-full sm:w-auto px-6 py-2 min-w-[150px] bg-[#00174f] text-white rounded-md cursor-pointer hover:bg-[#00174f]/80 transition duration-150 ease-in-out"
+                    >
+                        {processing ? "Searching..." : "Search"}
+                    </button>
+                </div>
             </form>
 
             <!-- Search Results and Error Messages -->

@@ -80,7 +80,7 @@
                         2,
                     )}</pre>
             {:else}
-                <p>No data found in this collection.</p>
+                <p>No match found in this collection.</p>
             {/if}
         </div>
     {/if}
