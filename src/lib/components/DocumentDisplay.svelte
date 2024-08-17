@@ -1,4 +1,4 @@
-<!-- DocumentDisplay.svelte -->
+<!-- src/lib/components/DocumentDisplay.svelte -->
 
 <script lang="ts">
     interface DocumentDisplayProps {
