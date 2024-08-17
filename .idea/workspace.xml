@@ -4,7 +4,16 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="a783835f-4b80-4f56-9697-5aabbe390336" name="Changes" comment="" />
+    <list default="true" id="a783835f-4b80-4f56-9697-5aabbe390336" name="Changes" comment="">
+      <change beforePath="$PROJECT_DIR$/.idea/dataSources/29708e88-fd06-4084-bfc7-1e0cf5b7d61e.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/dataSources/29708e88-fd06-4084-bfc7-1e0cf5b7d61e.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/capella-document-search.sqlite" beforeDir="false" afterPath="$PROJECT_DIR$/capella-document-search.sqlite" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/lib/api.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/lib/api.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/lib/collectionManager.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/lib/collectionManager.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/lib/db/dbOperations.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/lib/db/dbOperations.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/routes/api/collections/+server.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/routes/api/collections/+server.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/routes/search/+page.svelte" beforeDir="false" afterPath="$PROJECT_DIR$/src/routes/search/+page.svelte" afterDir="false" />
+    </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
@@ -13,22 +22,22 @@
   <component name="Git.Settings">
     <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
   </component>
-  <component name="ProjectColorInfo"><![CDATA[{
-  "associatedIndex": 0
-}]]></component>
+  <component name="ProjectColorInfo">{
+  &quot;associatedIndex&quot;: 0
+}</component>
   <component name="ProjectId" id="2kjLiPPSMp2aRblsR0EuMSQOqbL" />
   <component name="ProjectViewState">
     <option name="hideEmptyMiddlePackages" value="true" />
     <option name="showLibraryContents" value="true" />
   </component>
-  <component name="PropertiesComponent"><![CDATA[{
-  "keyToString": {
-    "ASKED_SHARE_PROJECT_CONFIGURATION_FILES": "true",
-    "RunOnceActivity.OpenDatabaseViewOnStart": "true",
-    "RunOnceActivity.ShowReadmeOnStart": "true",
-    "git-widget-placeholder": "feature/populate-checkbox-via-api",
-    "last_opened_file_path": "/Users/SOwusu/WebstormProjects/capella-document-search"
+  <component name="PropertiesComponent">{
+  &quot;keyToString&quot;: {
+    &quot;ASKED_SHARE_PROJECT_CONFIGURATION_FILES&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.OpenDatabaseViewOnStart&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
+    &quot;git-widget-placeholder&quot;: &quot;feature/add-tool-tips&quot;,
+    &quot;last_opened_file_path&quot;: &quot;/Users/SOwusu/WebstormProjects/capella-document-search&quot;
   }
-}]]></component>
+}</component>
   <component name="SpellCheckerSettings" RuntimeDictionaries="0" Folders="0" CustomDictionaries="0" DefaultDictionary="application-level" UseSingleDictionary="true" transferred="true" />
 </project>
