@@ -6,6 +6,7 @@
     import DocumentDisplay from "$lib/components/DocumentDisplay.svelte";
     import { onMount } from "svelte";
     import { getCollections } from "$lib/collectionManager";
+    import FileUploadResults from "$lib/components/FileUploadResults.svelte";
 
     let showDebugInfo = false;
     let debugInfo = "";
@@ -16,22 +17,16 @@
     let errorMessage = "";
     let searchPerformed = false;
 
-    let allCollections: {
-        bucket: string;
-        scope_name: string;
-        collection_name: string;
-        tooltip_content: string | null;
-    }[] = [];
-    let selectedCollections: {
-        bucket: string;
-        scope_name: string;
-        collection_name: string;
-    }[] = [];
+    let allCollections = [];
+    let selectedCollections = [];
 
     let modalIsOpen = false;
     let currentTooltip = "";
 
     let buttonState = "ready";
+    let isSearchMode = true;
+    let file: File | null = null;
+    let fileUploadResults = [];
 
     $: buttonClass = {
         ready: "cursor-pointer",
@@ -40,44 +35,136 @@
     }[buttonState];
 
     $: buttonText = {
-        ready: "Search",
-        searching: "Searching...",
+        ready: isSearchMode ? "Search" : "Upload",
+        searching: isSearchMode ? "Searching..." : "Uploading...",
         results: "Done",
     }[buttonState];
+
+    function toggleMode() {
+        isSearchMode = !isSearchMode;
+        resetForm();
+    }
+
+    function resetForm() {
+        buttonState = "ready";
+        searchResults = [];
+        fileUploadResults = [];
+        errorMessage = "";
+        searchPerformed = false;
+        documentKey = "";
+        file = null;
+    }
+
+    function handleFileChange(event: Event) {
+        const target = event.target as HTMLInputElement;
+        if (target.files) {
+            file = target.files[0];
+        }
+    }
 
     function handleSubmit(event) {
         buttonState = "searching";
         processing = true;
         errorMessage = "";
         searchResults = [];
+        fileUploadResults = [];
         searchPerformed = true;
 
-        return async ({ result }) => {
-            console.log("Form submission result:", result);
-            if (result.type === "success") {
-                try {
-                    const data = result.data;
-                    console.log("Received data:", data);
-                    if (data && data.data && data.data.searchDocuments) {
-                        searchResults = data.data.searchDocuments;
-                        console.log("Search results:", searchResults);
-                        buttonState = "results";
-                    } else {
-                        errorMessage = "Unexpected response structure";
-                        buttonState = "ready";
-                    }
-                } catch (e) {
-                    console.error("Error processing server response:", e);
-                    errorMessage =
-                        "Error processing server response: " + e.message;
-                    buttonState = "ready";
+        return async ({ result, update }) => {
+            try {
+                if (!isSearchMode) {
+                    const formData = new FormData(
+                        event.target as HTMLFormElement,
+                    );
+                    formData.append(
+                        "collections",
+                        JSON.stringify(allCollections),
+                    );
+
+                    const response = await fetch(event.target.action, {
+                        method: "POST",
+                        body: formData,
+                    });
+
+                    result = await response.json();
                 }
-            } else if (result.type === "error") {
-                errorMessage = result.error;
+
+                console.log("Form submission result:", result);
+                if (result.type === "success") {
+                    const data = result.data;
+                    console.log(
+                        "Full received data structure:",
+                        JSON.stringify(data, null, 2),
+                    );
+
+                    if (isSearchMode) {
+                        if (
+                            data &&
+                            data.data &&
+                            Array.isArray(data.data.searchDocuments)
+                        ) {
+                            searchResults = data.data.searchDocuments;
+                            console.log("Search results:", searchResults);
+                        } else {
+                            throw new Error(
+                                "Unexpected search results structure",
+                            );
+                        }
+                    } else {
+                        if (data && Array.isArray(data)) {
+                            fileUploadResults = data;
+                            console.log(
+                                "File upload results:",
+                                fileUploadResults,
+                            );
+                        } else {
+                            throw new Error(
+                                "Unexpected file upload result structure",
+                            );
+                        }
+                    }
+                    buttonState = "results";
+                } else if (result.type === "error") {
+                    throw new Error(result.error);
+                }
+            } catch (e) {
+                console.error("Error processing server response:", e);
+                errorMessage = "Error processing server response: " + e.message;
                 buttonState = "ready";
+            } finally {
+                processing = false;
+                update();
             }
-            processing = false;
         };
+    }
+
+    function toggleCollection(collection: {
+        bucket: string;
+        scope_name: string;
+        collection_name: string;
+    }) {
+        const index = selectedCollections.findIndex(
+            (c) =>
+                c.bucket === collection.bucket &&
+                c.scope_name === collection.scope_name &&
+                c.collection_name === collection.collection_name,
+        );
+
+        if (index !== -1) {
+            selectedCollections = selectedCollections.filter(
+                (_, i) => i !== index,
+            );
+        } else {
+            selectedCollections = [...selectedCollections, collection];
+        }
+    }
+
+    function selectAllCollections() {
+        selectedCollections = [...allCollections];
+    }
+
+    function deselectAllCollections() {
+        selectedCollections = [];
     }
 
     function resetSearch() {
@@ -124,35 +211,6 @@
         resetSearch();
     }
 
-    function toggleCollection(collection: {
-        bucket: string;
-        scope_name: string;
-        collection_name: string;
-    }) {
-        const index = selectedCollections.findIndex(
-            (c) =>
-                c.bucket === collection.bucket &&
-                c.scope_name === collection.scope_name &&
-                c.collection_name === collection.collection_name,
-        );
-
-        if (index !== -1) {
-            selectedCollections = selectedCollections.filter(
-                (_, i) => i !== index,
-            );
-        } else {
-            selectedCollections = [...selectedCollections, collection];
-        }
-    }
-
-    function selectAllCollections() {
-        selectedCollections = [...allCollections];
-    }
-
-    function deselectAllCollections() {
-        selectedCollections = [];
-    }
-
     $: isSelected = (collection: {
         bucket: string;
         scope_name: string;
@@ -191,140 +249,207 @@
             <form
                 use:enhance={handleSubmit}
                 method="POST"
-                action="?/searchDocuments"
+                action={isSearchMode ? "?/searchDocuments" : "?/uploadFile"}
                 class="space-y-6"
+                enctype="multipart/form-data"
             >
-                <!-- Search Bar -->
+                <!-- Search Bar / File Upload -->
                 <div class="w-full flex justify-center mb-4">
-                    <fieldset class="w-2/3 max-w-2xl">
-                        <label for="documentKey" class="hidden">Search</label>
-                        <div class="relative">
-                            <span
-                                class="absolute inset-y-0 left-0 flex items-center pl-3"
+                    <fieldset
+                        class="w-2/3 max-w-2xl relative flex items-center"
+                    >
+                        <label
+                            for={isSearchMode ? "documentKey" : "fileInput"}
+                            class="hidden"
+                        >
+                            {isSearchMode ? "Search" : "Upload File"}
+                        </label>
+                        {#if isSearchMode}
+                            <div class="relative flex-grow">
+                                <span
+                                    class="absolute inset-y-0 left-0 flex items-center pl-3"
+                                >
+                                    <button
+                                        type="button"
+                                        title="search"
+                                        class="p-1 focus:outline-none focus:ring focus:ring-tommy-red/50 rounded-full"
+                                    >
+                                        <svg
+                                            fill="currentColor"
+                                            viewBox="0 0 512 512"
+                                            class="w-4 h-4 text-gray-500"
+                                        >
+                                            <path
+                                                d="M479.6,399.716l-81.084-81.084-62.368-25.767A175.014,175.014,0,0,0,368,192c0-97.047-78.953-176-176-176S16,94.953,16,192,94.953,368,192,368a175.034,175.034,0,0,0,101.619-32.377l25.7,62.2L400.4,478.911a56,56,0,1,0,79.2-79.195ZM48,192c0-79.4,64.6-144,144-144s144,64.6,144,144S271.4,336,192,336,48,271.4,48,192ZM456.971,456.284a24.028,24.028,0,0,1-33.942,0l-76.572-76.572-23.894-57.835L380.4,345.771l76.573,76.572A24.028,24.028,0,0,1,456.971,456.284Z"
+                                            ></path>
+                                        </svg>
+                                    </button>
+                                </span>
+                                <input
+                                    type="search"
+                                    id="documentKey"
+                                    name="documentKey"
+                                    bind:value={documentKey}
+                                    on:input={() => {
+                                        searchPerformed = false;
+                                    }}
+                                    on:click={handleInputClick}
+                                    placeholder="Search for a single Document by typing in the key here and click the Search button below..."
+                                    class="w-full py-2 pl-10 pr-4 text-sm rounded-md focus:outline-none bg-white border border-gray-300 text-gray-700 focus:ring-2 focus:ring-tommy-red focus:border-tommy-red transition duration-150 ease-in-out"
+                                />
+                            </div>
+                        {:else}
+                            <div
+                                class="flex w-full max-w-xl text-center flex-col gap-1"
                             >
-                                <button
-                                    type="button"
-                                    title="search"
-                                    class="p-1 focus:outline-none focus:ring focus:ring-tommy-red/50 rounded-full"
+                                <span
+                                    class="w-fit pl-0.5 text-sm text-slate-700 dark:text-slate-300"
+                                    >Upload Document Keys</span
+                                >
+                                <div
+                                    class="flex w-full flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-slate-300 p-8 text-slate-700 dark:border-slate-700 dark:text-slate-300"
                                 >
                                     <svg
+                                        xmlns="http://www.w3.org/2000/svg"
+                                        viewBox="0 0 24 24"
+                                        aria-hidden="true"
                                         fill="currentColor"
-                                        viewBox="0 0 512 512"
-                                        class="w-4 h-4 text-gray-500"
+                                        class="w-12 h-12 opacity-75"
                                     >
                                         <path
-                                            d="M479.6,399.716l-81.084-81.084-62.368-25.767A175.014,175.014,0,0,0,368,192c0-97.047-78.953-176-176-176S16,94.953,16,192,94.953,368,192,368a175.034,175.034,0,0,0,101.619-32.377l25.7,62.2L400.4,478.911a56,56,0,1,0,79.2-79.195ZM48,192c0-79.4,64.6-144,144-144s144,64.6,144,144S271.4,336,192,336,48,271.4,48,192ZM456.971,456.284a24.028,24.028,0,0,1-33.942,0l-76.572-76.572-23.894-57.835L380.4,345.771l76.573,76.572A24.028,24.028,0,0,1,456.971,456.284Z"
-                                        ></path>
+                                            fill-rule="evenodd"
+                                            d="M10.5 3.75a6 6 0 0 0-5.98 6.496A5.25 5.25 0 0 0 6.75 20.25H18a4.5 4.5 0 0 0 2.206-8.423 3.75 3.75 0 0 0-4.133-4.303A6.001 6.001 0 0 0 10.5 3.75Zm2.03 5.47a.75.75 0 0 0-1.06 0l-3 3a.75.75 0 1 0 1.06 1.06l1.72-1.72v4.94a.75.75 0 0 0 1.5 0v-4.94l1.72 1.72a.75.75 0 1 0 1.06-1.06l-3-3Z"
+                                            clip-rule="evenodd"
+                                        />
                                     </svg>
-                                </button>
-                            </span>
-                            <input
-                                type="search"
-                                id="documentKey"
-                                name="documentKey"
-                                bind:value={documentKey}
-                                on:input={() => {
-                                    searchPerformed = false;
-                                }}
-                                on:click={handleInputClick}
-                                placeholder="Search for a single Document by typing in the key here and click the Search button below..."
-                                class="w-full py-2 pl-10 pr-4 text-sm rounded-md focus:outline-none bg-white border border-gray-300 text-gray-700 focus:ring-2 focus:ring-tommy-red focus:border-tommy-red transition duration-150 ease-in-out"
-                            />
-                        </div>
+                                    <div class="group">
+                                        <label
+                                            for="fileInput"
+                                            class="cursor-pointer font-medium text-blue-700 group-focus-within:underline dark:text-blue-600"
+                                        >
+                                            <input
+                                                id="fileInput"
+                                                name="file"
+                                                type="file"
+                                                class="sr-only"
+                                                aria-describedby="validFileFormats"
+                                                accept=".csv"
+                                                on:change={handleFileChange}
+                                            />
+                                            Browse
+                                        </label>
+                                        or drag and drop here
+                                    </div>
+                                    <small id="validFileFormats"
+                                        >CSV files only</small
+                                    >
+                                    {#if file}
+                                        <p class="mt-2 text-sm text-gray-500">
+                                            Selected file: {file.name}
+                                        </p>
+                                    {/if}
+                                </div>
+                            </div>
+                        {/if}
+                        <button
+                            type="button"
+                            on:click={toggleMode}
+                            class="ml-2 p-2 bg-gray-200 rounded-full hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-tommy-red"
+                        >
+                            <svg
+                                xmlns="http://www.w3.org/2000/svg"
+                                fill="none"
+                                viewBox="0 0 24 24"
+                                stroke-width="1.5"
+                                stroke="currentColor"
+                                class="w-6 h-6"
+                            >
+                                <path
+                                    stroke-linecap="round"
+                                    stroke-linejoin="round"
+                                    d="M19.5 12c0-1.232-.046-2.453-.138-3.662a4.006 4.006 0 0 0-3.7-3.7 48.678 48.678 0 0 0-7.324 0 4.006 4.006 0 0 0-3.7 3.7c-.017.22-.032.441-.046.662M19.5 12l3-3m-3 3-3-3m-12 3c0 1.232.046 2.453.138 3.662a4.006 4.006 0 0 0 3.7 3.7 48.656 48.656 0 0 0 7.324 0 4.006 4.006 0 0 0 3.7-3.7c.017-.22.032-.441.046-.662M4.5 12l3 3m-3-3-3 3"
+                                />
+                            </svg>
+                        </button>
                     </fieldset>
                 </div>
 
-                <!-- Collections Section -->
-                <div class="mb-4">
-                    <div class="flex justify-between items-center mb-2">
-                        <h3 class="text-lg font-semibold">
-                            Select Data Scopes & Collections:
-                        </h3>
-                        <div>
-                            <button
-                                type="button"
-                                on:click={selectAllCollections}
-                                class="px-3 py-1 bg-[#00174f] text-white rounded hover:bg-[#00174f]/80 mr-2"
-                                >Select All</button
-                            >
-                            <button
-                                type="button"
-                                on:click={deselectAllCollections}
-                                class="px-3 py-1 bg-[#00174f] text-white rounded hover:bg-[#00174f]/80"
-                                >Deselect All</button
-                            >
+                <!-- Collections Section (only show in search mode) -->
+                {#if isSearchMode}
+                    <div class="mb-4">
+                        <div class="flex justify-between items-center mb-2">
+                            <h3 class="text-lg font-semibold">
+                                Select Data Scopes & Collections:
+                            </h3>
+                            <div>
+                                <button
+                                    type="button"
+                                    on:click={selectAllCollections}
+                                    class="px-3 py-1 bg-[#00174f] text-white rounded hover:bg-[#00174f]/80 mr-2"
+                                >
+                                    Select All
+                                </button>
+                                <button
+                                    type="button"
+                                    on:click={deselectAllCollections}
+                                    class="px-3 py-1 bg-[#00174f] text-white rounded hover:bg-[#00174f]/80"
+                                >
+                                    Deselect All
+                                </button>
+                            </div>
                         </div>
-                    </div>
-                    <div
-                        class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"
-                    >
-                        {#each Object.entries(groupedCollections) as [scope, collections]}
-                            <div class="border rounded p-3">
-                                <h4 class="font-semibold mb-2">{scope}</h4>
-                                {#each collections as collection}
-                                    <label
-                                        for={`toggle-${collection.bucket}-${collection.scope_name}-${collection.collection_name}`}
-                                        class="flex items-center justify-between cursor-pointer mb-2"
-                                    >
-                                        <span
-                                            class="text-sm pr-2 flex items-center"
+                        <div
+                            class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"
+                        >
+                            {#each Object.entries(groupedCollections) as [scope, collections]}
+                                <div class="border rounded p-3">
+                                    <h4 class="font-semibold mb-2">{scope}</h4>
+                                    {#each collections as collection}
+                                        <label
+                                            for={`toggle-${collection.bucket}-${collection.scope_name}-${collection.collection_name}`}
+                                            class="flex items-center justify-between cursor-pointer mb-2"
                                         >
-                                            {collection.collection_name}
-                                            {#if collection.tooltip_content}
-                                                <button
-                                                    on:click|preventDefault={() =>
-                                                        openTooltipModal(
-                                                            collection.tooltip_content,
-                                                        )}
-                                                    class="ml-2 text-gray-500 hover:text-gray-700 focus:outline-none"
-                                                >
-                                                    <svg
-                                                        xmlns="http://www.w3.org/2000/svg"
-                                                        fill="none"
-                                                        viewBox="0 0 24 24"
-                                                        stroke="currentColor"
-                                                        class="w-4 h-4"
-                                                    >
-                                                        <path
-                                                            stroke-linecap="round"
-                                                            stroke-linejoin="round"
-                                                            stroke-width="2"
-                                                            d="M2.25 12c0-5.385 4.365-9.75 9.75-9.75s9.75 4.365 9.75 9.75-4.365 9.75-9.75 9.75S2.25 17.385 2.25 12Zm8.706-1.442c1.146-.573 2.437.463 2.126 1.706l-.709 2.836.042-.02a.75.75 0 0 1 .67 1.34l-.04.022c-1.147.573-2.438-.463-2.127-1.706l.71-2.836-.042.02a.75.75 0 1 1-.671-1.34l.041-.022ZM12 9a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5Z"
-                                                        />
-                                                    </svg>
-                                                </button>
-                                            {/if}
-                                        </span>
-                                        <div
-                                            class="relative inline-flex items-center"
-                                        >
-                                            <input
-                                                id={`toggle-${collection.bucket}-${collection.scope_name}-${collection.collection_name}`}
-                                                type="checkbox"
-                                                class="peer sr-only"
-                                                role="switch"
-                                                checked={isSelected(collection)}
-                                                on:change={() =>
-                                                    toggleCollection(
+                                            <span
+                                                class="text-sm pr-2 flex items-center"
+                                            >
+                                                {collection.collection_name}
+                                                {#if collection.tooltip_content}
+                                                    <!-- ... (keep existing tooltip button) ... -->
+                                                {/if}
+                                            </span>
+                                            <div
+                                                class="relative inline-flex items-center"
+                                            >
+                                                <input
+                                                    id={`toggle-${collection.bucket}-${collection.scope_name}-${collection.collection_name}`}
+                                                    type="checkbox"
+                                                    class="peer sr-only"
+                                                    role="switch"
+                                                    checked={isSelected(
                                                         collection,
                                                     )}
-                                            />
-                                            <div
-                                                class="w-11 h-6 bg-gray-200 rounded-full peer peer-focus:ring-4 peer-focus:ring-[#551a8b]/50 dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-light-blue"
-                                            ></div>
-                                        </div>
-                                    </label>
-                                {/each}
-                            </div>
-                        {/each}
+                                                    on:change={() =>
+                                                        toggleCollection(
+                                                            collection,
+                                                        )}
+                                                />
+                                                <div
+                                                    class="w-11 h-6 bg-gray-200 rounded-full peer peer-focus:ring-4 peer-focus:ring-[#551a8b]/50 dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-light-blue"
+                                                ></div>
+                                            </div>
+                                        </label>
+                                    {/each}
+                                </div>
+                            {/each}
+                        </div>
                     </div>
-                </div>
 
-                <input
-                    type="hidden"
-                    name="collections"
-                    value={JSON.stringify(selectedCollections)}
-                />
+                    <input
+                        type="hidden"
+                        name="collections"
+                        value={JSON.stringify(selectedCollections)}
+                    />
+                {/if}
 
                 <div class="flex justify-center">
                     <button
@@ -346,20 +471,26 @@
                 <p class="text-red-600 mt-4">{errorMessage}</p>
             {/if}
 
-            {#if searchResults.length > 0}
-                <h2 class="mt-4 mb-2"></h2>
-                {#each searchResults as result}
-                    <DocumentDisplay
-                        bucket={result.bucket}
-                        scope={result.scope}
-                        collection={result.collection}
-                        data={result.data}
-                        timeTaken={result.timeTaken}
-                        {documentKey}
-                    />
-                {/each}
-            {:else if !processing && documentKey && searchPerformed}
-                <p class="mt-4">No results found for the given document key.</p>
+            {#if isSearchMode}
+                {#if searchResults.length > 0}
+                    <h2 class="mt-4 mb-2">Search Results:</h2>
+                    {#each searchResults as result}
+                        <DocumentDisplay
+                            bucket={result.bucket}
+                            scope={result.scope}
+                            collection={result.collection}
+                            data={result.data}
+                            timeTaken={result.timeTaken}
+                            {documentKey}
+                        />
+                    {/each}
+                {:else if !processing && documentKey && searchPerformed}
+                    <p class="mt-4">
+                        No results found for the given document key.
+                    </p>
+                {/if}
+            {:else if fileUploadResults.length > 0}
+                <FileUploadResults results={fileUploadResults} />
             {/if}
 
             {#if showDebugInfo}

@@ -27,6 +27,7 @@
   "dependencies": {
     "@apollo/client": "^3.11.4",
     "cross-fetch": "^4.0.0",
+    "csv-parse": "^5.5.6",
     "graphql": "^16.9.0",
     "graphql-request": "^7.1.0"
   },
