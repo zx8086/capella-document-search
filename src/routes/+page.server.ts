@@ -8,9 +8,9 @@ import {
 } from "@apollo/client/core";
 import fetch from "cross-fetch";
 import type { Actions } from "./$types";
+import { error } from "@sveltejs/kit";
 
 const YOUR_GRAPHQL_ENDPOINT = "http://localhost:4000/graphql";
-
 const client = new ApolloClient({
   link: createHttpLink({ uri: YOUR_GRAPHQL_ENDPOINT, fetch }),
   cache: new InMemoryCache(),
@@ -84,6 +84,41 @@ export const actions: Actions = {
         error:
           error instanceof Error ? error.message : "An unknown error occurred",
       };
+    }
+  },
+
+  uploadFile: async ({ request }) => {
+    try {
+      const data = await request.formData();
+      const file = data.get("file") as File | null;
+      const collections = JSON.parse(data.get("collections") as string);
+
+      if (!file) {
+        throw error(400, "No file uploaded");
+      }
+
+      // Process the CSV file
+      const content = await file.text();
+      const documentKeys = content.split(",").map((key) => key.trim());
+
+      // Use the collections data to search for each document key
+      const results = await Promise.all(
+        documentKeys.map(async (key) => {
+          // Perform your search logic here using the key and collections
+          // Return the search result for each key
+        }),
+      );
+
+      return {
+        type: "success",
+        data: results,
+      };
+    } catch (e) {
+      console.error("Error in uploadFile action:", e);
+      throw error(
+        500,
+        e instanceof Error ? e.message : "An unknown error occurred",
+      );
     }
   },
 };
