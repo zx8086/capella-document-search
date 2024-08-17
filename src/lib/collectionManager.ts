@@ -9,16 +9,23 @@ interface Collection {
 export async function seedCollections() {
   try {
     const response = await fetch("/api/collections", { method: "POST" });
+    const result = await response.json();
+
     if (!response.ok) {
-      const errorText = await response.text();
+      console.error(
+        `Failed to seed collections. Status: ${response.status}, Error:`,
+        result,
+      );
       throw new Error(
-        `Failed to seed collections. Status: ${response.status}, Error: ${errorText}`,
+        `Failed to seed collections. Status: ${response.status}, Error: ${result.message || JSON.stringify(result)}`,
       );
     }
-    const result = await response.json();
+
     if (!result.success) {
+      console.error("Seeding collections failed:", result.message);
       throw new Error(result.message);
     }
+
     console.log(`Collections seeded successfully. Count: ${result.count}`);
   } catch (error) {
     console.error("Error seeding collections:", error);

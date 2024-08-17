@@ -5,7 +5,8 @@ import {
   initializeDatabase,
   insertScope,
   insertCollection,
-  getAllCollections,
+  insertTooltip,
+  getAllCollectionsWithTooltips,
 } from "$lib/db/dbOperations";
 import { getAllScopes } from "$lib/api";
 
@@ -16,6 +17,17 @@ export async function POST() {
     const scopesAndCollections = await getAllScopes();
     console.log("Received scopes and collections:", scopesAndCollections);
 
+    if (scopesAndCollections.length === 0) {
+      console.warn("No scopes and collections returned from API");
+      return json(
+        {
+          success: false,
+          message: "No scopes and collections available to seed",
+        },
+        { status: 404 },
+      );
+    }
+
     let insertedCount = 0;
     for (const item of scopesAndCollections) {
       console.log("Inserting item:", item);
@@ -25,28 +37,37 @@ export async function POST() {
         item.scope,
         item.collection,
       );
+      // Insert a mock tooltip for demonstration purposes
+      const tooltipResult = insertTooltip(
+        item.bucket,
+        item.scope,
+        item.collection,
+        `This is a mock tooltip for ${item.bucket}.${item.scope}.${item.collection}`,
+      );
       console.log("Scope insertion result:", scopeResult);
       console.log("Collection insertion result:", collectionResult);
+      console.log("Tooltip insertion result:", tooltipResult);
       insertedCount++;
     }
-
     console.log("Inserted items count:", insertedCount);
-
-    const allCollections = getAllCollections();
-    console.log("All collections after insertion:", allCollections);
-
+    const allCollections = getAllCollectionsWithTooltips();
+    console.log(
+      "All collections with tooltips after insertion:",
+      allCollections,
+    );
     return json({
       success: true,
-      message: "Collections seeded successfully",
+      message: "Collections and tooltips seeded successfully",
       count: insertedCount,
     });
   } catch (error) {
-    console.error("Error seeding collections:", error);
-    // @ts-ignore
+    console.error("Error seeding collections and tooltips:", error);
     return json(
       {
         success: false,
-        message: "Error seeding collections: " + error.message,
+        message:
+          "Error seeding collections and tooltips: " +
+          (error instanceof Error ? error.message : String(error)),
       },
       { status: 500 },
     );
@@ -57,11 +78,17 @@ export async function GET() {
   console.log("GET request received for collections");
   initializeDatabase();
   try {
-    const collections = getAllCollections();
-    console.log("Retrieved collections:", collections);
-    return json(collections);
+    const collectionsWithTooltips = getAllCollectionsWithTooltips();
+    console.log(
+      "Retrieved collections with tooltips:",
+      collectionsWithTooltips,
+    );
+    return json(collectionsWithTooltips);
   } catch (error) {
-    console.error("Error retrieving collections:", error);
-    return json({ error: "Failed to retrieve collections" }, { status: 500 });
+    console.error("Error retrieving collections with tooltips:", error);
+    return json(
+      { error: "Failed to retrieve collections with tooltips" },
+      { status: 500 },
+    );
   }
 }
