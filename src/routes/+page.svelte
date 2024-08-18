@@ -44,8 +44,8 @@
     }[buttonState];
 
     $: buttonText = {
-        ready: isSearchMode ? "Search" : "Upload",
-        searching: isSearchMode ? "Searching..." : "Uploading...",
+        ready: isSearchMode ? "Search" : "Search",
+        searching: isSearchMode ? "Searching..." : "Processing...",
         results: "Done",
     }[buttonState];
 
@@ -94,20 +94,21 @@
                                 "Unexpected search results structure",
                             );
                         }
+                        buttonState = "results";
                     } else {
                         if (Array.isArray(data)) {
                             fileUploadResults = data;
                             console.log(
                                 "File upload results:",
-                                fileUploadResults,
+                                JSON.stringify(fileUploadResults, null, 2),
                             );
                         } else {
                             throw new Error(
                                 "Unexpected file upload result structure",
                             );
                         }
+                        buttonState = "ready";
                     }
-                    buttonState = "results";
                 } catch (e) {
                     console.error("Error processing server response:", e);
                     errorMessage =
@@ -238,19 +239,11 @@
                 enctype="multipart/form-data"
             >
                 <!-- Search Bar / File Upload -->
-                <div class="w-full flex justify-center mb-4">
-                    <fieldset
-                        class="w-2/3 max-w-2xl relative flex items-center"
-                    >
-                        <label
-                            for={isSearchMode ? "documentKey" : "fileInput"}
-                            class="hidden"
-                        >
-                            {isSearchMode ? "Search" : "Upload File"}
-                        </label>
+                <div class="w-full flex flex-col items-center mb-4 relative">
+                    <div class="w-2/3 max-w-2xl relative">
                         {#if isSearchMode}
-                            <!-- Existing search input -->
-                            <div class="relative flex-grow">
+                            <!-- Search input -->
+                            <div class="relative w-full">
                                 <span
                                     class="absolute inset-y-0 left-0 flex items-center pl-3"
                                 >
@@ -266,7 +259,7 @@
                                         >
                                             <path
                                                 d="M479.6,399.716l-81.084-81.084-62.368-25.767A175.014,175.014,0,0,0,368,192c0-97.047-78.953-176-176-176S16,94.953,16,192,94.953,368,192,368a175.034,175.034,0,0,0,101.619-32.377l25.7,62.2L400.4,478.911a56,56,0,1,0,79.2-79.195ZM48,192c0-79.4,64.6-144,144-144s144,64.6,144,144S271.4,336,192,336,48,271.4,48,192ZM456.971,456.284a24.028,24.028,0,0,1-33.942,0l-76.572-76.572-23.894-57.835L380.4,345.771l76.573,76.572A24.028,24.028,0,0,1,456.971,456.284Z"
-                                            ></path>
+                                            />
                                         </svg>
                                     </button>
                                 </span>
@@ -285,16 +278,9 @@
                             </div>
                         {:else}
                             <!-- File upload input -->
-                            <div
-                                class="flex w-full max-w-xl text-center flex-col gap-1"
-                            >
-                                <span
-                                    class="w-fit pl-0.5 text-sm text-slate-700 dark:text-slate-300"
-                                >
-                                    Upload Document Keys
-                                </span>
+                            <div class="w-full">
                                 <div
-                                    class="flex w-full flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-slate-300 p-8 text-slate-700 dark:border-slate-700 dark:text-slate-300"
+                                    class="flex flex-col items-center justify-center gap-2 rounded-md border border-dashed border-slate-300 p-8 text-slate-700 dark:border-slate-700 dark:text-slate-300 bg-white"
                                 >
                                     <svg
                                         xmlns="http://www.w3.org/2000/svg"
@@ -323,25 +309,38 @@
                                                 accept=".csv"
                                                 on:change={handleFileChange}
                                             />
-                                            Browse
+                                            Upload
                                         </label>
-                                        or drag and drop here
+                                        a file to check here
                                     </div>
                                     <small id="validFileFormats"
                                         >CSV files only</small
                                     >
                                     {#if file}
-                                        <p class="mt-2 text-sm text-gray-500">
-                                            Selected file: {file.name}
+                                        <p class="mt-2 text-sm">
+                                            Selected file: <span
+                                                class="text-green-600 font-semibold"
+                                                >{file.name}</span
+                                            >
                                         </p>
                                     {/if}
                                 </div>
                             </div>
                         {/if}
+                    </div>
+
+                    <!-- Mode toggle and future icons -->
+                    <div
+                        class="absolute top-0 right-0 flex items-center space-x-2"
+                    >
+                        <!-- Add more icons here in the future -->
                         <button
                             type="button"
                             on:click={toggleMode}
-                            class="ml-2 p-2 bg-gray-200 rounded-full hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-tommy-red"
+                            class="p-2 bg-gray-200 rounded-full hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-tommy-red"
+                            title={isSearchMode
+                                ? "Switch to Upload Mode"
+                                : "Switch to Search Mode"}
                         >
                             <svg
                                 xmlns="http://www.w3.org/2000/svg"
@@ -358,7 +357,7 @@
                                 />
                             </svg>
                         </button>
-                    </fieldset>
+                    </div>
                 </div>
 
                 <!-- Collections Section -->
@@ -460,10 +459,12 @@
                 <div class="flex justify-center">
                     <button
                         type="submit"
-                        disabled={buttonState === "searching" ||
-                            buttonState === "results"}
+                        disabled={isSearchMode
+                            ? buttonState === "searching" ||
+                              buttonState === "results"
+                            : buttonState === "searching"}
                         class="{buttonClass} w-full sm:w-auto px-6 py-2 min-w-[150px] bg-[#00174f] text-white rounded-md hover:bg-[#00174f]/80 transition duration-150 ease-in-out {buttonState ===
-                        'results'
+                            'results' && isSearchMode
                             ? 'opacity-50 cursor-not-allowed'
                             : ''}"
                     >
