@@ -7,9 +7,12 @@ import {
   gql,
 } from "@apollo/client/core";
 import fetch from "cross-fetch";
-import type { Actions } from "./$types";
+import type { Actions, PageServerLoad } from "./$types";
 import { error } from "@sveltejs/kit";
-import { getFormattedCollections } from "$lib/db/dbOperations";
+import {
+  getFormattedCollections,
+  initializeDatabase,
+} from "$lib/db/dbOperations";
 
 const YOUR_GRAPHQL_ENDPOINT = "http://localhost:4000/graphql";
 const client = new ApolloClient({
@@ -17,7 +20,12 @@ const client = new ApolloClient({
   cache: new InMemoryCache(),
 });
 
-const collections = getFormattedCollections();
+initializeDatabase();
+
+export const load: PageServerLoad = async () => {
+  const collections = getFormattedCollections();
+  return { collections };
+};
 
 export const actions: Actions = {
   searchDocuments: async ({ request }) => {
@@ -60,7 +68,7 @@ export const actions: Actions = {
           collections: formattedCollections,
           keys,
         },
-        fetchPolicy: "no-cache", // Disable caching for this query
+        fetchPolicy: "no-cache",
       });
 
       console.log("GraphQL Response:", response.data);
@@ -101,6 +109,9 @@ export const actions: Actions = {
       const content = await file.text();
       const documentKeys = content.split(",").map((key) => key.trim());
       console.log("Document keys extracted:", documentKeys);
+
+      // Get the collections here, inside the action
+      const collections = getFormattedCollections();
 
       // Use all collections to search for each document key
       const results = await Promise.all(
@@ -174,7 +185,3 @@ export const actions: Actions = {
     }
   },
 };
-
-export function load() {
-  return { collections };
-}

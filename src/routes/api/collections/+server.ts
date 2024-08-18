@@ -7,16 +7,18 @@ import {
   insertCollection,
   insertTooltip,
   getAllCollectionsWithTooltips,
+  getDatabase,
 } from "$lib/db/dbOperations";
 import { getAllScopes } from "$lib/api";
 
 export async function POST() {
   console.log("POST request received for collections");
   initializeDatabase();
+  const db = getDatabase();
+
   try {
     const scopesAndCollections = await getAllScopes();
     console.log("Received scopes and collections:", scopesAndCollections);
-
     if (scopesAndCollections.length === 0) {
       console.warn("No scopes and collections returned from API");
       return json(
@@ -29,26 +31,31 @@ export async function POST() {
     }
 
     let insertedCount = 0;
-    for (const item of scopesAndCollections) {
-      console.log("Inserting item:", item);
-      const scopeResult = insertScope(item.bucket, item.scope);
-      const collectionResult = insertCollection(
-        item.bucket,
-        item.scope,
-        item.collection,
-      );
-      // Insert a mock tooltip for demonstration purposes
-      const tooltipResult = insertTooltip(
-        item.bucket,
-        item.scope,
-        item.collection,
-        `This is a mock tooltip for ${item.bucket}.${item.scope}.${item.collection}`,
-      );
-      console.log("Scope insertion result:", scopeResult);
-      console.log("Collection insertion result:", collectionResult);
-      console.log("Tooltip insertion result:", tooltipResult);
-      insertedCount++;
-    }
+
+    // Use a transaction for atomicity
+    db.transaction(() => {
+      for (const item of scopesAndCollections) {
+        console.log("Inserting item:", item);
+        const scopeResult = insertScope(item.bucket, item.scope);
+        const collectionResult = insertCollection(
+          item.bucket,
+          item.scope,
+          item.collection,
+        );
+        // Insert a mock tooltip for demonstration purposes
+        const tooltipResult = insertTooltip(
+          item.bucket,
+          item.scope,
+          item.collection,
+          `This is a mock tooltip for ${item.bucket}.${item.scope}.${item.collection}`,
+        );
+        console.log("Scope insertion result:", scopeResult);
+        console.log("Collection insertion result:", collectionResult);
+        console.log("Tooltip insertion result:", tooltipResult);
+        insertedCount++;
+      }
+    })();
+
     console.log("Inserted items count:", insertedCount);
     const allCollections = getAllCollectionsWithTooltips();
     console.log(
@@ -75,6 +82,7 @@ export async function POST() {
 }
 
 export async function GET() {
+  // GET function remains unchanged
   console.log("GET request received for collections");
   initializeDatabase();
   try {

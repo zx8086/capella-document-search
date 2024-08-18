@@ -1,8 +1,15 @@
 /* src/lib/db/dbOperations.ts */
 
-import { Database } from "bun:sqlite";
+import { Database, Statement } from "bun:sqlite";
 
 let db: Database | null = null;
+let insertScopeStmt: Statement | null = null;
+let insertCollectionStmt: Statement | null = null;
+let insertTooltipStmt: Statement | null = null;
+let getTooltipStmt: Statement | null = null;
+let getAllCollectionsStmt: Statement | null = null;
+let getFormattedCollectionsStmt: Statement | null = null;
+let getAllCollectionsWithTooltipsStmt: Statement | null = null;
 
 export function initializeDatabase() {
   if (!db) {
@@ -31,7 +38,39 @@ export function initializeDatabase() {
         REFERENCES collections (bucket, scope_name, collection_name)
       );
     `);
-    console.log("Database initialized");
+
+    // Prepare statements after database is initialized
+    insertScopeStmt = db.prepare(
+      "INSERT OR REPLACE INTO scopes (bucket, scope_name) VALUES (?, ?)",
+    );
+    insertCollectionStmt = db.prepare(
+      "INSERT OR REPLACE INTO collections (bucket, scope_name, collection_name) VALUES (?, ?, ?)",
+    );
+    insertTooltipStmt = db.prepare(
+      "INSERT OR REPLACE INTO tooltips (bucket, scope_name, collection_name, tooltip_content) VALUES (?, ?, ?, ?)",
+    );
+    getTooltipStmt = db.prepare(
+      "SELECT tooltip_content FROM tooltips WHERE bucket = ? AND scope_name = ? AND collection_name = ?",
+    );
+    getAllCollectionsStmt = db.prepare(`
+      SELECT c.bucket, c.scope_name, c.collection_name
+      FROM collections c
+      JOIN scopes s ON c.bucket = s.bucket AND c.scope_name = s.scope_name
+    `);
+    getFormattedCollectionsStmt = db.prepare(`
+      SELECT c.bucket, c.scope_name as scope, c.collection_name as collection
+      FROM collections c
+      JOIN scopes s ON c.bucket = s.bucket AND c.scope_name = s.scope_name
+      ORDER BY c.bucket, c.scope_name, c.collection_name
+    `);
+    getAllCollectionsWithTooltipsStmt = db.prepare(`
+      SELECT c.bucket, c.scope_name, c.collection_name, t.tooltip_content
+      FROM collections c
+      LEFT JOIN tooltips t ON c.bucket = t.bucket AND c.scope_name = t.scope_name AND c.collection_name = t.collection_name
+      JOIN scopes s ON c.bucket = s.bucket AND c.scope_name = s.scope_name
+    `);
+
+    console.log("Database and prepared statements initialized");
   }
   return db;
 }
@@ -44,11 +83,10 @@ export function getDatabase() {
 }
 
 export function insertScope(bucket: string, scopeName: string) {
-  const db = getDatabase();
-  const stmt = db.prepare(
-    "INSERT OR REPLACE INTO scopes (bucket, scope_name) VALUES (?, ?)",
-  );
-  const result = stmt.run(bucket, scopeName);
+  if (!insertScopeStmt) {
+    throw new Error("Database not initialized");
+  }
+  const result = insertScopeStmt.run(bucket, scopeName);
   console.log(`Inserted scope: ${bucket}.${scopeName}, Result:`, result);
   return result;
 }
@@ -58,11 +96,10 @@ export function insertCollection(
   scopeName: string,
   collectionName: string,
 ) {
-  const db = getDatabase();
-  const stmt = db.prepare(
-    "INSERT OR REPLACE INTO collections (bucket, scope_name, collection_name) VALUES (?, ?, ?)",
-  );
-  const result = stmt.run(bucket, scopeName, collectionName);
+  if (!insertCollectionStmt) {
+    throw new Error("Database not initialized");
+  }
+  const result = insertCollectionStmt.run(bucket, scopeName, collectionName);
   console.log(
     `Inserted collection: ${bucket}.${scopeName}.${collectionName}, Result:`,
     result,
@@ -71,31 +108,27 @@ export function insertCollection(
 }
 
 export function getAllCollections() {
-  const db = getDatabase();
-  const stmt = db.prepare(`
-    SELECT c.bucket, c.scope_name, c.collection_name
-    FROM collections c
-    JOIN scopes s ON c.bucket = s.bucket AND c.scope_name = s.scope_name
-  `);
-  const results = stmt.all();
-  console.log("Retrieved collections:", results);
+  if (!getAllCollectionsStmt) {
+    throw new Error("Database not initialized");
+  }
+  const results = getAllCollectionsStmt.all();
+  console.log("Retrieved collections - function getAllCollections:", results);
   return results;
 }
 
 export function getFormattedCollections() {
-  const db = getDatabase();
-  const stmt = db.prepare(`
-    SELECT c.bucket, c.scope_name as scope, c.collection_name as collection
-    FROM collections c
-    JOIN scopes s ON c.bucket = s.bucket AND c.scope_name = s.scope_name
-    ORDER BY c.bucket, c.scope_name, c.collection_name
-  `);
-  const results = stmt.all() as Array<{
+  if (!getFormattedCollectionsStmt) {
+    throw new Error("Database not initialized");
+  }
+  const results = getFormattedCollectionsStmt.all() as Array<{
     bucket: string;
     scope: string;
     collection: string;
   }>;
-  console.log("Retrieved formatted collections:", results);
+  console.log(
+    "Retrieved formatted collections - function getFormattedCollections:",
+    results,
+  );
   return results;
 }
 
@@ -105,11 +138,15 @@ export function insertTooltip(
   collectionName: string,
   tooltipContent: string,
 ) {
-  const db = getDatabase();
-  const stmt = db.prepare(
-    "INSERT OR REPLACE INTO tooltips (bucket, scope_name, collection_name, tooltip_content) VALUES (?, ?, ?, ?)",
+  if (!insertTooltipStmt) {
+    throw new Error("Database not initialized");
+  }
+  const result = insertTooltipStmt.run(
+    bucket,
+    scopeName,
+    collectionName,
+    tooltipContent,
   );
-  const result = stmt.run(bucket, scopeName, collectionName, tooltipContent);
   console.log(
     `Inserted tooltip for: ${bucket}.${scopeName}.${collectionName}, Result:`,
     result,
@@ -122,23 +159,21 @@ export function getTooltip(
   scopeName: string,
   collectionName: string,
 ) {
-  const db = getDatabase();
-  const stmt = db.prepare(
-    "SELECT tooltip_content FROM tooltips WHERE bucket = ? AND scope_name = ? AND collection_name = ?",
-  );
-  const result = stmt.get(bucket, scopeName, collectionName);
+  if (!getTooltipStmt) {
+    throw new Error("Database not initialized");
+  }
+  const result = getTooltipStmt.get(bucket, scopeName, collectionName);
   return result ? result.tooltip_content : null;
 }
 
 export function getAllCollectionsWithTooltips() {
-  const db = getDatabase();
-  const stmt = db.prepare(`
-    SELECT c.bucket, c.scope_name, c.collection_name, t.tooltip_content
-    FROM collections c
-    LEFT JOIN tooltips t ON c.bucket = t.bucket AND c.scope_name = t.scope_name AND c.collection_name = t.collection_name
-    JOIN scopes s ON c.bucket = s.bucket AND c.scope_name = s.scope_name
-  `);
-  const results = stmt.all();
-  console.log("Retrieved collections with tooltips:", results);
+  if (!getAllCollectionsWithTooltipsStmt) {
+    throw new Error("Database not initialized");
+  }
+  const results = getAllCollectionsWithTooltipsStmt.all();
+  console.log(
+    "Retrieved collections with tooltips - function getAllCollectionsWithTooltips:",
+    results,
+  );
   return results;
 }
