@@ -1,15 +1,23 @@
 <!-- src/lib/components/FileUploadResults.svelte -->
 
 <script lang="ts">
+    import { onMount } from "svelte";
+
     type DetailedResult = {
         documentKey: string;
         found: boolean;
-        collections: {
+        foundIn: {
             bucket: string;
             scope: string;
             collection: string;
             timeTaken: number;
         }[];
+        notFoundIn: {
+            bucket: string;
+            scope: string;
+            collection: string;
+        }[];
+        totalCollectionsSearched: number;
     };
     type SimpleResult = {
         message: string;
@@ -20,6 +28,33 @@
     ): result is DetailedResult {
         return "documentKey" in result;
     }
+
+    function handleToggle(event: Event) {
+        const details = event.target as HTMLDetailsElement;
+        const icon = details.querySelector("svg");
+        if (icon) {
+            if (details.open) {
+                icon.innerHTML =
+                    '<path stroke-linecap="round" stroke-linejoin="round" d="m4.5 5.25 7.5 7.5 7.5-7.5m-15 6 7.5 7.5 7.5-7.5" />';
+            } else {
+                icon.innerHTML =
+                    '<path stroke-linecap="round" stroke-linejoin="round" d="m5.25 4.5 7.5 7.5-7.5 7.5m6-15 7.5 7.5-7.5 7.5" />';
+            }
+        }
+    }
+
+    onMount(() => {
+        const detailsElements = document.querySelectorAll("details");
+        detailsElements.forEach((details) => {
+            details.addEventListener("toggle", handleToggle);
+        });
+
+        return () => {
+            detailsElements.forEach((details) => {
+                details.removeEventListener("toggle", handleToggle);
+            });
+        };
+    });
 </script>
 
 <div class="mt-16">
@@ -38,9 +73,14 @@
                         Status
                     </th>
                     <th
-                        class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                        class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-1/4"
                     >
-                        Collections Found
+                        Found In
+                    </th>
+                    <th
+                        class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-1/4"
+                    >
+                        Search Summary
                     </th>
                 </tr>
             </thead>
@@ -67,15 +107,91 @@
                                 {/if}
                             </td>
                             <td class="px-6 py-4">
-                                {#if result.found}
-                                    <ul class="list-disc list-inside">
-                                        {#each result.collections as collection}
-                                            <li>
-                                                {collection.bucket}/{collection.scope}/{collection.collection}
-                                                (Time: {collection.timeTaken}ms)
-                                            </li>
-                                        {/each}
-                                    </ul>
+                                {#if result.foundIn.length > 0}
+                                    <p>
+                                        Found in {result.foundIn.length} of {result.totalCollectionsSearched}
+                                        collections searched
+                                    </p>
+                                    <details class="mt-2">
+                                        <summary
+                                            class="cursor-pointer text-blue-600 hover:text-blue-800 flex items-center"
+                                        >
+                                            <svg
+                                                xmlns="http://www.w3.org/2000/svg"
+                                                fill="none"
+                                                viewBox="0 0 24 24"
+                                                stroke-width="1.5"
+                                                stroke="currentColor"
+                                                class="w-4 h-4 mr-1 inline-block"
+                                            >
+                                                <path
+                                                    stroke-linecap="round"
+                                                    stroke-linejoin="round"
+                                                    d="m5.25 4.5 7.5 7.5-7.5 7.5m6-15 7.5 7.5-7.5 7.5"
+                                                />
+                                            </svg>
+                                            <span>View found collections</span>
+                                        </summary>
+                                        <div class="mt-2 ml-4 max-w-md">
+                                            <ul class="list-disc list-inside">
+                                                {#each result.foundIn as collection}
+                                                    <li
+                                                        class="text-sm text-gray-600"
+                                                    >
+                                                        {collection.bucket}/{collection.scope}/{collection.collection}
+                                                        (Time: {collection.timeTaken}ms)
+                                                    </li>
+                                                {/each}
+                                            </ul>
+                                        </div>
+                                    </details>
+                                {:else}
+                                    <span class="text-gray-500"
+                                        >Not found in any collection</span
+                                    >
+                                {/if}
+                            </td>
+                            <td class="px-6 py-4">
+                                <p>
+                                    Found in {result.foundIn.length} of {result.totalCollectionsSearched}
+                                    collections searched
+                                </p>
+                                {#if result.notFoundIn.length > 0}
+                                    <details class="mt-2">
+                                        <summary
+                                            class="cursor-pointer text-blue-600 hover:text-blue-800 flex items-center"
+                                        >
+                                            <svg
+                                                xmlns="http://www.w3.org/2000/svg"
+                                                fill="none"
+                                                viewBox="0 0 24 24"
+                                                stroke-width="1.5"
+                                                stroke="currentColor"
+                                                class="w-4 h-4 mr-1 inline-block"
+                                            >
+                                                <path
+                                                    stroke-linecap="round"
+                                                    stroke-linejoin="round"
+                                                    d="m5.25 4.5 7.5 7.5-7.5 7.5m6-15 7.5 7.5-7.5 7.5"
+                                                />
+                                            </svg>
+                                            <span
+                                                >View collections where not
+                                                found</span
+                                            >
+                                        </summary>
+                                        <div class="mt-2 ml-4 max-w-md">
+                                            <ul class="list-disc list-inside">
+                                                {#each result.notFoundIn as collection}
+                                                    <li
+                                                        class="text-sm text-gray-600"
+                                                    >
+                                                        {collection.bucket}/{collection.scope}/{collection.collection}
+                                                    </li>
+                                                {/each}
+                                            </ul>
+                                        </div>
+                                    </details>
                                 {/if}
                             </td>
                         </tr>
