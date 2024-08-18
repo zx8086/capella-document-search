@@ -9,6 +9,7 @@ import {
 import fetch from "cross-fetch";
 import type { Actions } from "./$types";
 import { error } from "@sveltejs/kit";
+import { getFormattedCollections } from "$lib/db/dbOperations";
 
 const YOUR_GRAPHQL_ENDPOINT = "http://localhost:4000/graphql";
 const client = new ApolloClient({
@@ -16,72 +17,21 @@ const client = new ApolloClient({
   cache: new InMemoryCache(),
 });
 
-// Mock collections data
-const mockCollections = [
-  { bucket: "default", scope: "prices", collection: "prices" },
-  { bucket: "default", scope: "order", collection: "archived-orders" },
-  { bucket: "default", scope: "order", collection: "archived-order-items" },
-  { bucket: "default", scope: "new_model", collection: "seasonal_assignment" },
-  { bucket: "default", scope: "new_model", collection: "product2g" },
-  { bucket: "default", scope: "new_model", collection: "variant" },
-  { bucket: "default", scope: "new_model", collection: "article" },
-  { bucket: "default", scope: "seasons", collection: "retry_notifications" },
-  { bucket: "default", scope: "seasons", collection: "delivery_dates_import" },
-  { bucket: "default", scope: "seasons", collection: "delivery_dates" },
-  { bucket: "default", scope: "seasons", collection: "dates_import" },
-  { bucket: "default", scope: "seasons", collection: "dates" },
-  {
-    bucket: "default",
-    scope: "brands_divisions",
-    collection: "retry_notifications",
-  },
-  {
-    bucket: "default",
-    scope: "brands_divisions",
-    collection: "brands_divisions",
-  },
-  { bucket: "default", scope: "eventing", collection: "metadata" },
-  { bucket: "default", scope: "media_assets", collection: "images" },
-  {
-    bucket: "default",
-    scope: "media_assets",
-    collection: "retry_notifications",
-  },
-  { bucket: "default", scope: "media_assets", collection: "look_items" },
-  { bucket: "default", scope: "styles", collection: "prepacks" },
-  {
-    bucket: "default",
-    scope: "styles",
-    collection: "retry_rich_notifications",
-  },
-  { bucket: "default", scope: "styles", collection: "distribution_curves" },
-  { bucket: "default", scope: "styles", collection: "retry_notifications" },
-  { bucket: "default", scope: "styles", collection: "eventing" },
-  { bucket: "default", scope: "styles", collection: "variant" },
-  { bucket: "default", scope: "styles", collection: "article" },
-  { bucket: "default", scope: "styles", collection: "product2g" },
-  { bucket: "default", scope: "styles_notifications", collection: "retry" },
-  { bucket: "default", scope: "styles_notifications", collection: "metadata" },
-  { bucket: "default", scope: "customer", collection: "assignments" },
-  { bucket: "default", scope: "customer", collection: "sales-organizations" },
-  { bucket: "default", scope: "customer", collection: "customers" },
-  { bucket: "default", scope: "_default", collection: "_default" },
-  { bucket: "default", scope: "_default", collection: "data_merge_check" },
-];
+const collections = getFormattedCollections();
 
 export const actions: Actions = {
   searchDocuments: async ({ request }) => {
     try {
       const data = await request.formData();
-      const collections = JSON.parse(data.get("collections") as string);
+      const selectedCollections = JSON.parse(data.get("collections") as string);
       const documentKey = data.get("documentKey") as string;
       const keys = [documentKey];
 
-      console.log("Collections:", collections);
+      console.log("Selected Collections:", selectedCollections);
       console.log("Keys:", keys);
 
       // Ensure collections are in the correct format
-      const formattedCollections = collections.map(
+      const formattedCollections = selectedCollections.map(
         ({ bucket, scope_name, collection_name }) => ({
           bucket,
           scope: scope_name,
@@ -174,7 +124,7 @@ export const actions: Actions = {
           const response = await client.query({
             query,
             variables: {
-              collections: mockCollections,
+              collections,
               keys: [key],
             },
             fetchPolicy: "no-cache",
@@ -224,3 +174,7 @@ export const actions: Actions = {
     }
   },
 };
+
+export function load() {
+  return { collections };
+}
