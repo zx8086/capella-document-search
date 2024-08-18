@@ -7,6 +7,7 @@
     import { onMount } from "svelte";
     import { getCollections } from "$lib/collectionManager";
     import FileUploadResults from "$lib/components/FileUploadResults.svelte";
+    import { toast } from "svelte-sonner";
 
     let showDebugInfo = false;
     let debugInfo = "";
@@ -42,12 +43,6 @@
         searching: "cursor-not-allowed",
         results: "cursor-not-allowed",
     }[buttonState];
-
-    // $: buttonText = {
-    //     ready: isSearchMode ? "Search" : "Search",
-    //     searching: isSearchMode ? "Searching..." : "Processing...",
-    //     results: "Done",
-    // }[buttonState];
 
     $: buttonText = {
         ready: isSearchMode ? "Search" : file ? "Search" : "Upload a file",
@@ -98,6 +93,15 @@
                         if (data && data.data && data.data.searchDocuments) {
                             searchResults = data.data.searchDocuments;
                             console.log("Search results:", searchResults);
+                            if (searchResults.length === 0) {
+                                toast.error(
+                                    "No results found for the given document key.",
+                                    {
+                                        duration: Infinity,
+                                        class: "!bg-red-100 !text-red-800 !font-medium",
+                                    },
+                                );
+                            }
                         } else {
                             throw new Error(
                                 "Unexpected search results structure",
@@ -120,12 +124,13 @@
                     }
                 } catch (e) {
                     console.error("Error processing server response:", e);
-                    errorMessage =
-                        "Error processing server response: " + e.message;
+                    toast.error(
+                        "Error processing server response: " + e.message,
+                    );
                     buttonState = "ready";
                 }
             } else if (result.type === "error") {
-                errorMessage = result.error;
+                toast.error(result.error);
                 buttonState = "ready";
             }
             processing = false;
@@ -535,10 +540,6 @@
                             {documentKey}
                         />
                     {/each}
-                {:else if !processing && documentKey && searchPerformed}
-                    <p class="mt-4">
-                        No results found for the given document key.
-                    </p>
                 {/if}
             {:else if fileUploadResults.length > 0}
                 <FileUploadResults results={fileUploadResults} />

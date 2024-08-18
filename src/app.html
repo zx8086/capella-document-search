@@ -4,6 +4,32 @@
         <meta charset="utf-8" />
         <link rel="icon" href="%sveltekit.assets%/favicon.png" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <!-- Load Elastic APM script -->
+        <script src="/elastic-apm-rum.umd.js"></script>
+        <script type="text/javascript">
+            // Initialize Elastic APM
+            if (window.elasticApm) {
+                try {
+                    window.elasticApm.init({
+                        serviceName: "Couchbase Capella Document Search",
+                        serverUrl: "https://apm.siobytes.com",
+                        serviceVersion: "1.0.0",
+                        environment: "development",
+                        logLevel: "debug",
+                        breakdownMetrics: true,
+                        centralConfig: true,
+                        distributedTracingOrigins: ["http://localhost:5173"],
+                    });
+                    console.log("Elastic APM initialized.");
+                } catch (e) {
+                    console.error("Error initializing Elastic APM RUM:", e);
+                }
+            } else {
+                console.error(
+                    "Elastic APM RUM script loaded but window.elasticApm is undefined.",
+                );
+            }
+        </script>
         %sveltekit.head%
         <script
             defer
