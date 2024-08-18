@@ -43,9 +43,15 @@
         results: "cursor-not-allowed",
     }[buttonState];
 
+    // $: buttonText = {
+    //     ready: isSearchMode ? "Search" : "Search",
+    //     searching: isSearchMode ? "Searching..." : "Processing...",
+    //     results: "Done",
+    // }[buttonState];
+
     $: buttonText = {
-        ready: isSearchMode ? "Search" : "Search",
-        searching: isSearchMode ? "Searching..." : "Processing...",
+        ready: isSearchMode ? "Search" : file ? "Search" : "Upload a file",
+        searching: isSearchMode ? "Searching..." : "Searching...",
         results: "Done",
     }[buttonState];
 
@@ -71,6 +77,8 @@
         }
     }
 
+    let isLoading = false;
+
     function handleSubmit(event) {
         buttonState = "searching";
         processing = true;
@@ -78,6 +86,7 @@
         searchResults = [];
         fileUploadResults = [];
         searchPerformed = true;
+        isLoading = true;
 
         return async ({ result }) => {
             console.log("Form submission result:", result);
@@ -107,7 +116,7 @@
                                 "Unexpected file upload result structure",
                             );
                         }
-                        buttonState = "ready";
+                        buttonState = "results"; // Change this from "ready" to "results"
                     }
                 } catch (e) {
                     console.error("Error processing server response:", e);
@@ -120,6 +129,7 @@
                 buttonState = "ready";
             }
             processing = false;
+            isLoading = false;
         };
     }
 
@@ -280,26 +290,33 @@
                             <!-- File upload input -->
                             <div class="w-full">
                                 <div
-                                    class="flex flex-col items-center justify-center gap-2 rounded-md border border-dashed border-slate-300 p-8 text-slate-700 dark:border-slate-700 dark:text-slate-300 bg-white"
+                                    class="flex flex-col items-center justify-center gap-2 rounded-md border border-dashed border-slate-300 p-8 text-slate-700 dark:border-slate-700 dark:text-slate-300 bg-white min-h-[150px] relative"
                                 >
-                                    <svg
-                                        xmlns="http://www.w3.org/2000/svg"
-                                        viewBox="0 0 24 24"
-                                        aria-hidden="true"
-                                        fill="currentColor"
-                                        class="w-12 h-12 opacity-75"
+                                    <div
+                                        class="flex flex-col items-center justify-center h-full"
                                     >
-                                        <path
-                                            fill-rule="evenodd"
-                                            d="M10.5 3.75a6 6 0 0 0-5.98 6.496A5.25 5.25 0 0 0 6.75 20.25H18a4.5 4.5 0 0 0 2.206-8.423 3.75 3.75 0 0 0-4.133-4.303A6.001 6.001 0 0 0 10.5 3.75Zm2.03 5.47a.75.75 0 0 0-1.06 0l-3 3a.75.75 0 1 0 1.06 1.06l1.72-1.72v4.94a.75.75 0 0 0 1.5 0v-4.94l1.72 1.72a.75.75 0 1 0 1.06-1.06l-3-3Z"
-                                            clip-rule="evenodd"
-                                        />
-                                    </svg>
-                                    <div class="group">
                                         <label
                                             for="fileInput"
-                                            class="cursor-pointer font-medium text-blue-700 group-focus-within:underline dark:text-blue-600"
+                                            class="cursor-pointer flex flex-col items-center group"
                                         >
+                                            <svg
+                                                xmlns="http://www.w3.org/2000/svg"
+                                                viewBox="0 0 24 24"
+                                                aria-hidden="true"
+                                                fill="currentColor"
+                                                class="w-12 h-12 opacity-75 mb-2 group-hover:opacity-100 transition-opacity"
+                                            >
+                                                <path
+                                                    fill-rule="evenodd"
+                                                    d="M10.5 3.75a6 6 0 0 0-5.98 6.496A5.25 5.25 0 0 0 6.75 20.25H18a4.5 4.5 0 0 0 2.206-8.423 3.75 3.75 0 0 0-4.133-4.303A6.001 6.001 0 0 0 10.5 3.75Zm2.03 5.47a.75.75 0 0 0-1.06 0l-3 3a.75.75 0 1 0 1.06 1.06l1.72-1.72v4.94a.75.75 0 0 0 1.5 0v-4.94l1.72 1.72a.75.75 0 1 0 1.06-1.06l-3-3Z"
+                                                    clip-rule="evenodd"
+                                                />
+                                            </svg>
+                                            <span
+                                                class="font-medium text-blue-700 group-hover:underline dark:text-blue-600"
+                                            >
+                                                Upload
+                                            </span>
                                             <input
                                                 id="fileInput"
                                                 name="file"
@@ -309,20 +326,27 @@
                                                 accept=".csv"
                                                 on:change={handleFileChange}
                                             />
-                                            Upload
                                         </label>
-                                        a file to check here
+                                        <span class="mt-1"
+                                            >a file with Document keys to check
+                                            here</span
+                                        >
+                                        <small
+                                            id="validFileFormats"
+                                            class="text-xs mt-1"
+                                            >CSV files only</small
+                                        >
                                     </div>
-                                    <small id="validFileFormats"
-                                        >CSV files only</small
-                                    >
+
                                     {#if file}
-                                        <p class="mt-2 text-sm">
+                                        <div
+                                            class="absolute bottom-2 left-2 right-2 text-xs bg-white bg-opacity-80 p-1 rounded truncate"
+                                        >
                                             Selected file: <span
-                                                class="text-green-600 font-semibold"
+                                                class="font-semibold text-green-600"
                                                 >{file.name}</span
                                             >
-                                        </p>
+                                        </div>
                                     {/if}
                                 </div>
                             </div>
@@ -462,12 +486,32 @@
                         disabled={isSearchMode
                             ? buttonState === "searching" ||
                               buttonState === "results"
-                            : buttonState === "searching"}
-                        class="{buttonClass} w-full sm:w-auto px-6 py-2 min-w-[150px] bg-[#00174f] text-white rounded-md hover:bg-[#00174f]/80 transition duration-150 ease-in-out {buttonState ===
-                            'results' && isSearchMode
+                            : buttonState === "searching" ||
+                              buttonState === "results" ||
+                              !file}
+                        class="{buttonClass} w-full sm:w-auto px-6 py-2 min-w-[150px] bg-[#00174f] text-white rounded-md hover:bg-[#00174f]/80 transition duration-150 ease-in-out {(buttonState ===
+                            'results' &&
+                            isSearchMode) ||
+                        (!isSearchMode && (!file || buttonState === 'results'))
                             ? 'opacity-50 cursor-not-allowed'
-                            : ''}"
+                            : ''} flex items-center justify-center"
                     >
+                        {#if isLoading}
+                            <svg
+                                xmlns="http://www.w3.org/2000/svg"
+                                viewBox="0 0 24 24"
+                                aria-hidden="true"
+                                class="size-4 fill-white motion-safe:animate-spin mr-2"
+                            >
+                                <path
+                                    d="M12,1A11,11,0,1,0,23,12,11,11,0,0,0,12,1Zm0,19a8,8,0,1,1,8-8A8,8,0,0,1,12,20Z"
+                                    opacity=".25"
+                                />
+                                <path
+                                    d="M10.14,1.16a11,11,0,0,0-9,8.92A1.59,1.59,0,0,0,2.46,12,1.52,1.52,0,0,0,4.11,10.7a8,8,0,0,1,6.66-6.61A1.42,1.42,0,0,0,12,2.69h0A1.57,1.57,0,0,0,10.14,1.16Z"
+                                />
+                            </svg>
+                        {/if}
                         {buttonText}
                     </button>
                 </div>
