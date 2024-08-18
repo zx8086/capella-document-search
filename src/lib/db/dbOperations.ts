@@ -82,6 +82,23 @@ export function getAllCollections() {
   return results;
 }
 
+export function getFormattedCollections() {
+  const db = getDatabase();
+  const stmt = db.prepare(`
+    SELECT c.bucket, c.scope_name as scope, c.collection_name as collection
+    FROM collections c
+    JOIN scopes s ON c.bucket = s.bucket AND c.scope_name = s.scope_name
+    ORDER BY c.bucket, c.scope_name, c.collection_name
+  `);
+  const results = stmt.all() as Array<{
+    bucket: string;
+    scope: string;
+    collection: string;
+  }>;
+  console.log("Retrieved formatted collections:", results);
+  return results;
+}
+
 export function insertTooltip(
   bucket: string,
   scopeName: string,
