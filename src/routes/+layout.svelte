@@ -5,6 +5,7 @@
     import "../app.css";
     import * as Drawer from "$lib/components/ui/drawer";
     import { Button } from "$lib/components/ui/button";
+    import { Toaster } from "$lib/components/ui/sonner";
 
     let quotes = [
         {
@@ -27,6 +28,9 @@
         },
         {
             text: "The way you do anything, is the way you do everything !",
+        },
+        {
+            text: "Speed = Productivity !",
         },
     ];
 
@@ -76,6 +80,24 @@
 
     <!-- Main Content -->
     <main class="flex-grow">
+        <Toaster
+            richColors
+            closeButton
+            position="bottom-right"
+            toastOptions={{
+                classNames: {
+                    toast: "bg-white dark:bg-gray-800 text-gray-900 dark:text-white",
+                    title: "font-medium text-base",
+                    description: "text-sm",
+                    actionButton: "bg-[#00174f] text-white",
+                    cancelButton: "bg-gray-200 text-gray-900",
+                    closeButton:
+                        "text-gray-400 hover:text-gray-900 dark:hover:text-white",
+                },
+                class: "!p-4 !min-w-[300px] !rounded-lg !shadow-lg !font-sans",
+                style: "font-size: 32px;",
+            }}
+        />
         <slot />
     </main>
 
@@ -98,7 +120,7 @@
                                 >B2B Platform Engineering</Drawer.Title
                             >
                             <Drawer.Description class="text-gray-300"
-                                >Our team's motto</Drawer.Description
+                                >Mottos we work by...</Drawer.Description
                             >
                         </Drawer.Header>
                         <div class="p-4 h-full flex flex-col">
