@@ -194,6 +194,8 @@ export const actions: Actions = {
         }),
       );
 
+      console.log("File upload results:", results); // Add this line for debugging
+
       return results;
     } catch (e) {
       console.error("Error in uploadFile action:", e);

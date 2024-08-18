@@ -22,8 +22,7 @@
     }
 </script>
 
-<div class="mt-4">
-    <h2 class="text-xl font-bold mb-4">File Upload Results</h2>
+<div class="mt-16">
     {#if results.length > 0 && isDetailedResult(results[0])}
         <table class="min-w-full divide-y divide-gray-200">
             <thead class="bg-gray-50">
