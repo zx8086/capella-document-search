@@ -23,6 +23,19 @@
         message: string;
     };
     export let results: (DetailedResult | SimpleResult)[];
+
+    let foundCount = 0;
+    let notFoundCount = 0;
+
+    $: {
+        foundCount = results.filter(
+            (r) => isDetailedResult(r) && r.found,
+        ).length;
+        notFoundCount = results.filter(
+            (r) => isDetailedResult(r) && !r.found,
+        ).length;
+    }
+
     function isDetailedResult(
         result: DetailedResult | SimpleResult,
     ): result is DetailedResult {
@@ -40,6 +53,35 @@
                 icon.innerHTML =
                     '<path stroke-linecap="round" stroke-linejoin="round" d="m5.25 4.5 7.5 7.5-7.5 7.5m6-15 7.5 7.5-7.5 7.5" />';
             }
+        }
+    }
+
+    function downloadCSV(type: "found" | "notFound") {
+        const filteredResults = results.filter(
+            (r) => isDetailedResult(r) && r.found === (type === "found"),
+        );
+        const csv = [
+            ["Document Key"],
+            ...filteredResults.map((r) => {
+                if (isDetailedResult(r)) {
+                    return [r.documentKey];
+                }
+                return [];
+            }),
+        ]
+            .map((row) => row.join(","))
+            .join("\n");
+
+        const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+        const link = document.createElement("a");
+        if (link.download !== undefined) {
+            const url = URL.createObjectURL(blob);
+            link.setAttribute("href", url);
+            link.setAttribute("download", `${type}_document_keys.csv`);
+            link.style.visibility = "hidden";
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
         }
     }
 
@@ -199,6 +241,56 @@
                 {/each}
             </tbody>
         </table>
+        <div class="mt-4 flex justify-between items-center">
+            <div class="flex items-center">
+                <span class="font-bold mr-2">Total Found: {foundCount}</span>
+                <button
+                    on:click={() => downloadCSV("found")}
+                    class="p-2 rounded-full bg-green-100 hover:bg-green-200 transition-colors duration-200"
+                    title="Download Found Keys"
+                >
+                    <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke-width="1.5"
+                        stroke="currentColor"
+                        class="w-6 h-6 text-green-600"
+                    >
+                        <path
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                            d="M12 9.75v6.75m0 0-3-3m3 3 3-3m-8.25 6a4.5 4.5 0 0 1-1.41-8.775 5.25 5.25 0 0 1 10.233-2.33 3 3 0 0 1 3.758 3.848A3.752 3.752 0 0 1 18 19.5H6.75Z"
+                        />
+                    </svg>
+                </button>
+            </div>
+            <div class="flex items-center">
+                <span class="font-bold mr-2"
+                    >Total Not Found: {notFoundCount}</span
+                >
+                <button
+                    on:click={() => downloadCSV("notFound")}
+                    class="p-2 rounded-full bg-red-100 hover:bg-red-200 transition-colors duration-200"
+                    title="Download Not Found Keys"
+                >
+                    <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke-width="1.5"
+                        stroke="currentColor"
+                        class="w-6 h-6 text-red-600"
+                    >
+                        <path
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                            d="M12 9.75v6.75m0 0-3-3m3 3 3-3m-8.25 6a4.5 4.5 0 0 1-1.41-8.775 5.25 5.25 0 0 1 10.233-2.33 3 3 0 0 1 3.758 3.848A3.752 3.752 0 0 1 18 19.5H6.75Z"
+                        />
+                    </svg>
+                </button>
+            </div>
+        </div>
     {:else}
         <div class="bg-white shadow overflow-hidden sm:rounded-lg">
             <div class="px-4 py-5 sm:p-6">

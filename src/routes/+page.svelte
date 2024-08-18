@@ -361,7 +361,7 @@
                         <button
                             type="button"
                             on:click={toggleMode}
-                            class="p-2 bg-gray-200 rounded-full hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-tommy-red"
+                            class="p-2 bg-gray-200 rounded-full hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-tommy-red animate-pulse"
                             title={isSearchMode
                                 ? "Switch to Upload Mode"
                                 : "Switch to Search Mode"}
@@ -524,7 +524,7 @@
 
             {#if isSearchMode}
                 {#if searchResults.length > 0}
-                    <h2 class="mt-4 mb-2">Search Results:</h2>
+                    <h2 class="mt-4 mb-6"></h2>
                     {#each searchResults as result}
                         <DocumentDisplay
                             bucket={result.bucket}
