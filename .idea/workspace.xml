@@ -4,7 +4,12 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="a783835f-4b80-4f56-9697-5aabbe390336" name="Changes" comment="" />
+    <list default="true" id="a783835f-4b80-4f56-9697-5aabbe390336" name="Changes" comment="">
+      <change beforePath="$PROJECT_DIR$/.idea/dataSources/29708e88-fd06-4084-bfc7-1e0cf5b7d61e.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/dataSources/29708e88-fd06-4084-bfc7-1e0cf5b7d61e.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/lib/db/dbOperations.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/lib/db/dbOperations.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/routes/api/collections/+server.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/routes/api/collections/+server.ts" afterDir="false" />
+    </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
@@ -26,8 +31,9 @@
     "ASKED_SHARE_PROJECT_CONFIGURATION_FILES": "true",
     "RunOnceActivity.OpenDatabaseViewOnStart": "true",
     "RunOnceActivity.ShowReadmeOnStart": "true",
-    "git-widget-placeholder": "fix/activating-done-button-for-new-search",
-    "last_opened_file_path": "/Users/SOwusu/WebstormProjects/capella-document-search"
+    "git-widget-placeholder": "refactor/db-operations-plus-api-data-pulls",
+    "last_opened_file_path": "/Users/SOwusu/WebstormProjects/capella-document-search",
+    "settings.editor.selected.configurable": "database.query.execution"
   }
 }]]></component>
   <component name="SpellCheckerSettings" RuntimeDictionaries="0" Folders="0" CustomDictionaries="0" DefaultDictionary="application-level" UseSingleDictionary="true" transferred="true" />
