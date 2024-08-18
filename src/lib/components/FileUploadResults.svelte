@@ -78,7 +78,7 @@
                         Found In
                     </th>
                     <th
-                        class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-1/4"
+                        class="px-5 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-1/3"
                     >
                         Search Summary
                     </th>
@@ -130,16 +130,17 @@
                                                     d="m5.25 4.5 7.5 7.5-7.5 7.5m6-15 7.5 7.5-7.5 7.5"
                                                 />
                                             </svg>
-                                            <span>View found collections</span>
+                                            <span>View matched</span>
                                         </summary>
                                         <div class="mt-2 ml-4 max-w-md">
-                                            <ul class="list-disc list-inside">
+                                            <ul
+                                                class="list-inside list-none pl-0"
+                                            >
                                                 {#each result.foundIn as collection}
                                                     <li
                                                         class="text-sm text-gray-600"
                                                     >
                                                         {collection.bucket}/{collection.scope}/{collection.collection}
-                                                        (Time: {collection.timeTaken}ms)
                                                     </li>
                                                 {/each}
                                             </ul>
@@ -175,13 +176,12 @@
                                                     d="m5.25 4.5 7.5 7.5-7.5 7.5m6-15 7.5 7.5-7.5 7.5"
                                                 />
                                             </svg>
-                                            <span
-                                                >View collections where not
-                                                found</span
-                                            >
+                                            <span>View not matched</span>
                                         </summary>
                                         <div class="mt-2 ml-4 max-w-md">
-                                            <ul class="list-disc list-inside">
+                                            <ul
+                                                class="list-none pl-0 list-inside"
+                                            >
                                                 {#each result.notFoundIn as collection}
                                                     <li
                                                         class="text-sm text-gray-600"
