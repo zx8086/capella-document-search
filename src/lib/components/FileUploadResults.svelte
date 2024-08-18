@@ -110,7 +110,7 @@
                                 {#if result.foundIn.length > 0}
                                     <p>
                                         Found in {result.foundIn.length} of {result.totalCollectionsSearched}
-                                        collections searched
+                                        collections
                                     </p>
                                     <details class="mt-2">
                                         <summary
@@ -154,7 +154,7 @@
                             <td class="px-6 py-4">
                                 <p>
                                     Found in {result.foundIn.length} of {result.totalCollectionsSearched}
-                                    collections searched
+                                    collections
                                 </p>
                                 {#if result.notFoundIn.length > 0}
                                     <details class="mt-2">

@@ -5,14 +5,7 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="a783835f-4b80-4f56-9697-5aabbe390336" name="Changes" comment="">
-      <change beforePath="$PROJECT_DIR$/.idea/dataSources/29708e88-fd06-4084-bfc7-1e0cf5b7d61e.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/dataSources/29708e88-fd06-4084-bfc7-1e0cf5b7d61e.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/capella-document-search.sqlite" beforeDir="false" afterPath="$PROJECT_DIR$/capella-document-search.sqlite" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/lib/api.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/lib/api.ts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/lib/collectionManager.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/lib/collectionManager.ts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/lib/db/dbOperations.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/lib/db/dbOperations.ts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/routes/api/collections/+server.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/routes/api/collections/+server.ts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/routes/search/+page.svelte" beforeDir="false" afterPath="$PROJECT_DIR$/src/routes/search/+page.svelte" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/lib/components/FileUploadResults.svelte" beforeDir="false" afterPath="$PROJECT_DIR$/src/lib/components/FileUploadResults.svelte" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -30,14 +23,14 @@
     <option name="hideEmptyMiddlePackages" value="true" />
     <option name="showLibraryContents" value="true" />
   </component>
-  <component name="PropertiesComponent">{
-  &quot;keyToString&quot;: {
-    &quot;ASKED_SHARE_PROJECT_CONFIGURATION_FILES&quot;: &quot;true&quot;,
-    &quot;RunOnceActivity.OpenDatabaseViewOnStart&quot;: &quot;true&quot;,
-    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
-    &quot;git-widget-placeholder&quot;: &quot;feature/add-tool-tips&quot;,
-    &quot;last_opened_file_path&quot;: &quot;/Users/SOwusu/WebstormProjects/capella-document-search&quot;
+  <component name="PropertiesComponent"><![CDATA[{
+  "keyToString": {
+    "ASKED_SHARE_PROJECT_CONFIGURATION_FILES": "true",
+    "RunOnceActivity.OpenDatabaseViewOnStart": "true",
+    "RunOnceActivity.ShowReadmeOnStart": "true",
+    "git-widget-placeholder": "master",
+    "last_opened_file_path": "/Users/SOwusu/WebstormProjects/capella-document-search"
   }
-}</component>
+}]]></component>
   <component name="SpellCheckerSettings" RuntimeDictionaries="0" Folders="0" CustomDictionaries="0" DefaultDictionary="application-level" UseSingleDictionary="true" transferred="true" />
 </project>
