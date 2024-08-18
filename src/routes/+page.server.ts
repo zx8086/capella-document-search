@@ -65,6 +65,8 @@ const mockCollections = [
   { bucket: "default", scope: "customer", collection: "assignments" },
   { bucket: "default", scope: "customer", collection: "sales-organizations" },
   { bucket: "default", scope: "customer", collection: "customers" },
+  { bucket: "default", scope: "_default", collection: "_default" },
+  { bucket: "default", scope: "_default", collection: "data_merge_check" },
 ];
 
 export const actions: Actions = {
@@ -134,20 +136,26 @@ export const actions: Actions = {
   },
   uploadFile: async ({ request }) => {
     try {
+      console.log("Starting uploadFile action");
       const data = await request.formData();
       const file = data.get("file") as File | null;
 
       if (!file) {
+        console.log("No file uploaded");
         throw error(400, "No file uploaded");
       }
+
+      console.log("File received:", file.name);
 
       // Process the CSV file
       const content = await file.text();
       const documentKeys = content.split(",").map((key) => key.trim());
+      console.log("Document keys extracted:", documentKeys);
 
-      // Use the mock collections data to search for each document key
+      // Use all collections to search for each document key
       const results = await Promise.all(
         documentKeys.map(async (key) => {
+          console.log(`Searching for document key: ${key}`);
           const query = gql`
             query searchDocuments(
               $collections: [BucketScopeCollection!]!
@@ -174,15 +182,17 @@ export const actions: Actions = {
 
           const searchResults = response.data.searchDocuments;
 
-          // Filter out collections where the document wasn't found
           const foundCollections = searchResults.filter(
             (result) => result.data !== null,
+          );
+          const notFoundCollections = searchResults.filter(
+            (result) => result.data === null,
           );
 
           return {
             documentKey: key,
             found: foundCollections.length > 0,
-            collections: foundCollections.map(
+            foundIn: foundCollections.map(
               ({ bucket, scope, collection, timeTaken }) => ({
                 bucket,
                 scope,
@@ -190,11 +200,19 @@ export const actions: Actions = {
                 timeTaken,
               }),
             ),
+            notFoundIn: notFoundCollections.map(
+              ({ bucket, scope, collection }) => ({
+                bucket,
+                scope,
+                collection,
+              }),
+            ),
+            totalCollectionsSearched: searchResults.length,
           };
         }),
       );
 
-      console.log("File upload results:", results); // Add this line for debugging
+      console.log("Final results:", JSON.stringify(results, null, 2));
 
       return results;
     } catch (e) {
