@@ -32,7 +32,6 @@ export async function POST() {
 
     let insertedCount = 0;
 
-    // Use a transaction for atomicity
     db.transaction(() => {
       for (const item of scopesAndCollections) {
         console.log("Inserting item:", item);
@@ -82,7 +81,6 @@ export async function POST() {
 }
 
 export async function GET() {
-  // GET function remains unchanged
   console.log("GET request received for collections");
   initializeDatabase();
   try {
