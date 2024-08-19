@@ -118,10 +118,9 @@ export const actions: Actions = {
         log(
           `Document key limit exceeded: ${documentKeys.length} keys found, limit is ${DOCUMENT_KEY_LIMIT}`,
         );
-        throw error(
-          400,
-          `Too many document keys. The limit is ${DOCUMENT_KEY_LIMIT}.`,
-        );
+        return {
+          error: `Too many document keys. The limit is ${DOCUMENT_KEY_LIMIT}. Found ${documentKeys.length} keys.`,
+        };
       }
 
       const collections = getFormattedCollections();
