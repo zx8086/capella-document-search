@@ -1,6 +1,7 @@
 <!-- src/routes/+page.svelte-->
 
 <script lang="ts">
+    import { log, warn, err } from "$utils/unifiedLogger";
     import { enhance } from "$app/forms";
     import { page } from "$app/stores";
     import DocumentDisplay from "$lib/components/DocumentDisplay.svelte";
@@ -94,15 +95,15 @@
         isLoading = true;
 
         return async ({ result }) => {
-            console.log("Form submission result:", result);
+            log("Form submission result:", result);
             if (result.type === "success") {
                 try {
                     const data = result.data;
-                    console.log("Received data:", data);
+                    log("Received data:", data);
                     if (isSearchMode) {
                         if (data && data.data && data.data.searchDocuments) {
                             searchResults = data.data.searchDocuments;
-                            console.log("Search results:", searchResults);
+                            log("Search results:", searchResults);
                             if (searchResults.length === 0) {
                                 toast.error(
                                     "No results found for the given document key.",
@@ -120,7 +121,7 @@
                     } else {
                         if (Array.isArray(data)) {
                             fileUploadResults = data;
-                            console.log(
+                            log(
                                 "File upload results:",
                                 JSON.stringify(fileUploadResults, null, 2),
                             );
@@ -132,7 +133,7 @@
                     }
                     buttonState = "results";
                 } catch (e) {
-                    console.error("Error processing server response:", e);
+                    err("Error processing server response:", e);
                     toast.error(
                         "Error processing server response: " + e.message,
                         {
@@ -143,7 +144,7 @@
                     buttonState = "ready";
                 }
             } else if (result.type === "failure") {
-                console.error("Form submission failed:", result.data);
+                err("Form submission failed:", result.data);
                 if (result.data.error) {
                     toast.error(result.data.error, {
                         duration: Infinity,
@@ -157,7 +158,7 @@
                 }
                 buttonState = "ready";
             } else if (result.type === "error") {
-                console.error("Form submission error:", result.error);
+                err("Form submission error:", result.error);
                 toast.error(result.error, {
                     duration: Infinity,
                     class: "!bg-red-100 !text-red-800 !font-medium",
@@ -244,7 +245,7 @@
 
     onMount(async () => {
         try {
-            console.log("GETTING COLLECTIONS");
+            log("GETTING COLLECTIONS");
             allCollections = await getCollections();
             selectedCollections = allCollections.map(
                 ({ bucket, scope_name, collection_name }) => ({
@@ -254,7 +255,7 @@
                 }),
             );
         } catch (error) {
-            console.error("Error fetching collections:", error);
+            err("Error fetching collections:", error);
             errorMessage =
                 "Failed to fetch collections. Please try again later.";
         }
