@@ -175,7 +175,6 @@ export function getAllCollectionsWithTooltips() {
   const results = getAllCollectionsWithTooltipsStmt.all();
   log(
     "Retrieved collections with tooltips - function getAllCollectionsWithTooltips:",
-    results,
   );
   return results;
 }

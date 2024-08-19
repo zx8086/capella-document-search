@@ -38,6 +38,134 @@
     let isSearchMode = true;
     let file: File | null = null;
     let fileUploadResults = [];
+    let fileInputFiles: FileList | null = null;
+
+    // Reactive statement to update file when fileInputFiles changes
+    $: if (fileInputFiles && fileInputFiles.length > 0) {
+        file = fileInputFiles[0];
+    } else {
+        file = null;
+    }
+
+    function handleFileChange(event: Event) {
+        const target = event.target as HTMLInputElement;
+        if (target.files) {
+            fileInputFiles = target.files;
+            buttonState = "ready";
+            fileUploadResults = [];
+        }
+    }
+
+    function handleSubmit(event) {
+        buttonState = "searching";
+        processing = true;
+        errorMessage = "";
+        searchResults = [];
+        fileUploadResults = [];
+        searchPerformed = true;
+        isLoading = true;
+
+        return async ({ result }) => {
+            log("Form submission result:", result);
+            try {
+                if (result.type === "success") {
+                    const data = result.data;
+                    log("Received data:", data);
+                    if (isSearchMode) {
+                        if (data && data.data && data.data.searchDocuments) {
+                            searchResults = data.data.searchDocuments;
+                            log("Search results:", searchResults);
+                            if (searchResults.length === 0) {
+                                toast.error(
+                                    "No results found for the given document key.",
+                                    {
+                                        duration: 5000,
+                                    },
+                                );
+                            } else {
+                                toast.success(
+                                    "Search completed successfully.",
+                                    {
+                                        duration: 3000,
+                                    },
+                                );
+                            }
+                        } else {
+                            throw new Error(
+                                "Unexpected search results structure",
+                            );
+                        }
+                    } else {
+                        if (Array.isArray(data)) {
+                            fileUploadResults = data;
+                            // log(
+                            //     "File upload results:",
+                            //     JSON.stringify(fileUploadResults, null, 2),
+                            // );
+                            toast.success("File processed successfully.", {
+                                duration: 3000,
+                            });
+                        } else {
+                            throw new Error(
+                                "Unexpected file upload result structure",
+                            );
+                        }
+                    }
+                    buttonState = "results";
+                } else if (result.type === "failure") {
+                    err("Form submission failed:", result.data);
+                    if (result.data && result.data.error) {
+                        toast.error(result.data.error, {
+                            duration: 5000,
+                        });
+                    } else {
+                        toast.error(
+                            "An unexpected error occurred during submission.",
+                            {
+                                duration: 5000,
+                            },
+                        );
+                    }
+                    buttonState = "ready";
+                    if (!isSearchMode) {
+                        resetFileInput();
+                    }
+                } else if (result.type === "error") {
+                    err("Form submission error:", result.error);
+                    toast.error(result.error || "An unknown error occurred", {
+                        duration: 5000,
+                    });
+                    buttonState = "ready";
+                    if (!isSearchMode) {
+                        resetFileInput();
+                    }
+                }
+            } catch (e) {
+                err("Error processing response:", e);
+                toast.error(`Error: ${e.message}`, {
+                    duration: 5000,
+                });
+                buttonState = "ready";
+                if (!isSearchMode) {
+                    resetFileInput();
+                }
+            } finally {
+                processing = false;
+                isLoading = false;
+            }
+        };
+    }
+
+    function resetFileInput() {
+        fileInputFiles = null;
+        file = null;
+        const fileInput = document.getElementById(
+            "fileInput",
+        ) as HTMLInputElement;
+        if (fileInput) {
+            fileInput.value = "";
+        }
+    }
 
     let fileUploadTooltipContent =
         "Upload a CSV file containing document keys to check in Capella. Each key should be on a separate line or column. No comma is needed after the last document key! The search will be performed across all collections.";
@@ -74,101 +202,7 @@
         file = null;
     }
 
-    function handleFileChange(event: Event) {
-        const target = event.target as HTMLInputElement;
-        if (target.files) {
-            file = target.files[0];
-            buttonState = "ready";
-            fileUploadResults = [];
-        }
-    }
-
     let isLoading = false;
-
-    function handleSubmit(event) {
-        buttonState = "searching";
-        processing = true;
-        errorMessage = "";
-        searchResults = [];
-        fileUploadResults = [];
-        searchPerformed = true;
-        isLoading = true;
-
-        return async ({ result }) => {
-            log("Form submission result:", result);
-            if (result.type === "success") {
-                try {
-                    const data = result.data;
-                    log("Received data:", data);
-                    if (isSearchMode) {
-                        if (data && data.data && data.data.searchDocuments) {
-                            searchResults = data.data.searchDocuments;
-                            log("Search results:", searchResults);
-                            if (searchResults.length === 0) {
-                                toast.error(
-                                    "No results found for the given document key.",
-                                    {
-                                        duration: Infinity,
-                                        class: "!bg-red-100 !text-red-800 !font-medium",
-                                    },
-                                );
-                            }
-                        } else {
-                            throw new Error(
-                                "Unexpected search results structure",
-                            );
-                        }
-                    } else {
-                        if (Array.isArray(data)) {
-                            fileUploadResults = data;
-                            log(
-                                "File upload results:",
-                                JSON.stringify(fileUploadResults, null, 2),
-                            );
-                        } else {
-                            throw new Error(
-                                "Unexpected file upload result structure",
-                            );
-                        }
-                    }
-                    buttonState = "results";
-                } catch (e) {
-                    err("Error processing server response:", e);
-                    toast.error(
-                        "Error processing server response: " + e.message,
-                        {
-                            duration: Infinity,
-                            class: "!bg-red-100 !text-red-800 !font-medium",
-                        },
-                    );
-                    buttonState = "ready";
-                }
-            } else if (result.type === "failure") {
-                err("Form submission failed:", result.data);
-                if (result.data.error) {
-                    toast.error(result.data.error, {
-                        duration: Infinity,
-                        class: "!bg-red-100 !text-red-800 !font-medium",
-                    });
-                } else {
-                    toast.error("An unexpected error occurred", {
-                        duration: Infinity,
-                        class: "!bg-red-100 !text-red-800 !font-medium",
-                    });
-                }
-                buttonState = "ready";
-            } else if (result.type === "error") {
-                err("Form submission error:", result.error);
-                toast.error(result.error, {
-                    duration: Infinity,
-                    class: "!bg-red-100 !text-red-800 !font-medium",
-                });
-                buttonState = "ready";
-            }
-            processing = false;
-            isLoading = false;
-        };
-    }
 
     function toggleCollection(collection: {
         bucket: string;
@@ -357,6 +391,7 @@
                                                 aria-describedby="validFileFormats"
                                                 accept=".csv"
                                                 on:change={handleFileChange}
+                                                bind:files={fileInputFiles}
                                             />
                                         </label>
                                         <span class="mt-1 flex items-center">

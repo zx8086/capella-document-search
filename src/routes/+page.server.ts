@@ -36,7 +36,7 @@ export const actions: Actions = {
       const documentKey = data.get("documentKey") as string;
       const keys = [documentKey];
 
-      log("Selected Collections:", selectedCollections);
+      // log("Selected Collections:", selectedCollections);
       log("Keys:", keys);
 
       const formattedCollections = selectedCollections.map(
@@ -71,7 +71,7 @@ export const actions: Actions = {
         fetchPolicy: "no-cache",
       });
 
-      log("GraphQL Response:", response.data);
+      // log("GraphQL Response:", response.data);
 
       return {
         type: "success",
@@ -106,8 +106,23 @@ export const actions: Actions = {
       log("File received:", file.name);
 
       const content = await file.text();
-      const documentKeys = content.split(",").map((key) => key.trim());
+      const documentKeys = content
+        .split(",")
+        .map((key) => key.trim())
+        .filter(Boolean);
       log("Document keys extracted:", documentKeys);
+
+      // Check if the number of document keys exceeds the limit
+      const DOCUMENT_KEY_LIMIT = 50;
+      if (documentKeys.length > DOCUMENT_KEY_LIMIT) {
+        log(
+          `Document key limit exceeded: ${documentKeys.length} keys found, limit is ${DOCUMENT_KEY_LIMIT}`,
+        );
+        throw error(
+          400,
+          `Too many document keys. The limit is ${DOCUMENT_KEY_LIMIT}.`,
+        );
+      }
 
       const collections = getFormattedCollections();
 
