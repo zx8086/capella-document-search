@@ -39,7 +39,7 @@
     let fileUploadResults = [];
 
     let fileUploadTooltipContent =
-        "Upload a CSV file containing document keys to check. Each key should be on a separate line or column, seperated by a comma. No comma after the last document key! The search for these keys will be performed across all collections.";
+        "Upload a CSV file containing document keys to check in Capella. Each key should be on a separate line or column. No comma is needed after the last document key! The search will be performed across all collections.";
 
     function openTooltipModal(tooltipContent: string) {
         currentTooltip = tooltipContent;
@@ -266,7 +266,7 @@
 <div class="min-h-screen flex flex-col bg-white mb-20 mt-5">
     <!-- Logo Section -->
     <div class="text-center py-4">
-        <img src="/favicon.ico" alt="PVH" class="mx-auto h-16" />
+        <img src="/favicon.png" alt="PVH" class="mx-auto h-16" />
     </div>
 
     <!-- Main Content -->
