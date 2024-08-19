@@ -1,5 +1,7 @@
 /* src/lib/collectionManager.ts */
 
+import { log, err } from "../utils/unifiedLogger";
+
 interface Collection {
   bucket: string;
   scope: string;
@@ -7,12 +9,14 @@ interface Collection {
 }
 
 export async function seedCollections() {
+  log("function seedCollections called");
   try {
+    log("POST: /api/collections");
     const response = await fetch("/api/collections", { method: "POST" });
     const result = await response.json();
 
     if (!response.ok) {
-      console.error(
+      err(
         `Failed to seed collections. Status: ${response.status}, Error:`,
         result,
       );
@@ -22,19 +26,21 @@ export async function seedCollections() {
     }
 
     if (!result.success) {
-      console.error("Seeding collections failed:", result.message);
+      err("Seeding collections failed:", result.message);
       throw new Error(result.message);
     }
 
-    console.log(`Collections seeded successfully. Count: ${result.count}`);
+    log(`Collections seeded successfully. Count: ${result.count}`);
   } catch (error) {
-    console.error("Error seeding collections:", error);
+    err("Error seeding collections:", error);
     throw error;
   }
 }
 
 export async function getCollections(): Promise<Collection[]> {
+  log("function getCollections called");
   try {
+    log("GET: /api/collections");
     const response = await fetch("/api/collections");
     if (!response.ok) {
       const errorText = await response.text();
@@ -43,10 +49,9 @@ export async function getCollections(): Promise<Collection[]> {
       );
     }
     const collections = await response.json();
-    console.log("Retrieved collections:", collections);
     return collections;
   } catch (error) {
-    console.error("Error fetching collections:", error);
+    err("Error fetching collections:", error);
     throw error;
   }
 }

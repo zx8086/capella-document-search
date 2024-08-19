@@ -1,36 +1,17 @@
 /* src/utils/logger.ts */
 
+console.log("Logger module is being imported");
+
 import winston from "winston";
 import { ecsFormat } from "@elastic/ecs-winston-format";
 import { OpenTelemetryTransportV3 } from "@opentelemetry/winston-transport";
+import DailyRotateFile from "winston-daily-rotate-file";
+import path from "path";
+import { fileURLToPath } from "url";
 import { config } from "./../config";
 
-let DailyRotateFile;
-let path;
-let __dirname;
-
-async function setupNodeSpecificModules() {
-  if (
-    typeof process !== "undefined" &&
-    process.versions &&
-    process.versions.node
-  ) {
-    const { default: DailyRotateFileModule } = await import(
-      "winston-daily-rotate-file"
-    );
-    DailyRotateFile = DailyRotateFileModule;
-
-    const { default: pathModule } = await import("path");
-    path = pathModule;
-
-    const { fileURLToPath } = await import("url");
-    const __filename = fileURLToPath(import.meta.url);
-    __dirname = path.dirname(__filename);
-
-    return true;
-  }
-  return false;
-}
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 export const logger = winston.createLogger({
   level: config.application.LOG_LEVEL,
@@ -46,27 +27,23 @@ export const logger = winston.createLogger({
   ],
 });
 
-setupNodeSpecificModules().then((isNode) => {
-  if (isNode) {
-    const rootDir = path.join(__dirname, "..", "..");
-    const logsDir = path.join(rootDir, "logs");
-    logger.add(
-      new DailyRotateFile({
-        filename: path.join(logsDir, "application-%DATE%.log"),
-        datePattern: "YYYY-MM-DD",
-        zippedArchive: true,
-        maxSize: config.application.LOG_MAX_SIZE,
-        maxFiles: config.application.LOG_MAX_FILES,
-      }),
-    );
-  }
-});
+const rootDir = path.join(__dirname, "..", "..");
+const logsDir = path.join(rootDir, "logs");
+logger.add(
+  new DailyRotateFile({
+    filename: path.join(logsDir, "application-%DATE%.log"),
+    datePattern: "YYYY-MM-DD",
+    zippedArchive: true,
+    maxSize: config.application.LOG_MAX_SIZE,
+    maxFiles: config.application.LOG_MAX_FILES,
+  }),
+);
 
 export function log(message: string, meta?: any): void {
   logger.info(message, meta);
 }
 
-export function error(message: string, meta?: any): void {
+export function err(message: string, meta?: any): void {
   logger.error(message, meta);
 }
 

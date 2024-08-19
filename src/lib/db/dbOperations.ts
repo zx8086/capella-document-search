@@ -1,6 +1,7 @@
 /* src/lib/db/dbOperations.ts */
 
 import { Database, Statement } from "bun:sqlite";
+import { log, err } from "$utils/unifiedLogger";
 
 let db: Database | null = null;
 let insertScopeStmt: Statement | null = null;
@@ -13,7 +14,7 @@ let getAllCollectionsWithTooltipsStmt: Statement | null = null;
 
 export function initializeDatabase() {
   if (!db) {
-    console.log("Initializing database");
+    log("Initializing database");
     db = new Database("capella-document-search.sqlite", { create: true });
     db.exec(`
       CREATE TABLE IF NOT EXISTS scopes (
@@ -70,7 +71,7 @@ export function initializeDatabase() {
       JOIN scopes s ON c.bucket = s.bucket AND c.scope_name = s.scope_name
     `);
 
-    console.log("Database and prepared statements initialized");
+    log("Database and prepared statements initialized");
   }
   return db;
 }
@@ -87,7 +88,7 @@ export function insertScope(bucket: string, scopeName: string) {
     throw new Error("Database not initialized");
   }
   const result = insertScopeStmt.run(bucket, scopeName);
-  console.log(`Inserted scope: ${bucket}.${scopeName}, Result:`, result);
+  log(`Inserted scope: ${bucket}.${scopeName}, Result:`, result);
   return result;
 }
 
@@ -100,7 +101,7 @@ export function insertCollection(
     throw new Error("Database not initialized");
   }
   const result = insertCollectionStmt.run(bucket, scopeName, collectionName);
-  console.log(
+  log(
     `Inserted collection: ${bucket}.${scopeName}.${collectionName}, Result:`,
     result,
   );
@@ -112,7 +113,7 @@ export function getAllCollections() {
     throw new Error("Database not initialized");
   }
   const results = getAllCollectionsStmt.all();
-  console.log("Retrieved collections - function getAllCollections:", results);
+  log("Retrieved collections - function getAllCollections:", results);
   return results;
 }
 
@@ -125,10 +126,11 @@ export function getFormattedCollections() {
     scope: string;
     collection: string;
   }>;
-  console.log(
-    "Retrieved formatted collections - function getFormattedCollections:",
-    results,
-  );
+  // console.log(
+  //   "Retrieved formatted collections - function getFormattedCollections:",
+  //   results,
+  // );
+  log("Retrieved formatted collections - function getFormattedCollections:");
   return results;
 }
 
@@ -147,7 +149,7 @@ export function insertTooltip(
     collectionName,
     tooltipContent,
   );
-  console.log(
+  log(
     `Inserted tooltip for: ${bucket}.${scopeName}.${collectionName}, Result:`,
     result,
   );
@@ -171,7 +173,7 @@ export function getAllCollectionsWithTooltips() {
     throw new Error("Database not initialized");
   }
   const results = getAllCollectionsWithTooltipsStmt.all();
-  console.log(
+  log(
     "Retrieved collections with tooltips - function getAllCollectionsWithTooltips:",
     results,
   );

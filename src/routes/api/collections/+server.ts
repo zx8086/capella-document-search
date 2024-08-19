@@ -1,5 +1,6 @@
 /* src/routes/api/collections/+server.ts */
 
+import { log, warn, err } from "$utils/unifiedLogger";
 import { json } from "@sveltejs/kit";
 import {
   initializeDatabase,
@@ -12,15 +13,15 @@ import {
 import { getAllScopes } from "$lib/api";
 
 export async function POST() {
-  console.log("POST request received for collections");
+  log("POST request received for collections");
   initializeDatabase();
   const db = getDatabase();
 
   try {
     const scopesAndCollections = await getAllScopes();
-    console.log("Received scopes and collections:", scopesAndCollections);
+    log("Received scopes and collections:");
     if (scopesAndCollections.length === 0) {
-      console.warn("No scopes and collections returned from API");
+      warn("No scopes and collections returned from API");
       return json(
         {
           success: false,
@@ -34,40 +35,36 @@ export async function POST() {
 
     db.transaction(() => {
       for (const item of scopesAndCollections) {
-        console.log("Inserting item:", item);
+        log("Inserting item:", item);
         const scopeResult = insertScope(item.bucket, item.scope);
         const collectionResult = insertCollection(
           item.bucket,
           item.scope,
           item.collection,
         );
-        // Insert a mock tooltip for demonstration purposes
         const tooltipResult = insertTooltip(
           item.bucket,
           item.scope,
           item.collection,
           `This is a mock tooltip for ${item.bucket}.${item.scope}.${item.collection}`,
         );
-        console.log("Scope insertion result:", scopeResult);
-        console.log("Collection insertion result:", collectionResult);
-        console.log("Tooltip insertion result:", tooltipResult);
+        log("Scope insertion result:", scopeResult);
+        log("Collection insertion result:", collectionResult);
+        log("Tooltip insertion result:", tooltipResult);
         insertedCount++;
       }
     })();
 
-    console.log("Inserted items count:", insertedCount);
+    log("Inserted items count:", insertedCount);
     const allCollections = getAllCollectionsWithTooltips();
-    console.log(
-      "All collections with tooltips after insertion:",
-      allCollections,
-    );
+    log("All collections with tooltips after insertion:", allCollections);
     return json({
       success: true,
       message: "Collections and tooltips seeded successfully",
       count: insertedCount,
     });
   } catch (error) {
-    console.error("Error seeding collections and tooltips:", error);
+    err("Error seeding collections and tooltips:", error);
     return json(
       {
         success: false,
@@ -81,17 +78,14 @@ export async function POST() {
 }
 
 export async function GET() {
-  console.log("GET request received for collections");
+  log("GET request received for collections");
   initializeDatabase();
   try {
     const collectionsWithTooltips = getAllCollectionsWithTooltips();
-    console.log(
-      "Retrieved collections with tooltips:",
-      collectionsWithTooltips,
-    );
+    log("Retrieved collections with tooltips:", collectionsWithTooltips);
     return json(collectionsWithTooltips);
   } catch (error) {
-    console.error("Error retrieving collections with tooltips:", error);
+    err("Error retrieving collections with tooltips:", error);
     return json(
       { error: "Failed to retrieve collections with tooltips" },
       { status: 500 },
