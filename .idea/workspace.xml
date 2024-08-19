@@ -5,7 +5,9 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="a783835f-4b80-4f56-9697-5aabbe390336" name="Changes" comment="">
+      <change beforePath="$PROJECT_DIR$/logs/application-2024-08-19.log" beforeDir="false" afterPath="$PROJECT_DIR$/logs/application-2024-08-19.log" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/routes/+page.server.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/routes/+page.server.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/utils/logger.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/utils/logger.ts" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -28,7 +30,7 @@
     "ASKED_SHARE_PROJECT_CONFIGURATION_FILES": "true",
     "RunOnceActivity.OpenDatabaseViewOnStart": "true",
     "RunOnceActivity.ShowReadmeOnStart": "true",
-    "git-widget-placeholder": "feature/add-upload-line-limit",
+    "git-widget-placeholder": "refactor/logging-and-opentelemetry",
     "last_opened_file_path": "/Users/SOwusu/WebstormProjects/capella-document-search",
     "settings.editor.selected.configurable": "database.query.execution"
   }
