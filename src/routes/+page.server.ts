@@ -13,7 +13,7 @@ import {
   getFormattedCollections,
   initializeDatabase,
 } from "$lib/db/dbOperations";
-import { log, error, warn, debug } from "$utils/logger";
+import { log, err } from "$utils/unifiedLogger";
 
 const YOUR_GRAPHQL_ENDPOINT = "http://localhost:4000/graphql";
 const client = new ApolloClient({
@@ -24,7 +24,6 @@ const client = new ApolloClient({
 initializeDatabase();
 
 export const load: PageServerLoad = async () => {
-  log("Test");
   const collections = getFormattedCollections();
   return { collections };
 };
@@ -37,10 +36,9 @@ export const actions: Actions = {
       const documentKey = data.get("documentKey") as string;
       const keys = [documentKey];
 
-      console.log("Selected Collections:", selectedCollections);
-      console.log("Keys:", keys);
+      // log("Selected Collections:", selectedCollections);
+      log("Keys:", keys);
 
-      // Ensure collections are in the correct format
       const formattedCollections = selectedCollections.map(
         ({ bucket, scope_name, collection_name }) => ({
           bucket,
@@ -73,19 +71,19 @@ export const actions: Actions = {
         fetchPolicy: "no-cache",
       });
 
-      console.log("GraphQL Response:", response.data);
+      // log("GraphQL Response:", response.data);
 
       return {
         type: "success",
         data: response.data,
       };
     } catch (error) {
-      console.error("Error in searchDocuments action:", error);
+      err("Error in searchDocuments action:", error);
       if (error.graphQLErrors) {
-        console.error("GraphQL Errors:", error.graphQLErrors);
+        err("GraphQL Errors:", error.graphQLErrors);
       }
       if (error.networkError) {
-        console.error("Network Error:", error.networkError);
+        err("Network Error:", error.networkError);
       }
       return {
         type: "error",
@@ -96,29 +94,41 @@ export const actions: Actions = {
   },
   uploadFile: async ({ request }) => {
     try {
-      console.log("Starting uploadFile action");
+      log("Starting uploadFile action");
       const data = await request.formData();
       const file = data.get("file") as File | null;
 
       if (!file) {
-        console.log("No file uploaded");
+        log("No file uploaded");
         throw error(400, "No file uploaded");
       }
 
-      console.log("File received:", file.name);
+      log("File received:", file.name);
 
-      // Process the CSV file
       const content = await file.text();
-      const documentKeys = content.split(",").map((key) => key.trim());
-      console.log("Document keys extracted:", documentKeys);
+      const documentKeys = content
+        .split(",")
+        .map((key) => key.trim())
+        .filter(Boolean);
+      log("Document keys extracted:", documentKeys);
 
-      // Get the collections here, inside the action
+      // Check if the number of document keys exceeds the limit
+      const DOCUMENT_KEY_LIMIT = 50;
+      if (documentKeys.length > DOCUMENT_KEY_LIMIT) {
+        log(
+          `Document key limit exceeded: ${documentKeys.length} keys found, limit is ${DOCUMENT_KEY_LIMIT}`,
+        );
+        throw error(
+          400,
+          `Too many document keys. The limit is ${DOCUMENT_KEY_LIMIT}.`,
+        );
+      }
+
       const collections = getFormattedCollections();
 
-      // Use all collections to search for each document key
       const results = await Promise.all(
         documentKeys.map(async (key) => {
-          console.log(`Searching for document key: ${key}`);
+          log(`Searching for document key: ${key}`);
           const query = gql`
             query searchDocuments(
               $collections: [BucketScopeCollection!]!
@@ -175,11 +185,11 @@ export const actions: Actions = {
         }),
       );
 
-      console.log("Final results:", JSON.stringify(results, null, 2));
+      log("Final results:", JSON.stringify(results, null, 2));
 
       return results;
     } catch (e) {
-      console.error("Error in uploadFile action:", e);
+      err("Error in uploadFile action:", e);
       throw error(
         500,
         e instanceof Error ? e.message : "An unknown error occurred",

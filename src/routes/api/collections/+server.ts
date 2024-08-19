@@ -57,7 +57,7 @@ export async function POST() {
 
     log("Inserted items count:", insertedCount);
     const allCollections = getAllCollectionsWithTooltips();
-    log("All collections with tooltips after insertion:", allCollections);
+    log("All collections with tooltips after insertion:");
     return json({
       success: true,
       message: "Collections and tooltips seeded successfully",
@@ -82,7 +82,7 @@ export async function GET() {
   initializeDatabase();
   try {
     const collectionsWithTooltips = getAllCollectionsWithTooltips();
-    log("Retrieved collections with tooltips:", collectionsWithTooltips);
+    log("Retrieved collections with tooltips:");
     return json(collectionsWithTooltips);
   } catch (error) {
     err("Error retrieving collections with tooltips:", error);
