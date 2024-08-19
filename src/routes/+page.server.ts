@@ -13,6 +13,7 @@ import {
   getFormattedCollections,
   initializeDatabase,
 } from "$lib/db/dbOperations";
+import { log, error, warn, debug } from "$utils/logger";
 
 const YOUR_GRAPHQL_ENDPOINT = "http://localhost:4000/graphql";
 const client = new ApolloClient({
@@ -23,6 +24,7 @@ const client = new ApolloClient({
 initializeDatabase();
 
 export const load: PageServerLoad = async () => {
+  log("Test");
   const collections = getFormattedCollections();
   return { collections };
 };
