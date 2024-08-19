@@ -1,14 +1,12 @@
 <!-- src/routes/+page.svelte-->
 
 <script lang="ts">
-    import { log, warn, err } from "$utils/unifiedLogger";
     import { enhance } from "$app/forms";
-    import { page } from "$app/stores";
-    import DocumentDisplay from "$lib/components/DocumentDisplay.svelte";
     import { onMount } from "svelte";
     import { getCollections } from "$lib/collectionManager";
-    import FileUploadResults from "$lib/components/FileUploadResults.svelte";
     import { toast } from "svelte-sonner";
+    import DocumentDisplay from "$lib/components/DocumentDisplay.svelte";
+    import FileUploadResults from "$lib/components/FileUploadResults.svelte";
 
     let showDebugInfo = false;
     let debugInfo = "";
@@ -40,7 +38,6 @@
     let fileUploadResults = [];
     let fileInputFiles: FileList | null = null;
 
-    // Reactive statement to update file when fileInputFiles changes
     $: if (fileInputFiles && fileInputFiles.length > 0) {
         file = fileInputFiles[0];
     } else {
@@ -66,20 +63,17 @@
         isLoading = true;
 
         return async ({ result }) => {
-            log("Form submission result:", result);
             try {
                 if (result.type === "success") {
                     const data = result.data;
-                    log("Received data:", data);
                     if (isSearchMode) {
                         if (data && data.data && data.data.searchDocuments) {
                             searchResults = data.data.searchDocuments;
-                            log("Search results:", searchResults);
                             if (searchResults.length === 0) {
                                 toast.error(
                                     "No results found for the given document key.",
                                     {
-                                        duration: 5000,
+                                        duration: Infinity,
                                     },
                                 );
                             } else {
@@ -98,12 +92,12 @@
                     } else {
                         if (Array.isArray(data)) {
                             fileUploadResults = data;
-                            // log(
-                            //     "File upload results:",
-                            //     JSON.stringify(fileUploadResults, null, 2),
-                            // );
                             toast.success("File processed successfully.", {
                                 duration: 3000,
+                            });
+                        } else if (data && data.error) {
+                            toast.error(data.error, {
+                                duration: Infinity,
                             });
                         } else {
                             throw new Error(
@@ -112,46 +106,23 @@
                         }
                     }
                     buttonState = "results";
-                } else if (result.type === "failure") {
-                    err("Form submission failed:", result.data);
-                    if (result.data && result.data.error) {
-                        toast.error(result.data.error, {
-                            duration: 5000,
-                        });
-                    } else {
-                        toast.error(
-                            "An unexpected error occurred during submission.",
-                            {
-                                duration: 5000,
-                            },
-                        );
-                    }
-                    buttonState = "ready";
-                    if (!isSearchMode) {
-                        resetFileInput();
-                    }
                 } else if (result.type === "error") {
-                    err("Form submission error:", result.error);
                     toast.error(result.error || "An unknown error occurred", {
-                        duration: 5000,
+                        duration: Infinity,
                     });
                     buttonState = "ready";
-                    if (!isSearchMode) {
-                        resetFileInput();
-                    }
                 }
             } catch (e) {
-                err("Error processing response:", e);
                 toast.error(`Error: ${e.message}`, {
-                    duration: 5000,
+                    duration: Infinity,
                 });
                 buttonState = "ready";
-                if (!isSearchMode) {
-                    resetFileInput();
-                }
             } finally {
                 processing = false;
                 isLoading = false;
+                if (!isSearchMode) {
+                    resetFileInput();
+                }
             }
         };
     }
@@ -279,7 +250,6 @@
 
     onMount(async () => {
         try {
-            log("GETTING COLLECTIONS");
             allCollections = await getCollections();
             selectedCollections = allCollections.map(
                 ({ bucket, scope_name, collection_name }) => ({
@@ -289,7 +259,6 @@
                 }),
             );
         } catch (error) {
-            err("Error fetching collections:", error);
             errorMessage =
                 "Failed to fetch collections. Please try again later.";
         }
