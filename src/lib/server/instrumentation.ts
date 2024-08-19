@@ -12,7 +12,7 @@ import { OTLPMetricExporter } from "@opentelemetry/exporter-metrics-otlp-http";
 import { BatchSpanProcessor } from "@opentelemetry/sdk-trace-base";
 import { PeriodicExportingMetricReader } from "@opentelemetry/sdk-metrics";
 import { getNodeAutoInstrumentations } from "@opentelemetry/auto-instrumentations-node";
-import { config } from "./config";
+import { config } from "$config";
 
 const resource = new Resource({
   [SEMRESATTRS_SERVICE_NAME]: config.openTelemetry.SERVICE_NAME,

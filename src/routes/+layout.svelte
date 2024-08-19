@@ -2,6 +2,8 @@
 
 <script lang="ts">
     import { onMount, onDestroy } from "svelte";
+    import { browser } from "$app/environment";
+
     import "../app.css";
     import * as Drawer from "$lib/components/ui/drawer";
     import { Button } from "$lib/components/ui/button";
@@ -67,6 +69,11 @@
 
     onDestroy(() => {
         if (autoplayInterval) clearInterval(autoplayInterval);
+        if (browser) {
+            import("$lib/clientInstrumentation").then((module) => {
+                // Client-side instrumentation is now initialized
+            });
+        }
     });
 </script>
 

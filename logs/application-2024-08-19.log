@@ -1,3 +1,8 @@
 {"@timestamp":"2024-08-19T01:28:52.837Z","ecs.version":"8.10.0","log.level":"info","message":"Test"}
 {"@timestamp":"2024-08-19T01:28:52.839Z","ecs.version":"8.10.0","log.level":"info","message":"Test"}
 {"@timestamp":"2024-08-19T01:52:04.578Z","ecs.version":"8.10.0","log.level":"info","message":"Test"}
+{"@timestamp":"2024-08-19T02:07:21.675Z","ecs.version":"8.10.0","log.level":"info","message":"Test"}
+{"@timestamp":"2024-08-19T02:52:30.289Z","ecs.version":"8.10.0","log.level":"info","message":"Test"}
+{"@timestamp":"2024-08-19T02:53:25.101Z","ecs.version":"8.10.0","log.level":"info","message":"Test"}
+{"@timestamp":"2024-08-19T02:54:08.409Z","ecs.version":"8.10.0","log.level":"error","message":500}
+{"@timestamp":"2024-08-19T02:55:05.228Z","ecs.version":"8.10.0","log.level":"info","message":"Test"}
