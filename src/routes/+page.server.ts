@@ -8,12 +8,12 @@ import {
 } from "@apollo/client/core";
 import fetch from "cross-fetch";
 import type { Actions, PageServerLoad } from "./$types";
-import { error } from "@sveltejs/kit";
+import { error, fail } from "@sveltejs/kit";
 import {
   getFormattedCollections,
   initializeDatabase,
 } from "$lib/db/dbOperations";
-import { log, error, warn, debug } from "$utils/logger";
+import { log, warn, debug } from "$utils/logger";
 
 const YOUR_GRAPHQL_ENDPOINT = "http://localhost:4000/graphql";
 const client = new ApolloClient({
@@ -40,7 +40,6 @@ export const actions: Actions = {
       console.log("Selected Collections:", selectedCollections);
       console.log("Keys:", keys);
 
-      // Ensure collections are in the correct format
       const formattedCollections = selectedCollections.map(
         ({ bucket, scope_name, collection_name }) => ({
           bucket,
@@ -102,15 +101,25 @@ export const actions: Actions = {
 
       if (!file) {
         console.log("No file uploaded");
-        throw error(400, "No file uploaded");
+        return fail(400, { error: "No file uploaded" });
       }
 
       console.log("File received:", file.name);
 
-      // Process the CSV file
       const content = await file.text();
       const documentKeys = content.split(",").map((key) => key.trim());
-      console.log("Document keys extracted:", documentKeys);
+
+      const MAX_KEYS = 50;
+      if (documentKeys.length > MAX_KEYS) {
+        console.log(
+          `Too many document keys: ${documentKeys.length}. Limit is ${MAX_KEYS}.`,
+        );
+        return fail(400, {
+          error: `Too many document keys. Maximum allowed is ${MAX_KEYS}.`,
+        });
+      }
+
+      console.log(`Document keys extracted: ${documentKeys.length}`);
 
       // Get the collections here, inside the action
       const collections = getFormattedCollections();
