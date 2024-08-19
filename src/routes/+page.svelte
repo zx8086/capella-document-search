@@ -38,6 +38,14 @@
     let file: File | null = null;
     let fileUploadResults = [];
 
+    let fileUploadTooltipContent =
+        "Upload a CSV file containing document keys to check. Each key should be on a separate line or column, seperated by a comma. No comma after the last document key! The search for these keys will be performed across all collections.";
+
+    function openTooltipModal(tooltipContent: string) {
+        currentTooltip = tooltipContent;
+        modalIsOpen = true;
+    }
+
     $: buttonClass = {
         ready: "cursor-pointer",
         searching: "cursor-not-allowed",
@@ -45,7 +53,7 @@
     }[buttonState];
 
     $: buttonText = {
-        ready: isSearchMode ? "Search" : file ? "Search" : "Upload a file",
+        ready: isSearchMode ? "Search" : file ? "Search" : "Search",
         searching: isSearchMode ? "Searching..." : "Searching...",
         results: "Done",
     }[buttonState];
@@ -69,6 +77,8 @@
         const target = event.target as HTMLInputElement;
         if (target.files) {
             file = target.files[0];
+            buttonState = "ready";
+            fileUploadResults = [];
         }
     }
 
@@ -107,7 +117,6 @@
                                 "Unexpected search results structure",
                             );
                         }
-                        buttonState = "results";
                     } else {
                         if (Array.isArray(data)) {
                             fileUploadResults = data;
@@ -120,17 +129,39 @@
                                 "Unexpected file upload result structure",
                             );
                         }
-                        buttonState = "results"; // Change this from "ready" to "results"
                     }
+                    buttonState = "results";
                 } catch (e) {
                     console.error("Error processing server response:", e);
                     toast.error(
                         "Error processing server response: " + e.message,
+                        {
+                            duration: Infinity,
+                            class: "!bg-red-100 !text-red-800 !font-medium",
+                        },
                     );
                     buttonState = "ready";
                 }
+            } else if (result.type === "failure") {
+                console.error("Form submission failed:", result.data);
+                if (result.data.error) {
+                    toast.error(result.data.error, {
+                        duration: Infinity,
+                        class: "!bg-red-100 !text-red-800 !font-medium",
+                    });
+                } else {
+                    toast.error("An unexpected error occurred", {
+                        duration: Infinity,
+                        class: "!bg-red-100 !text-red-800 !font-medium",
+                    });
+                }
+                buttonState = "ready";
             } else if (result.type === "error") {
-                toast.error(result.error);
+                console.error("Form submission error:", result.error);
+                toast.error(result.error, {
+                    duration: Infinity,
+                    class: "!bg-red-100 !text-red-800 !font-medium",
+                });
                 buttonState = "ready";
             }
             processing = false;
@@ -182,11 +213,6 @@
 
     $: if (documentKey) {
         resetSearch();
-    }
-
-    function openTooltipModal(tooltipContent: string) {
-        currentTooltip = tooltipContent;
-        modalIsOpen = true;
     }
 
     $: if (documentKey) {
@@ -309,7 +335,7 @@
                                                 viewBox="0 0 24 24"
                                                 aria-hidden="true"
                                                 fill="currentColor"
-                                                class="w-12 h-12 opacity-75 mb-2 group-hover:opacity-100 transition-opacity"
+                                                class="w-12 h-12 opacity-75 mb-2 group-hover:opacity-100 transition-opacity animate-bounce"
                                             >
                                                 <path
                                                     fill-rule="evenodd"
@@ -332,15 +358,39 @@
                                                 on:change={handleFileChange}
                                             />
                                         </label>
-                                        <span class="mt-1"
-                                            >a file with Document keys to check
-                                            here</span
-                                        >
+                                        <span class="mt-1 flex items-center">
+                                            a file with Document keys to check
+                                            here
+                                            <button
+                                                on:click|preventDefault={() =>
+                                                    openTooltipModal(
+                                                        fileUploadTooltipContent,
+                                                    )}
+                                                class="ml-2 text-gray-500 hover:text-gray-700 focus:outline-none"
+                                            >
+                                                <svg
+                                                    xmlns="http://www.w3.org/2000/svg"
+                                                    fill="none"
+                                                    viewBox="0 0 24 24"
+                                                    stroke="currentColor"
+                                                    class="w-4 h-4"
+                                                >
+                                                    <path
+                                                        stroke-linecap="round"
+                                                        stroke-linejoin="round"
+                                                        stroke-width="2"
+                                                        d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                                                    />
+                                                </svg>
+                                            </button>
+                                        </span>
                                         <small
                                             id="validFileFormats"
                                             class="text-xs mt-1"
-                                            >CSV files only</small
                                         >
+                                            CSV files only (Document Keys Limit:
+                                            50)
+                                        </small>
                                     </div>
 
                                     {#if file}
@@ -527,21 +577,19 @@
                 <p class="text-red-600 mt-4">{errorMessage}</p>
             {/if}
 
-            {#if isSearchMode}
-                {#if searchResults.length > 0}
-                    <h2 class="mt-4 mb-6"></h2>
-                    {#each searchResults as result}
-                        <DocumentDisplay
-                            bucket={result.bucket}
-                            scope={result.scope}
-                            collection={result.collection}
-                            data={result.data}
-                            timeTaken={result.timeTaken}
-                            {documentKey}
-                        />
-                    {/each}
-                {/if}
-            {:else if fileUploadResults.length > 0}
+            {#if isSearchMode && searchResults.length > 0}
+                <h2 class="mt-4 mb-6">Search Results:</h2>
+                {#each searchResults as result}
+                    <DocumentDisplay
+                        bucket={result.bucket}
+                        scope={result.scope}
+                        collection={result.collection}
+                        data={result.data}
+                        timeTaken={result.timeTaken}
+                        {documentKey}
+                    />
+                {/each}
+            {:else if !isSearchMode && fileUploadResults.length > 0}
                 <FileUploadResults results={fileUploadResults} />
             {/if}
 
@@ -581,7 +629,7 @@
                 <h3
                     class="font-semibold tracking-wide text-black dark:text-white"
                 >
-                    Collection Information
+                    Tool Tip
                 </h3>
                 <button
                     on:click={() => (modalIsOpen = false)}

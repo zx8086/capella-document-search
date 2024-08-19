@@ -70,9 +70,7 @@
     onDestroy(() => {
         if (autoplayInterval) clearInterval(autoplayInterval);
         if (browser) {
-            import("$lib/clientInstrumentation").then((module) => {
-                // Client-side instrumentation is now initialized
-            });
+            import("$lib/clientInstrumentation").then((module) => {});
         }
     });
 </script>
