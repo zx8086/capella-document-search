@@ -1,0 +1,15 @@
+{
+    "keep": {
+        "days": true,
+        "amount": 14
+    },
+    "auditLog": "/Users/SOwusu/WebstormProjects/capella-document-search/logs/.3f18aa556a0983da29e986090003e9acb25ceb57-audit.json",
+    "files": [
+        {
+            "date": 1724030932832,
+            "name": "/Users/SOwusu/WebstormProjects/capella-document-search/logs/application-2024-08-19.log",
+            "hash": "7c85586214cd7a13ee63f0daf58384033d86b7981ec92635a569f354d317d447"
+        }
+    ],
+    "hashType": "sha256"
+}

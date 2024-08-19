@@ -1,3 +1,3 @@
 /* src/models/index.ts */
 
-export * from "./config";
+export * from "./types";

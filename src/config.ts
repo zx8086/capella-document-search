@@ -1,21 +1,7 @@
-import type { config } from "../../src/models/config";
+/* src/config.ts */
 
-function getEnvOrThrow(key: string): any {
-  const value = Bun.env[key];
-  if (value === undefined) {
-    throw new Error(`Required environment variable ${key} is not set`);
-  }
-  return value;
-}
-
-function getEnvNumberOrThrow(key: string): number {
-  const value = getEnvOrThrow(key);
-  const numberValue = Number(value);
-  if (isNaN(numberValue)) {
-    throw new Error(`Environment variable ${key} must be a valid number`);
-  }
-  return numberValue;
-}
+import { getEnvOrThrow, getEnvNumberOrThrow } from "./utils";
+import type { Config } from "./models/types";
 
 export const config: Config = {
   application: {
@@ -53,3 +39,5 @@ export const config: Config = {
     TEAMS_WEBHOOK_URL: getEnvOrThrow("TEAMS_WEBHOOK_URL"),
   },
 };
+
+export * from "./models/types";
