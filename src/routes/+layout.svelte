@@ -11,13 +11,13 @@
 
     let quotes = [
         {
-            text: `Prove by doing !`,
+            text: `Prove by Doing !`,
         },
         {
-            text: "First make it work, then make it better, then make it beautiful !",
+            text: "First make it Work, then make it Better, then make it Beautiful !",
         },
         {
-            text: "It’s not possible ! - “No, it is necessary !” (No Time For Caution) !",
+            text: `It's not possible ! - "No, it is necessary !" (No Time For Caution) !`,
         },
         {
             text: "#TEGID - The Enemy's Gate Is Down !",
@@ -26,13 +26,10 @@
             text: "De-coupled & Agnostic !",
         },
         {
-            text: "We build it, we support it !",
+            text: "We Build it, we Support it !",
         },
         {
-            text: "The way you do anything, is the way you do everything !",
-        },
-        {
-            text: "Speed = Productivity !",
+            text: "The way you do Anything, is the way you do Everything !",
         },
     ];
 
@@ -86,12 +83,14 @@
     <!-- Main Content -->
     <main class="flex-grow">
         <Toaster
+            expand
+            visibleToasts={5}
             richColors
             closeButton
-            position="bottom-right"
             toastOptions={{
-                classNames: {
-                    toast: "bg-white dark:bg-gray-800 text-gray-900 dark:text-white",
+                unstyled: true,
+                classes: {
+                    toast: "bg-white dark:bg-gray-800 text-gray-900 dark:text-white !p-4 !min-w-[300px] !rounded-lg !shadow-lg !font-sans",
                     title: "font-medium text-base",
                     description: "text-sm",
                     actionButton: "bg-[#00174f] text-white",
@@ -99,8 +98,6 @@
                     closeButton:
                         "text-gray-400 hover:text-gray-900 dark:hover:text-white",
                 },
-                class: "!p-4 !min-w-[300px] !rounded-lg !shadow-lg !font-sans",
-                style: "font-size: 32px;",
             }}
         />
         <slot />
@@ -113,18 +110,18 @@
                 &copy; {new Date().getFullYear()} PVH. Powered by
                 <Drawer.Root>
                     <Drawer.Trigger>
-                        <span class="cursor-pointer underline"
+                        <span class="cursor-pointer underline text-lg"
                             >B2B Platform Engineering</span
                         >
                     </Drawer.Trigger>
                     <Drawer.Content
-                        class="h-[50vh] sm:h-[60vh] bg-[#00174f] text-white"
+                        class="h-[33vh] sm:h-[40vh] bg-[#00174f] text-white"
                     >
                         <Drawer.Header>
-                            <Drawer.Title class="text-2xl"
+                            <Drawer.Title class="text-3xl font-bold"
                                 >B2B Platform Engineering</Drawer.Title
                             >
-                            <Drawer.Description class="text-gray-300"
+                            <Drawer.Description class="text-gray-300 text-lg"
                                 >Mottos we work by...</Drawer.Description
                             >
                         </Drawer.Header>
@@ -144,7 +141,7 @@
                                             class:opacity-0={currentQuoteIndex !==
                                                 index}
                                         >
-                                            <p class="text-3xl font-bold mb-4">
+                                            <p class="text-8xl font-bold mb-4">
                                                 "{quote.text}"
                                             </p>
                                         </div>
@@ -211,14 +208,26 @@
                             </div>
                         </div>
                         <Drawer.Footer
-                            class="flex justify-end bg-[#001140] px-4 py-2"
+                            class="flex flex-col items-center bg-[#001140] px-4 py-2 space-y-2"
                         >
-                            <Drawer.Close>
+                            <Drawer.Close
+                                class="flex flex-col items-center space-y-2"
+                            >
+                                <Button
+                                    href="https://pvhcorp.atlassian.net/wiki/x/fgBFEg"
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    variant="outline"
+                                    class="text-black border-white animate-pulse"
+                                >
+                                    Learn More
+                                </Button>
                                 <Button
                                     variant="outline"
-                                    class="text-white border-white hover:bg-[#002280]"
-                                    >Close</Button
+                                    class="text-black border-white"
                                 >
+                                    Close
+                                </Button>
                             </Drawer.Close>
                         </Drawer.Footer>
                     </Drawer.Content>
