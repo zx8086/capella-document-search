@@ -629,10 +629,10 @@
             class="max-w-lg flex flex-col gap-4 overflow-hidden rounded-xl border border-slate-300 bg-white text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300"
         >
             <div
-                class="flex items-center justify-between border-b border-slate-300 bg-slate-100/60 p-4 dark:border-slate-700 dark:bg-slate-900/20"
+                class="flex items-center justify-between border-b border-slate-300 bg-[#00174f] p-4 dark:border-slate-700 dark:bg-slate-900/20"
             >
                 <h3
-                    class="font-semibold tracking-wide text-black dark:text-white"
+                    class="font-semibold tracking-wide text-white dark:text-white"
                 >
                     Tool Tip
                 </h3>
