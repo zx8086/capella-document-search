@@ -1,13 +1,58 @@
 <!-- src/routes/+layout.svelte -->
 
 <script lang="ts">
-    import { onMount, onDestroy } from "svelte";
-    import { browser } from "$app/environment";
-
+    import { enhance } from "$app/forms";
     import "../app.css";
     import * as Drawer from "$lib/components/ui/drawer";
     import { Button } from "$lib/components/ui/button";
     import { Toaster } from "$lib/components/ui/sonner";
+
+    import { onMount, setContext, onDestroy } from "svelte";
+    import { browser } from "$app/environment";
+    import { key, initTracker } from "$lib/context/tracker";
+    import type { Options } from "@openreplay/tracker";
+
+    let tracker: any | null = null;
+
+    async function initializeTracker() {
+        if (browser) {
+            const TrackerClass = await initTracker();
+            if (TrackerClass) {
+                tracker = new TrackerClass({
+                    projectKey: "XULAx3Gt1QjSuNsrm586",
+                    ingestPoint: "https://api.openreplay.com/ingest",
+                    obscureTextNumbers: false,
+                    obscureTextEmails: true,
+                    __DISABLE_SECURE_MODE: true,
+                    network: {
+                        capturePayload: true,
+                        sessionTokenHeader: false,
+                        failuresOnly: false,
+                        ignoreHeaders: [
+                            "Authorization",
+                            "Cookie",
+                            "Set-Cookie",
+                        ],
+                        captureInIframes: false,
+                    },
+                    capturePerformance: true,
+                    respectDoNotTrack: false,
+                    verbose: true,
+                    console: {
+                        enabled: true,
+                        level: ["log", "info", "warn", "error"],
+                    },
+                } as Options);
+            }
+        }
+        return tracker;
+    }
+
+    function getTracker() {
+        return tracker;
+    }
+
+    setContext(key, { getTracker });
 
     let quotes = [
         {
@@ -60,8 +105,24 @@
         isPaused = !isPaused;
     }
 
-    onMount(() => {
+    onMount(async () => {
         startAutoplay();
+        // Initialize OpenReplay tracker
+        try {
+            const trackerInstance = await initializeTracker();
+            if (trackerInstance) {
+                await trackerInstance.start({
+                    userID: "simon.owusu@tommy.com",
+                    metadata: {
+                        balance: "10M",
+                        plan: "free",
+                    },
+                });
+                console.log("OpenReplay tracker started successfully");
+            }
+        } catch (error) {
+            console.error("Failed to initialize OpenReplay:", error);
+        }
     });
 
     onDestroy(() => {
