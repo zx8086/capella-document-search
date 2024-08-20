@@ -16,6 +16,7 @@
     let processing = false;
     let errorMessage = "";
     let searchPerformed = false;
+    let sortedResults: any[] = [];
 
     let allCollections: {
         bucket: string;
@@ -265,6 +266,27 @@
     });
 
     $: groupedCollections = groupCollectionsByScope(allCollections);
+
+    $: {
+        if (isSearchMode && searchResults.length > 0) {
+            sortedResults = [...searchResults].sort((a, b) => {
+                const aHasData =
+                    a.data !== null && Object.keys(a.data).length > 0;
+                const bHasData =
+                    b.data !== null && Object.keys(b.data).length > 0;
+
+                if (aHasData && !bHasData) {
+                    return -1;
+                } else if (!aHasData && bHasData) {
+                    return 1;
+                } else {
+                    return 0;
+                }
+            });
+        } else {
+            sortedResults = [];
+        }
+    }
 </script>
 
 <div class="min-h-screen flex flex-col bg-white mb-20 mt-5">
@@ -584,7 +606,7 @@
 
             {#if isSearchMode && searchResults.length > 0}
                 <h2 class="mt-4 mb-6">Search Results:</h2>
-                {#each searchResults as result}
+                {#each sortedResults as result}
                     <DocumentDisplay
                         bucket={result.bucket}
                         scope={result.scope}
