@@ -32,7 +32,7 @@ import * as api from "@opentelemetry/api-logs";
 import { config } from "$config";
 
 // Set up diagnostics logging
-diag.setLogger(new DiagConsoleLogger(), DiagLogLevel.DEBUG);
+diag.setLogger(new DiagConsoleLogger(), DiagLogLevel.INFO);
 
 const resource = new Resource({
   [SEMRESATTRS_SERVICE_NAME]: config.openTelemetry.SERVICE_NAME,

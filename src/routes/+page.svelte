@@ -1,12 +1,46 @@
 <!-- src/routes/+page.svelte-->
 
 <script lang="ts">
+    import type { Options } from "@openreplay/tracker";
     import { enhance } from "$app/forms";
-    import { onMount } from "svelte";
+    import { onMount, getContext } from "svelte";
     import { getCollections } from "$lib/collectionManager";
     import { toast } from "svelte-sonner";
     import DocumentDisplay from "$lib/components/DocumentDisplay.svelte";
     import FileUploadResults from "$lib/components/FileUploadResults.svelte";
+
+    import { key } from "$lib/context/tracker";
+    import { browser } from "$app/environment";
+
+    const { getTracker } = getContext(key);
+
+    onMount(async () => {
+        try {
+            if (browser) {
+                const tracker = getTracker();
+                if (tracker) {
+                    tracker.event("Page_View", {
+                        page: "Document Search",
+                        category: "Navigation",
+                        action: "View",
+                    });
+                }
+            }
+
+            allCollections = await getCollections();
+            selectedCollections = allCollections.map(
+                ({ bucket, scope_name, collection_name }) => ({
+                    bucket,
+                    scope_name,
+                    collection_name,
+                }),
+            );
+        } catch (error) {
+            console.error("Error in onMount:", error);
+            errorMessage =
+                "Failed to fetch collections or initialize tracker. Please try again later.";
+        }
+    });
 
     let showDebugInfo = false;
     let debugInfo = "";
@@ -162,6 +196,18 @@
     function toggleMode() {
         isSearchMode = !isSearchMode;
         resetForm();
+        if (browser) {
+            const tracker = getTracker();
+            if (tracker) {
+                tracker.event("Mode_Change", {
+                    newMode: isSearchMode
+                        ? "Search Document Key"
+                        : "Upload Document Keys",
+                    category: "User Interaction",
+                    action: "Toggle Mode",
+                });
+            }
+        }
     }
 
     function resetForm() {
@@ -248,22 +294,6 @@
             return acc;
         }, {});
     }
-
-    onMount(async () => {
-        try {
-            allCollections = await getCollections();
-            selectedCollections = allCollections.map(
-                ({ bucket, scope_name, collection_name }) => ({
-                    bucket,
-                    scope_name,
-                    collection_name,
-                }),
-            );
-        } catch (error) {
-            errorMessage =
-                "Failed to fetch collections. Please try again later.";
-        }
-    });
 
     $: groupedCollections = groupCollectionsByScope(allCollections);
 
