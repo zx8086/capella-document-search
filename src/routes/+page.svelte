@@ -88,6 +88,16 @@
         }
     }
 
+    function resetFileInput() {
+        file = null;
+        const fileInput = document.getElementById(
+            "fileInput",
+        ) as HTMLInputElement;
+        if (fileInput) {
+            fileInput.value = "";
+        }
+    }
+
     function handleSubmit(event) {
         buttonState = "searching";
         processing = true;
@@ -99,12 +109,23 @@
 
         return async ({ result }) => {
             try {
+                console.log("Full result object:", result);
                 if (result.type === "success") {
                     const data = result.data;
+                    console.log("Data object:", data);
                     if (isSearchMode) {
                         if (data && data.data && data.data.searchDocuments) {
                             searchResults = data.data.searchDocuments;
-                            if (searchResults.length === 0) {
+                            console.log("Search results:", searchResults);
+
+                            const foundCollectionsCount =
+                                data.foundCollectionsCount;
+                            console.log(
+                                "Found collections count:",
+                                foundCollectionsCount,
+                            );
+
+                            if (foundCollectionsCount === 0) {
                                 toast.error(
                                     "No results found for the given document key.",
                                     {
@@ -113,18 +134,23 @@
                                 );
                             } else {
                                 toast.success(
-                                    "Search completed successfully.",
+                                    `Search completed successfully. Document found in ${foundCollectionsCount} collection(s).`,
                                     {
                                         duration: 3000,
                                     },
                                 );
                             }
                         } else {
+                            console.error(
+                                "Unexpected result structure:",
+                                result,
+                            );
                             throw new Error(
                                 "Unexpected search results structure",
                             );
                         }
                     } else {
+                        // File upload handling
                         if (Array.isArray(data.results)) {
                             fileUploadResults = data.results;
                             toast.success(
@@ -138,6 +164,10 @@
                                 duration: Infinity,
                             });
                         } else {
+                            console.error(
+                                "Unexpected file upload result structure:",
+                                data,
+                            );
                             throw new Error(
                                 "Unexpected file upload result structure",
                             );
@@ -151,6 +181,7 @@
                     buttonState = "ready";
                 }
             } catch (e) {
+                console.error("Error in handleSubmit:", e);
                 toast.error(`Error: ${e.message}`, {
                     duration: Infinity,
                 });
@@ -163,17 +194,6 @@
                 }
             }
         };
-    }
-
-    function resetFileInput() {
-        fileInputFiles = null;
-        file = null;
-        const fileInput = document.getElementById(
-            "fileInput",
-        ) as HTMLInputElement;
-        if (fileInput) {
-            fileInput.value = "";
-        }
     }
 
     let fileUploadTooltipContent =
