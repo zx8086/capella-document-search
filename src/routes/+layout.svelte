@@ -71,7 +71,7 @@
             text: "De-coupled & Agnostic !",
         },
         {
-            text: "We Build it, we Support it !",
+            text: "We Build it, We Support it !",
         },
         {
             text: "The way you do Anything, is the way you do Everything !",

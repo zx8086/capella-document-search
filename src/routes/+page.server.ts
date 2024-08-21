@@ -186,7 +186,10 @@ export const actions: Actions = {
 
       log("Final results:", JSON.stringify(results, null, 2));
 
-      return results;
+      return {
+        success: `File processed successfully. ${documentKeys.length} Document Keys searched.`,
+        results,
+      };
     } catch (e) {
       err("Error in uploadFile action:", e);
       throw error(

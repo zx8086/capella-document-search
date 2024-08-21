@@ -125,11 +125,14 @@
                             );
                         }
                     } else {
-                        if (Array.isArray(data)) {
-                            fileUploadResults = data;
-                            toast.success("File processed successfully.", {
-                                duration: 3000,
-                            });
+                        if (Array.isArray(data.results)) {
+                            fileUploadResults = data.results;
+                            toast.success(
+                                data.success || "File processed successfully.",
+                                {
+                                    duration: 3000,
+                                },
+                            );
                         } else if (data && data.error) {
                             toast.error(data.error, {
                                 duration: Infinity,
@@ -635,7 +638,7 @@
             {/if}
 
             {#if isSearchMode && searchResults.length > 0}
-                <h2 class="mt-4 mb-6">Search Results:</h2>
+                <h2 class="mt-4 mb-6"></h2>
                 {#each sortedResults as result}
                     <DocumentDisplay
                         bucket={result.bucket}
