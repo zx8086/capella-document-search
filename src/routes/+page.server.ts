@@ -36,7 +36,6 @@ export const actions: Actions = {
       const documentKey = data.get("documentKey") as string;
       const keys = [documentKey];
 
-      // log("Selected Collections:", selectedCollections);
       log("Keys:", keys);
 
       const formattedCollections = selectedCollections.map(
@@ -71,11 +70,16 @@ export const actions: Actions = {
         fetchPolicy: "no-cache",
       });
 
-      // log("GraphQL Response:", response.data);
+      const searchResults = response.data.searchDocuments;
+      const foundCollectionsCount = searchResults.filter(
+        (result) => result.data !== null,
+      ).length;
 
+      console.log("Found Collections", foundCollectionsCount);
       return {
         type: "success",
         data: response.data,
+        foundCollectionsCount: foundCollectionsCount,
       };
     } catch (error) {
       err("Error in searchDocuments action:", error);
@@ -112,7 +116,6 @@ export const actions: Actions = {
         .filter(Boolean);
       log("Document keys extracted:", documentKeys);
 
-      // Check if the number of document keys exceeds the limit
       const DOCUMENT_KEY_LIMIT = 50;
       if (documentKeys.length > DOCUMENT_KEY_LIMIT) {
         log(
