@@ -36,7 +36,7 @@ export const actions: Actions = {
       const documentKey = data.get("documentKey") as string;
       const keys = [documentKey];
 
-      log("Keys:", keys);
+      log("Keys:", { keys });
 
       const formattedCollections = selectedCollections.map(
         ({ bucket, scope_name, collection_name }) => ({
@@ -75,7 +75,7 @@ export const actions: Actions = {
         (result) => result.data !== null,
       ).length;
 
-      console.log("Found Collections", foundCollectionsCount);
+      log("Found Collections", { foundCollectionsCount });
       return {
         type: "success",
         data: response.data,
@@ -114,7 +114,7 @@ export const actions: Actions = {
         .split(",")
         .map((key) => key.trim())
         .filter(Boolean);
-      log("Document keys extracted:", documentKeys);
+      log("Document keys extracted:", { documentKeys });
 
       const DOCUMENT_KEY_LIMIT = 50;
       if (documentKeys.length > DOCUMENT_KEY_LIMIT) {

@@ -36,9 +36,18 @@ export interface MessagingConfig {
   TEAMS_WEBHOOK_URL: string;
 }
 
-export interface Config {
+export interface OpenReplayConfig {
+  VITE_OPENREPLAY_PROJECT_KEY: string;
+  VITE_OPENREPLAY_INGEST_POINT: string;
+}
+
+export interface BackendConfig {
   application: ApplicationConfig;
   capella: CapellaConfig;
   openTelemetry: OpenTelemetryConfig;
   messaging: MessagingConfig;
+}
+
+export interface FrontendConfig {
+  openreplay: OpenReplayConfig;
 }

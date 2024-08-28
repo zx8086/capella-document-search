@@ -30,32 +30,32 @@ import { getNodeAutoInstrumentations } from "@opentelemetry/auto-instrumentation
 import { WinstonInstrumentation } from "@opentelemetry/instrumentation-winston";
 import { GraphQLInstrumentation } from "@opentelemetry/instrumentation-graphql";
 import * as api from "@opentelemetry/api-logs";
-import config from "./src/config";
+import backendConfig, { type BackendConfig } from "./src/backend-config";
 
 // Set up diagnostics logging
 diag.setLogger(new DiagConsoleLogger(), DiagLogLevel.INFO);
 
 // Create a shared resource
 const resource = new Resource({
-  [ATTR_SERVICE_NAME]: config.openTelemetry.SERVICE_NAME,
-  [ATTR_SERVICE_VERSION]: config.openTelemetry.SERVICE_VERSION,
+  [ATTR_SERVICE_NAME]: backendConfig.openTelemetry.SERVICE_NAME,
+  [ATTR_SERVICE_VERSION]: backendConfig.openTelemetry.SERVICE_VERSION,
   [SEMRESATTRS_DEPLOYMENT_ENVIRONMENT]:
-    config.openTelemetry.DEPLOYMENT_ENVIRONMENT,
+    backendConfig.openTelemetry.DEPLOYMENT_ENVIRONMENT,
 });
 
 // Create OTLP exporters
 const traceExporter = new OTLPTraceExporter({
-  url: config.openTelemetry.TRACES_ENDPOINT,
+  url: backendConfig.openTelemetry.TRACES_ENDPOINT,
   headers: { "Content-Type": "application/json" },
 });
 
 const otlpMetricExporter = new OTLPMetricExporter({
-  url: config.openTelemetry.METRICS_ENDPOINT,
+  url: backendConfig.openTelemetry.METRICS_ENDPOINT,
   headers: { "Content-Type": "application/json" },
 });
 
 const logExporter = new OTLPLogExporter({
-  url: config.openTelemetry.LOGS_ENDPOINT,
+  url: backendConfig.openTelemetry.LOGS_ENDPOINT,
   headers: { "Content-Type": "application/json" },
 });
 
@@ -67,12 +67,13 @@ api.logs.setGlobalLoggerProvider(loggerProvider);
 // Set up MetricReaders
 const consoleMetricReader = new PeriodicExportingMetricReader({
   exporter: new ConsoleMetricExporter(),
-  exportIntervalMillis: config.openTelemetry.CONSOLE_METRIC_READER_INTERVAL,
+  exportIntervalMillis:
+    backendConfig.openTelemetry.CONSOLE_METRIC_READER_INTERVAL,
 });
 
 const otlpMetricReader = new PeriodicExportingMetricReader({
   exporter: otlpMetricExporter,
-  exportIntervalMillis: config.openTelemetry.METRIC_READER_INTERVAL,
+  exportIntervalMillis: backendConfig.openTelemetry.METRIC_READER_INTERVAL,
 });
 
 // Set up MeterProvider
@@ -131,6 +132,6 @@ process.on("SIGTERM", () => {
 
 export const otelSDK = sdk;
 export const meter = metrics.getMeter(
-  config.openTelemetry.SERVICE_NAME,
-  config.openTelemetry.SERVICE_VERSION,
+  backendConfig.openTelemetry.SERVICE_NAME,
+  backendConfig.openTelemetry.SERVICE_VERSION,
 );

@@ -35,7 +35,7 @@ export async function POST() {
 
     db.transaction(() => {
       for (const item of scopesAndCollections) {
-        log("Inserting item:", item);
+        log("Inserting item:", { item });
         const scopeResult = insertScope(item.bucket, item.scope);
         const collectionResult = insertCollection(
           item.bucket,
@@ -48,14 +48,14 @@ export async function POST() {
           item.collection,
           `This is a mock tooltip for ${item.bucket}.${item.scope}.${item.collection}`,
         );
-        log("Scope insertion result:", scopeResult);
-        log("Collection insertion result:", collectionResult);
-        log("Tooltip insertion result:", tooltipResult);
+        log("Scope insertion result:", { scopeResult });
+        log("Collection insertion result:", { collectionResult });
+        log("Tooltip insertion result:", { tooltipResult });
         insertedCount++;
       }
     })();
 
-    log("Inserted items count:", insertedCount);
+    log("Inserted items count:", { insertedCount });
     const allCollections = getAllCollectionsWithTooltips();
     log("All collections with tooltips after insertion:");
     return json({

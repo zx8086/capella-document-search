@@ -1,7 +1,11 @@
 /* src/utils.ts */
 
 export function getEnvOrThrow(key: string): string {
-  const value = Bun.env[key];
+  const value =
+    typeof process !== "undefined" && process.env
+      ? process.env[key]
+      : import.meta.env[key];
+
   if (value === undefined) {
     throw new Error(`Required environment variable ${key} is not set`);
   }

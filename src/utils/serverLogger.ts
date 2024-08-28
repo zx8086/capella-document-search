@@ -4,10 +4,10 @@ import winston from "winston";
 import { ecsFormat } from "@elastic/ecs-winston-format";
 import { OpenTelemetryTransportV3 } from "@opentelemetry/winston-transport";
 import DailyRotateFile from "winston-daily-rotate-file";
-import { config } from "./../config";
+import backendConfig from "../backend-config";
 
 const logger = winston.createLogger({
-  level: config.application.LOG_LEVEL,
+  level: backendConfig.application.LOG_LEVEL,
   format: ecsFormat({
     convertReqRes: true,
     apmIntegration: true,
@@ -15,7 +15,7 @@ const logger = winston.createLogger({
   transports: [
     new winston.transports.Console(),
     new OpenTelemetryTransportV3({
-      level: config.application.LOG_LEVEL,
+      level: backendConfig.application.LOG_LEVEL,
     }),
   ],
 });
@@ -26,8 +26,8 @@ if (typeof process !== "undefined" && process.env.NODE_ENV === "production") {
       filename: "logs/application-%DATE%.log",
       datePattern: "YYYY-MM-DD",
       zippedArchive: true,
-      maxSize: config.application.LOG_MAX_SIZE,
-      maxFiles: config.application.LOG_MAX_FILES,
+      maxSize: backendConfig.application.LOG_MAX_SIZE,
+      maxFiles: backendConfig.application.LOG_MAX_FILES,
     }),
   );
 }

@@ -11,7 +11,7 @@
     import { browser } from "$app/environment";
     import { key, initTracker } from "$lib/context/tracker";
     import type { Options } from "@openreplay/tracker";
-
+    import { frontendConfig } from "../config";
     let tracker: any | null = null;
 
     async function initializeTracker() {
@@ -19,8 +19,10 @@
             const TrackerClass = await initTracker();
             if (TrackerClass) {
                 tracker = new TrackerClass({
-                    projectKey: "XULAx3Gt1QjSuNsrm586",
-                    ingestPoint: "https://api.openreplay.com/ingest",
+                    projectKey:
+                        frontendConfig.openreplay.VITE_OPENREPLAY_PROJECT_KEY,
+                    ingestPoint:
+                        frontendConfig.openreplay.VITE_OPENREPLAY_INGEST_POINT,
                     obscureTextNumbers: false,
                     obscureTextEmails: true,
                     __DISABLE_SECURE_MODE: true,
