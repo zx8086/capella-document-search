@@ -1,7 +1,7 @@
 /* src/lib/db/dbOperations.ts */
 
 import { Database, Statement } from "bun:sqlite";
-import { log, err } from "$utils/unifiedLogger";
+import { log, err } from "../../utils/unifiedLogger";
 
 let db: Database | null = null;
 let insertScopeStmt: Statement | null = null;

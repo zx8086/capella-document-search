@@ -30,11 +30,10 @@ import { getNodeAutoInstrumentations } from "@opentelemetry/auto-instrumentation
 import { WinstonInstrumentation } from "@opentelemetry/instrumentation-winston";
 import { GraphQLInstrumentation } from "@opentelemetry/instrumentation-graphql";
 import * as api from "@opentelemetry/api-logs";
-import config from "./config";
-import { log, err } from "$utils/logger";
+import config from "./src/config";
 
 // Set up diagnostics logging
-diag.setLogger(new DiagConsoleLogger(), DiagLogLevel.DEBUG);
+diag.setLogger(new DiagConsoleLogger(), DiagLogLevel.INFO);
 
 // Create a shared resource
 const resource = new Resource({
@@ -116,17 +115,17 @@ const sdk = new NodeSDK({
 // Start the SDK
 try {
   sdk.start();
-  log("OpenTelemetry SDK started with auto-instrumentation");
+  console.log("OpenTelemetry SDK started with auto-instrumentation");
 } catch (error) {
-  err("Error starting OpenTelemetry SDK:", error);
+  console.error("Error starting OpenTelemetry SDK:", error);
 }
 
 // Graceful shutdown
 process.on("SIGTERM", () => {
   sdk
     .shutdown()
-    .then(() => log("SDK shut down successfully"))
-    .catch((error) => log("Error shutting down SDK", error))
+    .then(() => console.log("SDK shut down successfully"))
+    .catch((error) => console.log("Error shutting down SDK", error))
     .finally(() => process.exit(0));
 });
 

@@ -1,7 +1,5 @@
 /* src/utils/browserLogger.ts */
 
-console.log("Browser Logger module is being imported");
-
 export function log(message: string, meta?: any): void {
   console.log(message, meta);
 }

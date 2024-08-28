@@ -1,19 +1,12 @@
-/* src/utils/logger.ts */
-
-console.log("Logger module is being imported");
+/* src/utils/serverLogger.ts */
 
 import winston from "winston";
 import { ecsFormat } from "@elastic/ecs-winston-format";
 import { OpenTelemetryTransportV3 } from "@opentelemetry/winston-transport";
 import DailyRotateFile from "winston-daily-rotate-file";
-import path from "path";
-import { fileURLToPath } from "url";
 import { config } from "./../config";
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
-export const logger = winston.createLogger({
+const logger = winston.createLogger({
   level: config.application.LOG_LEVEL,
   format: ecsFormat({
     convertReqRes: true,
@@ -27,17 +20,17 @@ export const logger = winston.createLogger({
   ],
 });
 
-const rootDir = path.join(__dirname, "..", "..");
-const logsDir = path.join(rootDir, "logs");
-logger.add(
-  new DailyRotateFile({
-    filename: path.join(logsDir, "application-%DATE%.log"),
-    datePattern: "YYYY-MM-DD",
-    zippedArchive: true,
-    maxSize: config.application.LOG_MAX_SIZE,
-    maxFiles: config.application.LOG_MAX_FILES,
-  }),
-);
+if (typeof process !== "undefined" && process.env.NODE_ENV === "production") {
+  logger.add(
+    new DailyRotateFile({
+      filename: "logs/application-%DATE%.log",
+      datePattern: "YYYY-MM-DD",
+      zippedArchive: true,
+      maxSize: config.application.LOG_MAX_SIZE,
+      maxFiles: config.application.LOG_MAX_FILES,
+    }),
+  );
+}
 
 export function log(message: string, meta?: any): void {
   logger.info(message, meta);

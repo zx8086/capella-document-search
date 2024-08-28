@@ -10,4 +10,20 @@ export default defineConfig({
       strict: false,
     },
   },
+  ssr: {
+    noExternal: ["@apollo/client", "@openreplay/tracker"],
+  },
+  build: {
+    rollupOptions: {
+      external: [
+        "winston",
+        "winston-daily-rotate-file",
+        "@elastic/ecs-winston-format",
+        "@opentelemetry/winston-transport",
+      ],
+    },
+  },
+  optimizeDeps: {
+    exclude: ["src/utils/serverLogger"],
+  },
 });

@@ -127,9 +127,9 @@
 
     onDestroy(() => {
         if (autoplayInterval) clearInterval(autoplayInterval);
-        if (browser) {
-            import("$lib/clientInstrumentation").then((module) => {});
-        }
+        // if (browser) {
+        //     import("$lib/clientInstrumentation").then((module) => {});
+        // }
     });
 </script>
 

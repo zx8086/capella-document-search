@@ -41,3 +41,4 @@ export const config: Config = {
 };
 
 export * from "./models/types";
+export default config;

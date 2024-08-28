@@ -13,7 +13,7 @@ import {
   getFormattedCollections,
   initializeDatabase,
 } from "$lib/db/dbOperations";
-import { log, err } from "$utils/unifiedLogger";
+import { log, err } from "../utils/serverLogger";
 
 const YOUR_GRAPHQL_ENDPOINT = "http://localhost:4000/graphql";
 const client = new ApolloClient({
