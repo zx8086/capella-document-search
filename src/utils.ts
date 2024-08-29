@@ -2,8 +2,8 @@
 
 export function getEnvOrThrow(key: string): string {
   const value =
-    typeof process !== "undefined" && process.env
-      ? process.env[key]
+    typeof process !== "undefined" && Bun.env
+      ? Bun.env[key]
       : import.meta.env[key];
 
   if (value === undefined) {

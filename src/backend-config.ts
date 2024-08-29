@@ -1,27 +1,12 @@
 /* src/backend-config.ts */
 
+import { getEnvOrThrow, getEnvNumberOrThrow } from "./utils";
 import type { BackendConfig } from "./models/types";
 
-function getEnvOrThrow(key: string): string {
-  if (typeof process === "undefined" || typeof process.env === "undefined") {
-    throw new Error(
-      "This configuration should only be used in a Node.js environment",
-    );
-  }
-  const value = process.env[key];
-  if (value === undefined) {
-    throw new Error(`Required environment variable ${key} is not set`);
-  }
-  return value;
-}
-
-function getEnvNumberOrThrow(key: string): number {
-  const value = getEnvOrThrow(key);
-  const numberValue = Number(value);
-  if (isNaN(numberValue)) {
-    throw new Error(`Environment variable ${key} must be a valid number`);
-  }
-  return numberValue;
+if (typeof process === "undefined" || typeof Bun.env === "undefined") {
+  throw new Error(
+    "This configuration should only be used in a Node.js environment",
+  );
 }
 
 const backendConfig: BackendConfig = {
