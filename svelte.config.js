@@ -1,6 +1,6 @@
 /* svelte.config.js */
 
-import adapter from "@sveltejs/adapter-node";
+import adapter from "svelte-adapter-bun";
 import { vitePreprocess } from "@sveltejs/vite-plugin-svelte";
 import path from "path";
 
@@ -12,7 +12,7 @@ const config = {
     alias: {
       $lib: path.resolve("./src/lib"),
       $utils: path.resolve("./src/utils"),
-      $config: path.resolve("./src/config.ts"),
+      $config: path.resolve("./src/backend-config.ts"),
     },
   },
 };
