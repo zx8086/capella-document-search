@@ -146,7 +146,7 @@
                         isFileValid = true;
                         buttonState = "ready";
                         toast.success(
-                            `File is valid. ${documentKeys.length} document key(s) found.`,
+                            `The uploaded CSV file is valid. ${documentKeys.length} document key(s) found.`,
                         );
                     }
                 } else {
@@ -793,7 +793,7 @@
                             </h4>
                             <pre
                                 class="bg-gray-100 p-3 rounded-md text-sm overflow-x-auto whitespace-pre-wrap break-all">
-            IMAGE_70_C51_K50K509654GE7, IMAGE_70</pre>
+IMAGE_70_C51_K50K509654GE7, IMAGE_01_B92_MW0MW10752403, IMAGE_04_C51_KB0KB09658PMT</pre>
                             <p class="mt-2 text-sm">
                                 In this format, all document keys are on a
                                 single line, separated by commas.
@@ -804,11 +804,11 @@
                             </h4>
                             <pre
                                 class="bg-gray-100 p-3 rounded-md text-sm whitespace-pre-wrap">
-            IMAGE_01_B92_MW0MW10752403,
-            IMAGE_04_C51_KB0KB09658PMT,
-            IMAGE_10_C34_AW0AW14437XI4,
-            IMAGE_70_C51_K50K509654GE7,
-            IMAGE_70_C51_LV04F1003GPDE</pre>
+  IMAGE_01_B92_MW0MW10752403,
+  IMAGE_04_C51_KB0KB09658PMT,
+  IMAGE_10_C34_AW0AW14437XI4,
+  IMAGE_70_C51_K50K509654GE7,
+  IMAGE_70_C51_LV04F1003GPDE</pre>
                             <p class="mt-2 text-sm">
                                 In this format, each document key is on a
                                 separate line, optionally followed by a comma.
