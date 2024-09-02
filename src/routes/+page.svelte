@@ -12,6 +12,7 @@
 
     import { key } from "$lib/context/tracker";
     import { browser } from "$app/environment";
+    import { frontendConfig } from "../config";
 
     const { getTracker } = getContext(key);
 
@@ -149,11 +150,14 @@
                             { duration: Infinity },
                         );
                         showExampleModal = true;
-                    } else if (documentKeys.length > 50) {
+                    } else if (
+                        documentKeys.length >
+                        frontendConfig.csv.VITE_FILE_UPLOAD_LIMIT
+                    ) {
                         isFileValid = false;
                         buttonState = "ready";
                         toast.error(
-                            `Too many document keys. The file contains ${documentKeys.length} keys, but the maximum allowed is 50.`,
+                            `Too many document keys. The file contains ${documentKeys.length} keys, but the maximum allowed is ${frontendConfig.csv.VITE_FILE_UPLOAD_LIMIT}.`,
                             { duration: Infinity },
                         );
                         showExampleModal = true;
@@ -200,7 +204,7 @@
         }
     }
 
-    function handleSubmit(event) {
+    function handleSubmit(event: Event) {
         buttonState = "searching";
         processing = true;
         errorMessage = "";
@@ -571,7 +575,8 @@
                                             class="text-xs mt-1"
                                         >
                                             CSV files only (Document Keys Limit:
-                                            50)
+                                            {frontendConfig.csv
+                                                .VITE_FILE_UPLOAD_LIMIT})
                                         </small>
                                     </div>
 
@@ -842,7 +847,8 @@ IMAGE_70_C51_K50K509654GE7, IMAGE_01_B92_MW0MW10752403, IMAGE_04_C51_KB0KB09658P
                                         string.
                                     </li>
                                     <li>
-                                        The file should contain between 1 and 50
+                                        The file should contain between 1 and {frontendConfig
+                                            .csv.VITE_FILE_UPLOAD_LIMIT}
                                         document keys.
                                     </li>
                                     <li>
