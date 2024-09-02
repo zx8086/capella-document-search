@@ -64,13 +64,7 @@
         const filteredResults = sortedResults.filter(
             (r) => r.found === (type === "found"),
         );
-        const csv = [
-            ["Document Key"],
-            ...filteredResults.map((r) => [r.documentKey]),
-        ]
-            .map((row) => row.join(","))
-            .join("\n");
-
+        const csv = filteredResults.map((r) => r.documentKey).join(",\n");
         const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
         const link = document.createElement("a");
         if (link.download !== undefined) {
