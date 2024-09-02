@@ -41,7 +41,7 @@ export interface OpenReplayConfig {
   VITE_OPENREPLAY_INGEST_POINT: string;
 }
 
-export interface CsvConfig {
+export interface CSVConfig {
   VITE_FILE_UPLOAD_LIMIT: number;
 }
 
@@ -54,5 +54,5 @@ export interface BackendConfig {
 
 export interface FrontendConfig {
   openreplay: OpenReplayConfig;
-  csv: CsvConfig;
+  csv: CSVConfig;
 }
