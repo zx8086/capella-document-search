@@ -444,7 +444,7 @@
     }
 </script>
 
-<div class="min-h-screen flex flex-col bg-white mb-20 mt-5">
+<div class="min-h-screen flex flex-col bg-white dark:bg-[#2C2C2C] mb-20 mt-5">
     <!-- Logo Section -->
     <div class="text-center py-4">
         <img src="/favicon.png" alt="PVH" class="mx-auto h-16" />
@@ -594,7 +594,6 @@
                     <div
                         class="absolute top-0 right-0 flex items-center space-x-2"
                     >
-                        <!-- Add more icons here in the future -->
                         <button
                             type="button"
                             on:click={toggleMode}
@@ -677,7 +676,7 @@
                                                                 stroke-linecap="round"
                                                                 stroke-linejoin="round"
                                                                 stroke-width="2"
-                                                                d="M2.25 12c0-5.385 4.365-9.75 9.75-9.75s9.75 4.365 9.75 9.75-4.365 9.75-9.75 9.75S2.25 17.385 2.25 12Zm8.706-1.442c1.146-.573 2.437.463 2.126 1.706l-.709 2.836.042-.02a.75.75 0 0 1 .67 1.34l-.04.022c-1.147.573-2.438-.463-2.127-1.706l.71-2.836-.042.02a.75.75 0 1 1-.671-1.34l.041-.022ZM12 9a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5Z"
+                                                                d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
                                                             />
                                                         </svg>
                                                     </button>
@@ -700,7 +699,7 @@
                                                         )}
                                                 />
                                                 <div
-                                                    class="w-11 h-6 bg-gray-200 rounded-full peer peer-focus:ring-4 peer-focus:ring-[#551a8b]/50 dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-light-blue"
+                                                    class="w-11 h-6 bg-gray-200 rounded-full peer peer-focus:ring-4 peer-focus:ring-[#551a8b]/50 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-light-blue"
                                                 ></div>
                                             </div>
                                         </label>
