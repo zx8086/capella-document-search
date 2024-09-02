@@ -5,7 +5,8 @@
   "scripts": {
     "dev": "vite dev",
     "build": "vite build",
-    "preview": "vite preview",
+    "preview": "vite preview --host",
+    "build:no-telemetry": "DISABLE_OPENTELEMETRY=true vite build",
     "start": "bun ./build/index.js",
     "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
     "check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch"
@@ -51,6 +52,7 @@
     "@opentelemetry/semantic-conventions": "^1.27.0",
     "@opentelemetry/winston-transport": "^0.5.0",
     "@slack/webhook": "^7.0.3",
+    "@types/papaparse": "^5.3.14",
     "axios": "^1.7.5",
     "bits-ui": "^0.21.13",
     "clsx": "^2.1.1",
@@ -61,6 +63,7 @@
     "help": "^3.0.2",
     "mode-watcher": "^0.4.1",
     "node-cron": "^3.0.3",
+    "papaparse": "^5.4.1",
     "svelte-sonner": "^0.3.27",
     "tailwind-merge": "^2.5.2",
     "tailwind-variants": "^0.2.1",

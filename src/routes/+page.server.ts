@@ -187,8 +187,6 @@ export const actions: Actions = {
         }),
       );
 
-      log("Final results:", JSON.stringify(results, null, 2));
-
       return {
         success: `File processed successfully. ${documentKeys.length} Document Keys searched.`,
         results,

@@ -2,6 +2,9 @@
 
 import { sveltekit } from "@sveltejs/kit/vite";
 import { defineConfig } from "vite";
+import path from "path";
+
+const disableOpenTelemetry = process.env.DISABLE_OPENTELEMETRY === "true";
 
 export default defineConfig({
   plugins: [sveltekit()],
@@ -10,20 +13,34 @@ export default defineConfig({
       strict: false,
     },
   },
+  resolve: {
+    alias: {
+      $lib: path.resolve("./src/lib"),
+      $utils: path.resolve("./src/utils"),
+      $config: path.resolve("./src/backend-config.ts"),
+    },
+  },
   ssr: {
     noExternal: ["@apollo/client", "@openreplay/tracker"],
   },
   build: {
     rollupOptions: {
-      external: [
-        "winston",
-        "winston-daily-rotate-file",
-        "@elastic/ecs-winston-format",
-        "@opentelemetry/winston-transport",
-      ],
+      external: disableOpenTelemetry
+        ? []
+        : [
+            "winston",
+            "winston-daily-rotate-file",
+            "@elastic/ecs-winston-format",
+            "@opentelemetry/winston-transport",
+          ],
     },
   },
   optimizeDeps: {
-    exclude: ["src/utils/serverLogger"],
+    exclude: disableOpenTelemetry ? [] : ["src/utils/serverLogger"],
   },
+  define: disableOpenTelemetry
+    ? {
+        "process.env.DISABLE_OPENTELEMETRY": JSON.stringify("true"),
+      }
+    : {},
 });

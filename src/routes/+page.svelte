@@ -8,6 +8,7 @@
     import { toast } from "svelte-sonner";
     import DocumentDisplay from "$lib/components/DocumentDisplay.svelte";
     import FileUploadResults from "$lib/components/FileUploadResults.svelte";
+    import Papa from "papaparse";
 
     import { key } from "$lib/context/tracker";
     import { browser } from "$app/environment";
@@ -79,13 +80,114 @@
         file = null;
     }
 
+    let isFileValid = false;
+    let showExampleModal = false;
+
     function handleFileChange(event: Event) {
         const target = event.target as HTMLInputElement;
-        if (target.files) {
-            fileInputFiles = target.files;
-            buttonState = "ready";
+        if (target.files && target.files.length > 0) {
+            file = target.files[0];
+            validateCSVFile(file);
+            // Clear previous results when a new file is selected
             fileUploadResults = [];
+            // Clear search results
+            searchResults = [];
+        } else {
+            file = null;
+            isFileValid = false;
         }
+    }
+
+    function validateCSVFile(file: File) {
+        Papa.parse(file, {
+            complete: (results) => {
+                if (results.data && results.data.length > 0) {
+                    let documentKeys: string[] = [];
+
+                    // Parse and extract document keys
+                    documentKeys = results.data.flatMap((row) => {
+                        if (Array.isArray(row)) {
+                            return row
+                                .map((item) => item.trim())
+                                .filter((item) => item !== "");
+                        } else if (typeof row === "string") {
+                            return row
+                                .split(",")
+                                .map((item) => item.trim())
+                                .filter((item) => item !== "");
+                        }
+                        return [];
+                    });
+
+                    // Validate format
+                    const isValidFormat = documentKeys.every((key) => {
+                        // This regex checks for uppercase word, underscore, and one or more numbers
+                        // It also ensures there are no quotes around the key
+                        return (
+                            /^[A-Z]+_\d+_.+$/.test(key) &&
+                            !/^["']|["']$/.test(key)
+                        );
+                    });
+
+                    if (!isValidFormat) {
+                        isFileValid = false;
+                        buttonState = "ready";
+                        toast.error(
+                            "Invalid file format. Some document keys do not follow the required format. Please check the example and try again.",
+                            { duration: Infinity },
+                        );
+                        showExampleModal = true;
+                        return;
+                    }
+
+                    // Validate number of keys
+                    if (documentKeys.length === 0) {
+                        isFileValid = false;
+                        buttonState = "ready";
+                        toast.error(
+                            "Invalid file format. The file contains no valid document keys. Please check the example and try again.",
+                            { duration: Infinity },
+                        );
+                        showExampleModal = true;
+                    } else if (documentKeys.length > 50) {
+                        isFileValid = false;
+                        buttonState = "ready";
+                        toast.error(
+                            `Too many document keys. The file contains ${documentKeys.length} keys, but the maximum allowed is 50.`,
+                            { duration: Infinity },
+                        );
+                        showExampleModal = true;
+                    } else {
+                        isFileValid = true;
+                        buttonState = "ready";
+                        toast.success(
+                            `The uploaded CSV file is valid. ${documentKeys.length} document key(s) found.`,
+                        );
+                    }
+                } else {
+                    isFileValid = false;
+                    buttonState = "ready";
+                    toast.error(
+                        "The file appears to be empty. Please check and try again.",
+                        { duration: Infinity },
+                    );
+                }
+            },
+            error: (error) => {
+                console.error("Error parsing CSV:", error);
+                isFileValid = false;
+                buttonState = "ready";
+                toast.error(
+                    "Error parsing the file. Please check the format and try again.",
+                    { duration: Infinity },
+                );
+                showExampleModal = true;
+            },
+        });
+    }
+
+    function closeExampleModal() {
+        showExampleModal = false;
     }
 
     function resetFileInput() {
@@ -623,11 +725,15 @@
                               buttonState === "results"
                             : buttonState === "searching" ||
                               buttonState === "results" ||
-                              !file}
+                              !file ||
+                              !isFileValid}
                         class="{buttonClass} w-full sm:w-auto px-6 py-2 min-w-[150px] bg-[#00174f] text-white rounded-md hover:bg-[#00174f]/80 transition duration-150 ease-in-out {(buttonState ===
                             'results' &&
                             isSearchMode) ||
-                        (!isSearchMode && (!file || buttonState === 'results'))
+                        (!isSearchMode &&
+                            (!file ||
+                                !isFileValid ||
+                                buttonState === 'results'))
                             ? 'opacity-50 cursor-not-allowed'
                             : ''} flex items-center justify-center"
                     >
@@ -651,6 +757,119 @@
                     </button>
                 </div>
             </form>
+
+            <!-- Example Modal -->
+            {#if showExampleModal}
+                <div
+                    class="fixed inset-0 z-30 flex items-center justify-center bg-black/50 backdrop-blur-sm"
+                    role="dialog"
+                    aria-modal="true"
+                >
+                    <div
+                        class="w-full max-w-lg flex flex-col overflow-hidden rounded-lg bg-white shadow-xl"
+                    >
+                        <div
+                            class="flex items-center justify-between bg-[#00174f] p-4 text-white"
+                        >
+                            <h3 class="text-xl font-semibold">
+                                CSV File Examples
+                            </h3>
+                            <button
+                                on:click={closeExampleModal}
+                                class="text-white hover:text-gray-200 focus:outline-none"
+                                aria-label="close modal"
+                            >
+                                <svg
+                                    xmlns="http://www.w3.org/2000/svg"
+                                    class="h-6 w-6"
+                                    fill="none"
+                                    viewBox="0 0 24 24"
+                                    stroke="currentColor"
+                                >
+                                    <path
+                                        stroke-linecap="round"
+                                        stroke-linejoin="round"
+                                        stroke-width="2"
+                                        d="M6 18L18 6M6 6l12 12"
+                                    />
+                                </svg>
+                            </button>
+                        </div>
+                        <div
+                            class="p-6 overflow-y-auto max-h-[calc(100vh-200px)]"
+                        >
+                            <p class="mb-4">
+                                Your CSV file can be in one of these two
+                                formats:
+                            </p>
+
+                            <h4 class="font-semibold mt-4 mb-2">
+                                1. Single-line format:
+                            </h4>
+                            <pre
+                                class="bg-gray-100 p-3 rounded-md text-sm overflow-x-auto whitespace-pre-wrap break-all">
+IMAGE_70_C51_K50K509654GE7, IMAGE_01_B92_MW0MW10752403, IMAGE_04_C51_KB0KB09658PMT</pre>
+                            <p class="mt-2 text-sm">
+                                In this format, all document keys are on a
+                                single line, separated by commas.
+                            </p>
+
+                            <h4 class="font-semibold mt-6 mb-2">
+                                2. Multi-line format:
+                            </h4>
+                            <pre
+                                class="bg-gray-100 p-3 rounded-md text-sm whitespace-pre-wrap">
+  IMAGE_01_B92_MW0MW10752403,
+  IMAGE_04_C51_KB0KB09658PMT,
+  IMAGE_10_C34_AW0AW14437XI4,
+  IMAGE_70_C51_K50K509654GE7,
+  IMAGE_70_C51_LV04F1003GPDE</pre>
+                            <p class="mt-2 text-sm">
+                                In this format, each document key is on a
+                                separate line, optionally followed by a comma.
+                            </p>
+
+                            <div
+                                class="mt-6 bg-blue-50 border-l-4 border-blue-500 p-4 rounded"
+                            >
+                                <h5 class="font-semibold text-blue-700 mb-2">
+                                    Important Notes:
+                                </h5>
+                                <ul
+                                    class="list-disc list-inside text-sm text-blue-800 space-y-1"
+                                >
+                                    <li>
+                                        Each document key should be a non-empty
+                                        string.
+                                    </li>
+                                    <li>
+                                        The file should contain between 1 and 50
+                                        document keys.
+                                    </li>
+                                    <li>
+                                        Trailing commas are optional and will be
+                                        ignored.
+                                    </li>
+                                    <li>
+                                        Leading and trailing whitespace will be
+                                        removed from each key.
+                                    </li>
+                                    <li>Empty lines will be ignored.</li>
+                                </ul>
+                            </div>
+                        </div>
+                        <div class="flex justify-end bg-gray-100 px-6 py-4">
+                            <button
+                                on:click={closeExampleModal}
+                                type="button"
+                                class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+                            >
+                                Close
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            {/if}
 
             <!-- Search Results and Error Messages -->
             {#if errorMessage}
