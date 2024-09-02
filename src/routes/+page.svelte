@@ -88,6 +88,10 @@
         if (target.files && target.files.length > 0) {
             file = target.files[0];
             validateCSVFile(file);
+            // Clear previous results when a new file is selected
+            fileUploadResults = [];
+            // Clear search results
+            searchResults = [];
         } else {
             file = null;
             isFileValid = false;
@@ -100,32 +104,43 @@
                 if (results.data && results.data.length > 0) {
                     let documentKeys: string[] = [];
 
-                    if (
-                        results.data.length === 1 &&
-                        typeof results.data[0] === "string"
-                    ) {
-                        // Single-line format
-                        documentKeys = results.data[0]
-                            .split(",")
-                            .map((key) => key.trim())
-                            .filter((key) => key !== "");
-                    } else {
-                        // Multi-line format or single-line parsed as multiple rows
-                        documentKeys = results.data.flatMap((row) => {
-                            if (Array.isArray(row)) {
-                                return row
-                                    .map((item) => item.trim())
-                                    .filter((item) => item !== "");
-                            } else if (typeof row === "string") {
-                                return row
-                                    .split(",")
-                                    .map((item) => item.trim())
-                                    .filter((item) => item !== "");
-                            }
-                            return [];
-                        });
+                    // Parse and extract document keys
+                    documentKeys = results.data.flatMap((row) => {
+                        if (Array.isArray(row)) {
+                            return row
+                                .map((item) => item.trim())
+                                .filter((item) => item !== "");
+                        } else if (typeof row === "string") {
+                            return row
+                                .split(",")
+                                .map((item) => item.trim())
+                                .filter((item) => item !== "");
+                        }
+                        return [];
+                    });
+
+                    // Validate format
+                    const isValidFormat = documentKeys.every((key) => {
+                        // This regex checks for uppercase word, underscore, and one or more numbers
+                        // It also ensures there are no quotes around the key
+                        return (
+                            /^[A-Z]+_\d+_.+$/.test(key) &&
+                            !/^["']|["']$/.test(key)
+                        );
+                    });
+
+                    if (!isValidFormat) {
+                        isFileValid = false;
+                        buttonState = "ready";
+                        toast.error(
+                            "Invalid file format. Some document keys do not follow the required format. Please check the example and try again.",
+                            { duration: Infinity },
+                        );
+                        showExampleModal = true;
+                        return;
                     }
 
+                    // Validate number of keys
                     if (documentKeys.length === 0) {
                         isFileValid = false;
                         buttonState = "ready";
