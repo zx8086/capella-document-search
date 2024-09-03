@@ -1,17 +1,17 @@
-import { fontFamily } from "tailwindcss/defaultTheme";
+import { fontFamily, screens } from "tailwindcss/defaultTheme";
 
 /** @type {import('tailwindcss').Config} */
 const config = {
   darkMode: ["class"],
   content: ["./src/**/*.{html,js,svelte,ts}"],
-  safelist: ["dark"],
   theme: {
+    screens: {
+      ...screens,
+      "2xl": "1400px",
+    },
     container: {
       center: true,
       padding: "2rem",
-      screens: {
-        "2xl": "1400px",
-      },
     },
     extend: {
       ringColor: {
@@ -62,9 +62,13 @@ const config = {
         sm: "calc(var(--radius) - 4px)",
       },
       fontFamily: {
-        sans: [...fontFamily.sans],
+        sans: ["Your-Primary-Font", ...fontFamily.sans],
       },
     },
+  },
+  plugins: [],
+  future: {
+    hoverOnlyWhenSupported: true,
   },
 };
 

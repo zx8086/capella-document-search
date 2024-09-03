@@ -29,7 +29,7 @@ import { getNodeAutoInstrumentations } from "@opentelemetry/auto-instrumentation
 import { WinstonInstrumentation } from "@opentelemetry/instrumentation-winston";
 import { GraphQLInstrumentation } from "@opentelemetry/instrumentation-graphql";
 import * as api from "@opentelemetry/api-logs";
-import backendConfig, { type BackendConfig } from "./backend-config";
+import backendConfig from "./backend-config";
 
 declare global {
   var INSTRUMENTATION_ENABLED: boolean;
