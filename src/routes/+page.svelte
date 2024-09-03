@@ -1,7 +1,7 @@
 <!-- src/routes/+page.svelte-->
 
 <script lang="ts">
-    import type { Options } from "@openreplay/tracker";
+    // import type { Options } from "@openreplay/tracker";
     import { enhance } from "$app/forms";
     import { onMount, getContext } from "svelte";
     import { getCollections } from "$lib/collectionManager";
@@ -13,6 +13,18 @@
     import { key } from "$lib/context/tracker";
     import { browser } from "$app/environment";
     import { frontendConfig } from "../config";
+
+    interface Collection {
+        bucket: string;
+        scope_name: string;
+        collection_name: string;
+        tooltip_content?: string | null;
+    }
+
+    interface SearchResult {
+        collection: string;
+        data: any;
+    }
 
     const { getTracker } = getContext(key);
 
@@ -44,33 +56,24 @@
         }
     });
 
-    let showDebugInfo = false;
+    let showDebugInfo: boolean = false;
     let debugInfo = "";
 
-    let documentKey = "";
-    let searchResults = [];
-    let processing = false;
-    let errorMessage = "";
+    let documentKey: string = "";
+    let processing: boolean = false;
+    let errorMessage: string = "";
     let searchPerformed = false;
     let sortedResults: any[] = [];
 
-    let allCollections: {
-        bucket: string;
-        scope_name: string;
-        collection_name: string;
-        tooltip_content: string | null;
-    }[] = [];
-    let selectedCollections: {
-        bucket: string;
-        scope_name: string;
-        collection_name: string;
-    }[] = [];
+    let allCollections: Collection[] = [];
+    let selectedCollections: Collection[] = [];
+    let searchResults: SearchResult[] = [];
 
-    let modalIsOpen = false;
-    let currentTooltip = "";
+    let modalIsOpen: boolean = false;
+    let currentTooltip: string = "";
 
     let buttonState = "ready";
-    let isSearchMode = true;
+    let isSearchMode: boolean = true;
     let file: File | null = null;
     let fileUploadResults = [];
     let fileInputFiles: FileList | null = null;
@@ -81,17 +84,15 @@
         file = null;
     }
 
-    let isFileValid = false;
-    let showExampleModal = false;
+    let isFileValid: boolean = false;
+    let showExampleModal: boolean = false;
 
-    function handleFileChange(event: Event) {
+    function handleFileChange(event: Event): void {
         const target = event.target as HTMLInputElement;
         if (target.files && target.files.length > 0) {
             file = target.files[0];
             validateCSVFile(file);
-            // Clear previous results when a new file is selected
             fileUploadResults = [];
-            // Clear search results
             searchResults = [];
         } else {
             file = null;
@@ -99,13 +100,12 @@
         }
     }
 
-    function validateCSVFile(file: File) {
+    function validateCSVFile(file: File): void {
         Papa.parse(file, {
             complete: (results) => {
                 if (results.data && results.data.length > 0) {
                     let documentKeys: string[] = [];
 
-                    // Parse and extract document keys
                     documentKeys = results.data.flatMap((row) => {
                         if (Array.isArray(row)) {
                             return row
@@ -120,10 +120,7 @@
                         return [];
                     });
 
-                    // Validate format
                     const isValidFormat = documentKeys.every((key) => {
-                        // This regex checks for uppercase word, underscore, and one or more numbers
-                        // It also ensures there are no quotes around the key
                         return (
                             /^[A-Z]+_\d+_.+$/.test(key) &&
                             !/^["']|["']$/.test(key)
@@ -141,7 +138,6 @@
                         return;
                     }
 
-                    // Validate number of keys
                     if (documentKeys.length === 0) {
                         isFileValid = false;
                         buttonState = "ready";
@@ -190,11 +186,11 @@
         });
     }
 
-    function closeExampleModal() {
+    function closeExampleModal(): void {
         showExampleModal = false;
     }
 
-    function resetFileInput() {
+    function resetFileInput(): void {
         file = null;
         const fileInput = document.getElementById(
             "fileInput",
@@ -204,7 +200,9 @@
         }
     }
 
-    function handleSubmit(event: Event) {
+    function handleSubmit(
+        event: Event,
+    ): (result: { type: string; data?: any; error?: string }) => Promise<void> {
         buttonState = "searching";
         processing = true;
         errorMessage = "";
@@ -302,10 +300,10 @@
         };
     }
 
-    let fileUploadTooltipContent =
+    let fileUploadTooltipContent: string =
         "Upload a CSV file containing document keys to check in Capella. Each key should be on a separate line or column. No comma is needed after the last document key! The search will be performed across all collections.";
 
-    function openTooltipModal(tooltipContent: string) {
+    function openTooltipModal(tooltipContent: string): void {
         currentTooltip = tooltipContent;
         modalIsOpen = true;
     }
@@ -322,7 +320,7 @@
         results: "Done",
     }[buttonState];
 
-    function toggleMode() {
+    function toggleMode(): void {
         isSearchMode = !isSearchMode;
         resetForm();
         if (browser) {
@@ -339,7 +337,7 @@
         }
     }
 
-    function resetForm() {
+    function resetForm(): void {
         buttonState = "ready";
         searchResults = [];
         fileUploadResults = [];
@@ -349,7 +347,7 @@
         file = null;
     }
 
-    let isLoading = false;
+    let isLoading: boolean = false;
 
     function toggleCollection(collection: {
         bucket: string;
@@ -372,22 +370,22 @@
         }
     }
 
-    function selectAllCollections() {
+    function selectAllCollections(): void {
         selectedCollections = [...allCollections];
     }
 
-    function deselectAllCollections() {
+    function deselectAllCollections(): void {
         selectedCollections = [];
     }
 
-    function resetSearch() {
+    function resetSearch(): void {
         buttonState = "ready";
         searchResults = [];
         errorMessage = "";
         searchPerformed = false;
     }
 
-    function handleInputClick() {
+    function handleInputClick(): void {
         if (buttonState === "results") {
             resetSearch();
         }
@@ -414,7 +412,9 @@
         );
     };
 
-    function groupCollectionsByScope(collections) {
+    function groupCollectionsByScope(
+        collections: Collection[],
+    ): Record<string, Collection[]> {
         return collections.reduce((acc, collection) => {
             if (!acc[collection.scope_name]) {
                 acc[collection.scope_name] = [];
@@ -823,11 +823,11 @@ IMAGE_70_C51_K50K509654GE7, IMAGE_01_B92_MW0MW10752403, IMAGE_04_C51_KB0KB09658P
                             </h4>
                             <pre
                                 class="bg-gray-100 p-3 rounded-md text-sm whitespace-pre-wrap">
-  IMAGE_01_B92_MW0MW10752403,
-  IMAGE_04_C51_KB0KB09658PMT,
-  IMAGE_10_C34_AW0AW14437XI4,
-  IMAGE_70_C51_K50K509654GE7,
-  IMAGE_70_C51_LV04F1003GPDE</pre>
+IMAGE_01_B92_MW0MW10752403,
+IMAGE_04_C51_KB0KB09658PMT,
+IMAGE_10_C34_AW0AW14437XI4,
+IMAGE_70_C51_K50K509654GE7,
+IMAGE_70_C51_LV04F1003GPDE</pre>
                             <p class="mt-2 text-sm">
                                 In this format, each document key is on a
                                 separate line, optionally followed by a comma.

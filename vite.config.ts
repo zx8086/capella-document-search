@@ -34,6 +34,7 @@ export default defineConfig({
             "@opentelemetry/winston-transport",
           ],
     },
+    target: "esnext",
   },
   optimizeDeps: {
     exclude: disableOpenTelemetry ? [] : ["src/utils/serverLogger"],
@@ -43,4 +44,7 @@ export default defineConfig({
         "process.env.DISABLE_OPENTELEMETRY": JSON.stringify("true"),
       }
     : {},
+  esbuild: {
+    target: "esnext",
+  },
 });
