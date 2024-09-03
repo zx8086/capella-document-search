@@ -1,7 +1,7 @@
 <!-- src/routes/+page.svelte-->
 
 <script lang="ts">
-    import type { Options } from "@openreplay/tracker";
+    // import type { Options } from "@openreplay/tracker";
     import { enhance } from "$app/forms";
     import { onMount, getContext } from "svelte";
     import { getCollections } from "$lib/collectionManager";
@@ -65,19 +65,6 @@
     let searchPerformed = false;
     let sortedResults: any[] = [];
 
-    // let allCollections: {
-    //     bucket: string;
-    //     scope_name: string;
-    //     collection_name: string;
-    //     tooltip_content: string | null;
-    // }[] = [];
-    // let selectedCollections: {
-    //     bucket: string;
-    //     scope_name: string;
-    //     collection_name: string;
-    // }[] = [];
-    // let searchResults = [];
-
     let allCollections: Collection[] = [];
     let selectedCollections: Collection[] = [];
     let searchResults: SearchResult[] = [];
@@ -100,7 +87,7 @@
     let isFileValid: boolean = false;
     let showExampleModal: boolean = false;
 
-    function handleFileChange(event: Event) {
+    function handleFileChange(event: Event): void {
         const target = event.target as HTMLInputElement;
         if (target.files && target.files.length > 0) {
             file = target.files[0];
@@ -113,7 +100,7 @@
         }
     }
 
-    function validateCSVFile(file: File) {
+    function validateCSVFile(file: File): void {
         Papa.parse(file, {
             complete: (results) => {
                 if (results.data && results.data.length > 0) {
@@ -199,11 +186,11 @@
         });
     }
 
-    function closeExampleModal() {
+    function closeExampleModal(): void {
         showExampleModal = false;
     }
 
-    function resetFileInput() {
+    function resetFileInput(): void {
         file = null;
         const fileInput = document.getElementById(
             "fileInput",
@@ -316,7 +303,7 @@
     let fileUploadTooltipContent: string =
         "Upload a CSV file containing document keys to check in Capella. Each key should be on a separate line or column. No comma is needed after the last document key! The search will be performed across all collections.";
 
-    function openTooltipModal(tooltipContent: string) {
+    function openTooltipModal(tooltipContent: string): void {
         currentTooltip = tooltipContent;
         modalIsOpen = true;
     }
@@ -333,7 +320,7 @@
         results: "Done",
     }[buttonState];
 
-    function toggleMode() {
+    function toggleMode(): void {
         isSearchMode = !isSearchMode;
         resetForm();
         if (browser) {
@@ -350,7 +337,7 @@
         }
     }
 
-    function resetForm() {
+    function resetForm(): void {
         buttonState = "ready";
         searchResults = [];
         fileUploadResults = [];
@@ -383,22 +370,22 @@
         }
     }
 
-    function selectAllCollections() {
+    function selectAllCollections(): void {
         selectedCollections = [...allCollections];
     }
 
-    function deselectAllCollections() {
+    function deselectAllCollections(): void {
         selectedCollections = [];
     }
 
-    function resetSearch() {
+    function resetSearch(): void {
         buttonState = "ready";
         searchResults = [];
         errorMessage = "";
         searchPerformed = false;
     }
 
-    function handleInputClick() {
+    function handleInputClick(): void {
         if (buttonState === "results") {
             resetSearch();
         }
@@ -425,7 +412,9 @@
         );
     };
 
-    function groupCollectionsByScope(collections) {
+    function groupCollectionsByScope(
+        collections: Collection[],
+    ): Record<string, Collection[]> {
         return collections.reduce((acc, collection) => {
             if (!acc[collection.scope_name]) {
                 acc[collection.scope_name] = [];
