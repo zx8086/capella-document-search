@@ -1,3 +1,5 @@
+/* tailwind.config.js */
+
 import { fontFamily, screens } from "tailwindcss/defaultTheme";
 
 /** @type {import('tailwindcss').Config} */

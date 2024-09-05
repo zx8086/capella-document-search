@@ -1,3 +1,5 @@
+#.gitignore
+
 node_modules
 
 # Output
@@ -23,4 +25,4 @@ vite.config.ts.timestamp-*
 logs
 .idea
 
-/data
+src/data/*.sqlite

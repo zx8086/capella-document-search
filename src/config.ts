@@ -11,6 +11,19 @@ const frontendConfig: FrontendConfig = {
   csv: {
     VITE_FILE_UPLOAD_LIMIT: getEnvNumberOrThrow("VITE_FILE_UPLOAD_LIMIT"),
   },
+  elasticApm: {
+    VITE_ELASTIC_APM_SERVICE_NAME: getEnvOrThrow(
+      "VITE_ELASTIC_APM_SERVICE_NAME",
+    ),
+    VITE_ELASTIC_APM_SERVER_URL: getEnvOrThrow("VITE_ELASTIC_APM_SERVER_URL"),
+    VITE_ELASTIC_APM_SERVICE_VERSION: getEnvOrThrow(
+      "VITE_ELASTIC_APM_SERVICE_VERSION",
+    ),
+    VITE_ELASTIC_APM_ENVIRONMENT: getEnvOrThrow("VITE_ELASTIC_APM_ENVIRONMENT"),
+    VITE_ELASTIC_APM_DISTRIBUTED_TRACING_ORIGINS: getEnvOrThrow(
+      "VITE_ELASTIC_APM_DISTRIBUTED_TRACING_ORIGINS",
+    ),
+  },
 };
 
 export { frontendConfig };
