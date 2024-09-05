@@ -54,7 +54,16 @@ export interface BackendConfig {
   messaging: MessagingConfig;
 }
 
+export interface ElasticApmConfig {
+  VITE_ELASTIC_APM_SERVICE_NAME: string;
+  VITE_ELASTIC_APM_SERVER_URL: string;
+  VITE_ELASTIC_APM_SERVICE_VERSION: string;
+  VITE_ELASTIC_APM_ENVIRONMENT: string;
+  VITE_ELASTIC_APM_DISTRIBUTED_TRACING_ORIGINS: string;
+}
+
 export interface FrontendConfig {
   openreplay: OpenReplayConfig;
   csv: CSVConfig;
+  elasticApm: ElasticApmConfig;
 }

@@ -1,26 +1,44 @@
+<!-- src/app.d.ts -->
+
 <!doctype html>
 <html lang="en">
     <head>
         <meta charset="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <link rel="icon" href="%sveltekit.assets%/favicon.png" />
-        <!-- Load Elastic APM script -->
+        <!-- Expose environment variables -->
+        <script>
+            window.env = {
+                VITE_ELASTIC_APM_SERVICE_NAME:
+                    "%VITE_ELASTIC_APM_SERVICE_NAME%",
+                VITE_ELASTIC_APM_SERVER_URL: "%VITE_ELASTIC_APM_SERVER_URL%",
+                VITE_ELASTIC_APM_SERVICE_VERSION:
+                    "%VITE_ELASTIC_APM_SERVICE_VERSION%",
+                VITE_ELASTIC_APM_ENVIRONMENT: "%VITE_ELASTIC_APM_ENVIRONMENT%",
+                VITE_ELASTIC_APM_DISTRIBUTED_TRACING_ORIGINS:
+                    "%VITE_ELASTIC_APM_DISTRIBUTED_TRACING_ORIGINS%",
+            };
+        </script>
         <script async src="/elastic-apm-rum.umd.js"></script>
         <script type="text/javascript">
             document.addEventListener("DOMContentLoaded", function () {
                 if (window.elasticApm) {
                     try {
                         window.elasticApm.init({
-                            serviceName: "Couchbase Capella Document Search",
-                            serverUrl: "https://apm.siobytes.com",
-                            serviceVersion: "1.0.0",
-                            environment: "development",
+                            serviceName:
+                                window.env.VITE_ELASTIC_APM_SERVICE_NAME,
+                            serverUrl: window.env.VITE_ELASTIC_APM_SERVER_URL,
+                            serviceVersion:
+                                window.env.VITE_ELASTIC_APM_SERVICE_VERSION,
+                            environment:
+                                window.env.VITE_ELASTIC_APM_ENVIRONMENT,
                             active: true,
                             logLevel: "debug",
                             breakdownMetrics: true,
                             centralConfig: true,
                             distributedTracingOrigins: [
-                                "http://localhost:5173",
+                                window.env
+                                    .VITE_ELASTIC_APM_DISTRIBUTED_TRACING_ORIGINS,
                             ],
                             transactionSampleRate: 1.0,
                         });
@@ -36,10 +54,6 @@
             });
         </script>
         %sveltekit.head%
-        <script
-            defer
-            src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"
-        ></script>
     </head>
     <body data-sveltekit-preload-data="hover">
         <div style="display: contents">%sveltekit.body%</div>
