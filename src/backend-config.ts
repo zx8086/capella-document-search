@@ -3,12 +3,6 @@
 import { getEnvOrThrow, getEnvNumberOrThrow } from "./utils";
 import type { BackendConfig } from "./models/types";
 
-if (typeof process === "undefined" || typeof Bun.env === "undefined") {
-  throw new Error(
-    "This configuration should only be used in a Node.js environment",
-  );
-}
-
 const backendConfig: BackendConfig = {
   application: {
     HEALTH_CHECK_PORT: getEnvNumberOrThrow("HEALTH_CHECK_PORT"),
@@ -18,6 +12,8 @@ const backendConfig: BackendConfig = {
     LOG_LEVEL: getEnvOrThrow("LOG_LEVEL"),
     LOG_MAX_SIZE: getEnvOrThrow("LOG_MAX_SIZE"),
     LOG_MAX_FILES: getEnvOrThrow("LOG_MAX_FILES"),
+    GRAPHQL_ENDPOINT: getEnvOrThrow("GRAPHQL_ENDPOINT"),
+    DB_DATA_DIR: getEnvOrThrow("DB_DATA_DIR"),
   },
   capella: {
     API_BASE_URL: getEnvOrThrow("API_BASE_URL"),

@@ -35,10 +35,19 @@ declare global {
   var INSTRUMENTATION_ENABLED: boolean;
 }
 
+const INSTRUMENTATION_ENABLED = process.env.ENABLE_OPENTELEMETRY === "true";
+console.log("INSTRUMENTATION_ENABLED:", INSTRUMENTATION_ENABLED);
+console.log(
+  "process.env.ENABLE_OPENTELEMETRY:",
+  process.env.ENABLE_OPENTELEMETRY,
+);
+
 let sdk: NodeSDK | undefined;
 let meter: any;
 
-if (globalThis.INSTRUMENTATION_ENABLED) {
+if (INSTRUMENTATION_ENABLED) {
+  console.log("Initializing OpenTelemetry SDK...");
+
   // Set up diagnostics logging
   diag.setLogger(new DiagConsoleLogger(), DiagLogLevel.INFO);
 

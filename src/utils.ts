@@ -1,10 +1,23 @@
 /* src/utils.ts */
 
+let isBrowser = false;
+
+// Check if we're in a browser environment
+try {
+  isBrowser = Boolean(window);
+} catch (e) {
+  // Not in a browser environment
+}
+
 export function getEnvOrThrow(key: string): string {
-  const value =
-    typeof process !== "undefined" && Bun.env
-      ? Bun.env[key]
-      : import.meta.env[key];
+  let value;
+  if (isBrowser) {
+    // Client-side
+    value = import.meta.env[key];
+  } else {
+    // Server-side
+    value = process.env[key];
+  }
 
   if (value === undefined) {
     throw new Error(`Required environment variable ${key} is not set`);

@@ -2,6 +2,9 @@
 
 import { Database, Statement } from "bun:sqlite";
 import { log, err } from "../../utils/unifiedLogger";
+import path from "path";
+import fs from "fs";
+import backendConfig from "../../backend-config";
 
 let db: Database | null = null;
 let insertScopeStmt: Statement | null = null;
@@ -15,7 +18,27 @@ let getAllCollectionsWithTooltipsStmt: Statement | null = null;
 export function initializeDatabase() {
   if (!db) {
     log("Initializing database");
-    db = new Database("capella-document-search.sqlite", { create: true });
+
+    const dataDir = path.resolve(
+      process.cwd(),
+      backendConfig.application.DB_DATA_DIR,
+    );
+    const dbPath = path.join(dataDir, "capella-document-search.sqlite");
+
+    log(`Database directory: ${dataDir}`);
+    log(`Database path: ${dbPath}`);
+
+    if (!fs.existsSync(dataDir)) {
+      try {
+        fs.mkdirSync(dataDir, { recursive: true });
+      } catch (error) {
+        err(`Failed to create database directory: ${error.message}`);
+        throw error;
+      }
+    }
+
+    db = new Database(dbPath, { create: true });
+
     db.exec(`
       CREATE TABLE IF NOT EXISTS scopes (
         bucket TEXT NOT NULL,
