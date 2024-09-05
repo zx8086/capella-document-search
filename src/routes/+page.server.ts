@@ -14,8 +14,9 @@ import {
   initializeDatabase,
 } from "$lib/db/dbOperations";
 import { log, err } from "../utils/serverLogger";
+import backendConfig from "../backend-config";
 
-const YOUR_GRAPHQL_ENDPOINT = "http://localhost:4000/graphql";
+const YOUR_GRAPHQL_ENDPOINT = backendConfig.application.GRAPHQL_ENDPOINT;
 const client = new ApolloClient({
   link: createHttpLink({ uri: YOUR_GRAPHQL_ENDPOINT, fetch }),
   cache: new InMemoryCache(),
@@ -24,7 +25,9 @@ const client = new ApolloClient({
 initializeDatabase();
 
 export const load: PageServerLoad = async () => {
+  console.log("Calling getFormattedCollections");
   const collections = getFormattedCollections();
+  console.log("Retrieved collections:", collections);
   return { collections };
 };
 

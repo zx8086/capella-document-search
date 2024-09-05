@@ -4,7 +4,7 @@ import { sveltekit } from "@sveltejs/kit/vite";
 import { defineConfig } from "vite";
 import path from "path";
 
-const disableOpenTelemetry = process.env.DISABLE_OPENTELEMETRY === "true";
+const enableOpenTelemetry = process.env.ENABLE_OPENTELEMETRY === "true";
 
 export default defineConfig({
   plugins: [sveltekit()],
@@ -25,25 +25,23 @@ export default defineConfig({
   },
   build: {
     rollupOptions: {
-      external: disableOpenTelemetry
-        ? []
-        : [
+      external: enableOpenTelemetry
+        ? [
             "winston",
             "winston-daily-rotate-file",
             "@elastic/ecs-winston-format",
             "@opentelemetry/winston-transport",
-          ],
+          ]
+        : [],
     },
     target: "esnext",
   },
   optimizeDeps: {
-    exclude: disableOpenTelemetry ? [] : ["src/utils/serverLogger"],
+    exclude: enableOpenTelemetry ? ["src/utils/serverLogger"] : [],
   },
-  define: disableOpenTelemetry
-    ? {
-        "process.env.DISABLE_OPENTELEMETRY": JSON.stringify("true"),
-      }
-    : {},
+  define: {
+    "process.env.ENABLE_OPENTELEMETRY": JSON.stringify(enableOpenTelemetry),
+  },
   esbuild: {
     target: "esnext",
   },

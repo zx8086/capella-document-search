@@ -41,7 +41,10 @@
                 }
             }
 
+            console.log("Fetching collections...");
             allCollections = await getCollections();
+            console.log("Fetched collections:", allCollections);
+
             selectedCollections = allCollections.map(
                 ({ bucket, scope_name, collection_name }) => ({
                     bucket,
@@ -49,6 +52,11 @@
                     collection_name,
                 }),
             );
+            console.log("Selected collections:", selectedCollections);
+
+            // Force a UI update
+            allCollections = [...allCollections];
+            selectedCollections = [...selectedCollections];
         } catch (error) {
             console.error("Error in onMount:", error);
             errorMessage =

@@ -82,7 +82,10 @@ export async function GET() {
   initializeDatabase();
   try {
     const collectionsWithTooltips = getAllCollectionsWithTooltips();
-    log("Retrieved collections with tooltips:");
+    log(
+      "Retrieved collections with tooltips:",
+      JSON.stringify(collectionsWithTooltips),
+    );
     return json(collectionsWithTooltips);
   } catch (error) {
     err("Error retrieving collections with tooltips:", error);

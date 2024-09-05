@@ -38,20 +38,24 @@ export async function seedCollections() {
 }
 
 export async function getCollections(): Promise<Collection[]> {
-  log("function getCollections called");
+  console.log("getCollections function called");
   try {
-    log("GET: /api/collections");
+    console.log("Fetching collections from /api/collections");
     const response = await fetch("/api/collections");
     if (!response.ok) {
       const errorText = await response.text();
+      console.error(
+        `Failed to fetch collections. Status: ${response.status}, Error: ${errorText}`,
+      );
       throw new Error(
         `Failed to fetch collections. Status: ${response.status}, Error: ${errorText}`,
       );
     }
     const collections = await response.json();
+    console.log("Fetched collections:", collections);
     return collections;
   } catch (error) {
-    err("Error fetching collections:", error);
+    console.error("Error fetching collections:", error);
     throw error;
   }
 }

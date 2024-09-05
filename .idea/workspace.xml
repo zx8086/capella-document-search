@@ -5,7 +5,16 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="a783835f-4b80-4f56-9697-5aabbe390336" name="Changes" comment="">
-      <change beforePath="$PROJECT_DIR$/logs/.3f18aa556a0983da29e986090003e9acb25ceb57-audit.json" beforeDir="false" afterPath="$PROJECT_DIR$/logs/.3f18aa556a0983da29e986090003e9acb25ceb57-audit.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.gitignore" beforeDir="false" afterPath="$PROJECT_DIR$/.gitignore" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Dockerfile" beforeDir="false" afterPath="$PROJECT_DIR$/Dockerfile" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/capella-document-search.sqlite" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/backend-config.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/backend-config.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/instrumentation.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/instrumentation.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/lib/api.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/lib/api.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/lib/db/dbOperations.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/lib/db/dbOperations.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/models/types.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/models/types.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/routes/+page.server.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/routes/+page.server.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/vite.config.ts" beforeDir="false" afterPath="$PROJECT_DIR$/vite.config.ts" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -28,7 +37,7 @@
     "ASKED_SHARE_PROJECT_CONFIGURATION_FILES": "true",
     "RunOnceActivity.OpenDatabaseViewOnStart": "true",
     "RunOnceActivity.ShowReadmeOnStart": "true",
-    "git-widget-placeholder": "master",
+    "git-widget-placeholder": "refactor/dockerfile-build",
     "last_opened_file_path": "/Users/SOwusu/WebstormProjects/capella-document-search",
     "settings.editor.selected.configurable": "database.query.execution"
   }
