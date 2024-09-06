@@ -13,8 +13,6 @@
     export { className as class };
 </script>
 
-/* src/lib/components/ui/button/button.svelte */
-
 <ButtonPrimitive.Root
     {builders}
     class={cn(buttonVariants({ variant, size, className }))}
