@@ -1,4 +1,4 @@
-<!-- src/app.d.ts -->
+<!-- src/app.html -->
 
 <!doctype html>
 <html lang="en">
@@ -6,53 +6,8 @@
         <meta charset="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <link rel="icon" href="%sveltekit.assets%/favicon.png" />
-        <!-- Expose environment variables -->
-        <script>
-            window.env = {
-                VITE_ELASTIC_APM_SERVICE_NAME:
-                    "%VITE_ELASTIC_APM_SERVICE_NAME%",
-                VITE_ELASTIC_APM_SERVER_URL: "%VITE_ELASTIC_APM_SERVER_URL%",
-                VITE_ELASTIC_APM_SERVICE_VERSION:
-                    "%VITE_ELASTIC_APM_SERVICE_VERSION%",
-                VITE_ELASTIC_APM_ENVIRONMENT: "%VITE_ELASTIC_APM_ENVIRONMENT%",
-                VITE_ELASTIC_APM_DISTRIBUTED_TRACING_ORIGINS:
-                    "%VITE_ELASTIC_APM_DISTRIBUTED_TRACING_ORIGINS%",
-            };
-        </script>
-        <script async src="/elastic-apm-rum.umd.js"></script>
-        <script type="text/javascript">
-            document.addEventListener("DOMContentLoaded", function () {
-                if (window.elasticApm) {
-                    try {
-                        window.elasticApm.init({
-                            serviceName:
-                                window.env.VITE_ELASTIC_APM_SERVICE_NAME,
-                            serverUrl: window.env.VITE_ELASTIC_APM_SERVER_URL,
-                            serviceVersion:
-                                window.env.VITE_ELASTIC_APM_SERVICE_VERSION,
-                            environment:
-                                window.env.VITE_ELASTIC_APM_ENVIRONMENT,
-                            active: true,
-                            logLevel: "debug",
-                            breakdownMetrics: true,
-                            centralConfig: true,
-                            distributedTracingOrigins: [
-                                window.env
-                                    .VITE_ELASTIC_APM_DISTRIBUTED_TRACING_ORIGINS,
-                            ],
-                            transactionSampleRate: 1.0,
-                        });
-                        console.log("Elastic APM initialized.");
-                    } catch (e) {
-                        console.error("Error initializing Elastic APM RUM:", e);
-                    }
-                } else {
-                    console.error(
-                        "Elastic APM RUM script not loaded correctly.",
-                    );
-                }
-            });
-        </script>
+        <script src="/elastic-apm-rum.umd.js"></script>
+        <script type="module" src="/apm-init.js"></script>
         %sveltekit.head%
     </head>
     <body data-sveltekit-preload-data="hover">

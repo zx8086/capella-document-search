@@ -7,8 +7,12 @@ declare global {
     // interface Error {}
     // interface Locals {}
     // interface PageData {}
-    // interface PageState {}
     // interface Platform {}
+  }
+
+  interface Window {
+    elasticApm: ElasticApm;
+    active: false;
   }
 }
 

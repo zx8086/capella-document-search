@@ -48,7 +48,7 @@ let meter: any;
 if (INSTRUMENTATION_ENABLED) {
   console.log("Initializing OpenTelemetry SDK...");
 
-  // Set up diagnostics logging
+  // Set up diagnostics logging with increased verbosity
   diag.setLogger(new DiagConsoleLogger(), DiagLogLevel.INFO);
 
   // Create a shared resource
@@ -59,26 +59,33 @@ if (INSTRUMENTATION_ENABLED) {
       backendConfig.openTelemetry.DEPLOYMENT_ENVIRONMENT,
   });
 
-  // Create OTLP exporters
+  // Create OTLP exporters with updated configurations
   const traceExporter = new OTLPTraceExporter({
     url: backendConfig.openTelemetry.TRACES_ENDPOINT,
+    concurrencyLimit: 50,
     headers: { "Content-Type": "application/json" },
+    timeoutMillis: 30000,
   });
 
   const otlpMetricExporter = new OTLPMetricExporter({
     url: backendConfig.openTelemetry.METRICS_ENDPOINT,
     headers: { "Content-Type": "application/json" },
+    timeoutMillis: 30000,
   });
 
   const logExporter = new OTLPLogExporter({
     url: backendConfig.openTelemetry.LOGS_ENDPOINT,
     headers: { "Content-Type": "application/json" },
+    timeoutMillis: 30000,
   });
 
   // Set up LoggerProvider
   const loggerProvider = new LoggerProvider({ resource });
   loggerProvider.addLogRecordProcessor(
-    new BatchLogRecordProcessor(logExporter),
+    new BatchLogRecordProcessor(logExporter, {
+      maxExportBatchSize: 512,
+      scheduledDelayMillis: 5000,
+    }),
   );
   api.logs.setGlobalLoggerProvider(loggerProvider);
 
@@ -96,11 +103,25 @@ if (INSTRUMENTATION_ENABLED) {
   // Set this MeterProvider to be global to the app being instrumented.
   metrics.setGlobalMeterProvider(meterProvider);
 
+  // Create a BatchSpanProcessor with custom configuration and logging
+  const batchSpanProcessor = new BatchSpanProcessor(traceExporter, {
+    maxExportBatchSize: 512,
+    scheduledDelayMillis: 5000,
+    exportTimeoutMillis: 30000,
+  });
+
+  // Add custom logging to the BatchSpanProcessor
+  const originalOnEnd = batchSpanProcessor.onEnd.bind(batchSpanProcessor);
+  batchSpanProcessor.onEnd = (span) => {
+    console.log(`Processing span: ${span.name}`);
+    return originalOnEnd(span);
+  };
+
   // Node SDK for OpenTelemetry
   sdk = new NodeSDK({
     resource: resource,
     traceExporter,
-    spanProcessors: [new BatchSpanProcessor(traceExporter)],
+    spanProcessors: [batchSpanProcessor],
     logRecordProcessor: new BatchLogRecordProcessor(logExporter),
     instrumentations: [
       getNodeAutoInstrumentations({

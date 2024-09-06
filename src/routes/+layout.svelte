@@ -1,7 +1,5 @@
 <!-- src/routes/+layout.svelte -->
-
 <script lang="ts">
-    import { enhance } from "$app/forms";
     import "../app.css";
     import * as Drawer from "$lib/components/ui/drawer";
     import { Button } from "$lib/components/ui/button";
@@ -114,7 +112,7 @@
     let currentQuoteIndex = 0;
     let isPaused = false;
     let autoplayIntervalTime = 4000;
-    let autoplayInterval: number | null = null;
+    let autoplayInterval: ReturnType<typeof setInterval> | null = null;
 
     function nextQuote() {
         currentQuoteIndex = (currentQuoteIndex + 1) % quotes.length;
@@ -139,6 +137,7 @@
     }
 
     onMount(async () => {
+        startAutoplay();
         // Initialize dark mode from local storage
         if (browser) {
             const savedTheme = localStorage.getItem("theme");
@@ -171,9 +170,6 @@
 
     onDestroy(() => {
         if (autoplayInterval) clearInterval(autoplayInterval);
-        // if (browser) {
-        //     import("$lib/clientInstrumentation").then((module) => {});
-        // }
     });
 </script>
 

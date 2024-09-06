@@ -7,18 +7,7 @@ import path from "path";
 const enableOpenTelemetry = process.env.ENABLE_OPENTELEMETRY === "true";
 
 export default defineConfig({
-  plugins: [
-    sveltekit(),
-    {
-      name: "html-transform",
-      transformIndexHtml(html) {
-        return html.replace(
-          /%VITE_ELASTIC_APM_.*?%/g,
-          (match) => process.env[match.slice(1, -1)] || "",
-        );
-      },
-    },
-  ],
+  plugins: [sveltekit()],
   server: {
     fs: {
       strict: false,
