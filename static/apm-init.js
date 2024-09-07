@@ -2,7 +2,6 @@
 
 (function () {
   console.log("APM init script loaded");
-
   function initAPM(config) {
     console.log("Initializing APM with config:", config);
     if (window.elasticApm) {
@@ -34,10 +33,8 @@
       );
     }
   }
-
   function waitForEnv(callback, maxAttempts = 10, interval = 500) {
     let attempts = 0;
-
     function checkEnv() {
       console.log("Checking for ENV, attempt:", attempts + 1);
       if (window.ENV) {
@@ -52,18 +49,24 @@
       }
     }
 
-    if (
-      window.location.hostname === "localhost" ||
-      window.location.hostname === "127.0.0.1"
-    ) {
+    // Check if we're in a production environment
+    var isProduction =
+      window.ENV && window.ENV.VITE_ELASTIC_APM_ENVIRONMENT === "production";
+
+    if (isProduction) {
+      console.log("Production environment detected. Initializing APM.");
+      checkEnv();
+    } else if (window.ENV) {
       console.log(
-        "Development environment detected. APM initialization skipped.",
+        "Environment detected:",
+        window.ENV.VITE_ELASTIC_APM_ENVIRONMENT,
       );
+      checkEnv();
     } else {
+      console.log("ENV not available. Attempting to load.");
       checkEnv();
     }
   }
-
   // Start checking for ENV
   waitForEnv(initAPM);
 })();

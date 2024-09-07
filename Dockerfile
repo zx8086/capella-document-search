@@ -4,7 +4,6 @@
 FROM oven/bun:1 AS base
 WORKDIR /app
 
-
 # Install dependencies
 FROM base AS deps
 COPY package.json bun.lockb ./
@@ -27,12 +26,15 @@ COPY package.json bunfig.toml svelte.config.js vite.config.ts ./
 COPY static/elastic-apm-rum.umd.js /app/build/client/elastic-apm-rum.umd.js
 COPY static/elastic-apm-rum-debug-wrapper.js /app/elastic-apm-rum-debug-wrapper.js
 
-# Combine debug wrapper with original script
-RUN cat /app/elastic-apm-rum-debug-wrapper.js > /app/build/client/elastic-apm-rum-debug.js && \
-    cat /app/build/client/elastic-apm-rum.umd.js >> /app/build/client/elastic-apm-rum-debug.js && \
-    echo "console.log('Debug: Elastic APM RUM script execution completed');" >> /app/build/client/elastic-apm-rum-debug.js && \
-    echo "console.log('Debug: window.elasticApm is:', window.elasticApm);" >> /app/build/client/elastic-apm-rum-debug.js && \
-    mv /app/build/client/elastic-apm-rum-debug.js /app/build/client/elastic-apm-rum.umd.js
+# Combine debug wrapper with original script using a shell script
+RUN echo '#!/bin/sh\n\
+    cat /app/elastic-apm-rum-debug-wrapper.js > /app/build/client/elastic-apm-rum-debug.js\n\
+    cat /app/build/client/elastic-apm-rum.umd.js >> /app/build/client/elastic-apm-rum-debug.js\n\
+    echo "console.log(\"Debug: Elastic APM RUM script execution completed\");" >> /app/build/client/elastic-apm-rum-debug.js\n\
+    echo "console.log(\"Debug: window.elasticApm is:\", window.elasticApm);" >> /app/build/client/elastic-apm-rum-debug.js\n\
+    mv /app/build/client/elastic-apm-rum-debug.js /app/build/client/elastic-apm-rum.umd.js' > /app/combine_scripts.sh && \
+    chmod +x /app/combine_scripts.sh && \
+    /app/combine_scripts.sh
 
 COPY static/apm-init.js /app/build/client/apm-init.js
 
@@ -54,8 +56,9 @@ RUN echo '#!/bin/sh\n\
     echo "Contents of set-global.js:"\n\
     cat /app/set-global.js\n\
     echo "HEALTH_CHECK_PORT is set to: $HEALTH_CHECK_PORT"\n\
-    echo "Starting application..."\n\
+    echo "Generating runtime config..."\n\
     /app/generate-runtime-config.sh\n\
+    echo "Starting application..."\n\
     exec bun --preload /app/set-global.js ./build/index.js' > /app/start.sh && chmod +x /app/start.sh
 
 # Expose the port the app runs on
