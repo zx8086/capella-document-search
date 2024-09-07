@@ -4,6 +4,7 @@
 FROM oven/bun:1 AS base
 WORKDIR /app
 
+
 # Install dependencies
 FROM base AS deps
 COPY package.json bun.lockb ./
@@ -22,6 +23,23 @@ COPY --from=builder /app/build ./build
 COPY --from=builder /app/src ./src
 COPY package.json bunfig.toml svelte.config.js vite.config.ts ./
 
+# Copy Elastic APM RUM script and debug wrapper
+COPY static/elastic-apm-rum.umd.js /app/build/client/elastic-apm-rum.umd.js
+COPY static/elastic-apm-rum-debug-wrapper.js /app/elastic-apm-rum-debug-wrapper.js
+
+# Combine debug wrapper with original script
+RUN cat /app/elastic-apm-rum-debug-wrapper.js > /app/build/client/elastic-apm-rum-debug.js && \
+    cat /app/build/client/elastic-apm-rum.umd.js >> /app/build/client/elastic-apm-rum-debug.js && \
+    echo "console.log('Debug: Elastic APM RUM script execution completed');" >> /app/build/client/elastic-apm-rum-debug.js && \
+    echo "console.log('Debug: window.elasticApm is:', window.elasticApm);" >> /app/build/client/elastic-apm-rum-debug.js && \
+    mv /app/build/client/elastic-apm-rum-debug.js /app/build/client/elastic-apm-rum.umd.js
+
+COPY static/apm-init.js /app/build/client/apm-init.js
+
+# Copy the runtime configuration script
+COPY /static/generate-runtime-config.sh /app/generate-runtime-config.sh
+RUN chmod +x /app/generate-runtime-config.sh
+
 # Ensure the src/data directory exists
 RUN mkdir -p /app/src/data && chown -R bun:bun /app/src/data
 
@@ -37,6 +55,7 @@ RUN echo '#!/bin/sh\n\
     cat /app/set-global.js\n\
     echo "HEALTH_CHECK_PORT is set to: $HEALTH_CHECK_PORT"\n\
     echo "Starting application..."\n\
+    /app/generate-runtime-config.sh\n\
     exec bun --preload /app/set-global.js ./build/index.js' > /app/start.sh && chmod +x /app/start.sh
 
 # Expose the port the app runs on

@@ -316,11 +316,19 @@
         modalIsOpen = true;
     }
 
-    $: buttonClass = {
-        ready: "cursor-pointer",
-        searching: "cursor-not-allowed",
-        results: "cursor-not-allowed",
-    }[buttonState];
+    $: buttonClass = isSearchMode
+        ? {
+              ready: "cursor-pointer hover:bg-[#00174f]/80",
+              searching: "cursor-not-allowed",
+              results: "cursor-not-allowed",
+          }[buttonState]
+        : !file || !isFileValid
+          ? "cursor-not-allowed"
+          : {
+                ready: "cursor-pointer hover:bg-[#00174f]/80",
+                searching: "cursor-not-allowed",
+                results: "cursor-not-allowed",
+            }[buttonState];
 
     $: buttonText = {
         ready: isSearchMode ? "Search" : file ? "Search" : "Search",
@@ -739,14 +747,14 @@
                               buttonState === "results" ||
                               !file ||
                               !isFileValid}
-                        class="{buttonClass} w-full sm:w-auto px-6 py-2 min-w-[150px] bg-[#00174f] text-white rounded-md hover:bg-[#00174f]/80 transition duration-150 ease-in-out {(buttonState ===
+                        class="{buttonClass} w-full sm:w-auto px-6 py-2 min-w-[150px] bg-[#00174f] text-white rounded-md transition duration-150 ease-in-out {(buttonState ===
                             'results' &&
                             isSearchMode) ||
                         (!isSearchMode &&
                             (!file ||
                                 !isFileValid ||
                                 buttonState === 'results'))
-                            ? 'opacity-50 cursor-not-allowed'
+                            ? 'opacity-50'
                             : ''} flex items-center justify-center"
                     >
                         {#if isLoading}

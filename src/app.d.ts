@@ -1,4 +1,4 @@
-// src/app.d.ts
+/* src/app.d.ts */
 
 // See https://kit.svelte.dev/docs/types#app
 // for information about these interfaces
