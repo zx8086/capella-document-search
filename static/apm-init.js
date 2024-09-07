@@ -46,13 +46,26 @@
         setTimeout(checkEnv, interval);
       } else {
         console.error("ENV not loaded after maximum attempts");
+        // In development, use default values
+        if (
+          window.location.hostname === "localhost" ||
+          window.location.hostname === "127.0.0.1"
+        ) {
+          console.log("Using default development config");
+          callback({
+            VITE_ELASTIC_APM_SERVICE_NAME: "Dev Service",
+            VITE_ELASTIC_APM_SERVER_URL: "http://localhost:8200",
+            VITE_ELASTIC_APM_SERVICE_VERSION: "dev",
+            VITE_ELASTIC_APM_ENVIRONMENT: "development",
+            VITE_ELASTIC_APM_DISTRIBUTED_TRACING_ORIGINS:
+              "http://localhost:3000",
+          });
+        }
       }
     }
-
     // Check if we're in a production environment
     var isProduction =
       window.ENV && window.ENV.VITE_ELASTIC_APM_ENVIRONMENT === "production";
-
     if (isProduction) {
       console.log("Production environment detected. Initializing APM.");
       checkEnv();
