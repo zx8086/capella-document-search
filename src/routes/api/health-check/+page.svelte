@@ -5,12 +5,15 @@
 
     let healthStatus: {
         status: string;
-        checks: Record<string, { status: string; message?: string }>;
-        checkType: "simple" | "detailed";
+        checks: Record<
+            string,
+            { status: string; message?: string; responseTime?: number }
+        >;
+        checkType: "Simple" | "Detailed";
     } | null = null;
     let loading = true;
     let error = "";
-    let checkType: "simple" | "detailed" = "simple";
+    let checkType: "Simple" | "Detailed" = "Simple";
 
     async function fetchHealthCheck() {
         loading = true;
@@ -30,7 +33,7 @@
     }
 
     function toggleCheckType() {
-        checkType = checkType === "simple" ? "detailed" : "simple";
+        checkType = checkType === "Simple" ? "Detailed" : "Simple";
         fetchHealthCheck();
     }
 
@@ -52,10 +55,10 @@
             on:click={toggleCheckType}
             class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded"
         >
-            Switch to {checkType === "simple" ? "Detailed" : "Simple"} Check
+            Switch to {checkType === "Simple" ? "Detailed" : "Simple"} Check
         </button>
         <p class="text-sm text-gray-600 mt-2">
-            {checkType === "simple"
+            {checkType === "Simple"
                 ? "Simple check tests the Database and Internal API."
                 : "Detailed check includes all checks including the Capella API."}
         </p>
@@ -93,6 +96,11 @@
                         >
                             {check.status}
                         </span>
+                        {#if check.responseTime !== undefined}
+                            <span class="text-sm text-gray-600 ml-2">
+                                (Response time: {check.responseTime}ms)
+                            </span>
+                        {/if}
                         {#if check.message}
                             <p class="text-sm text-gray-600 mt-1">
                                 {check.message}
@@ -105,4 +113,28 @@
     {:else}
         <p class="text-red-600">No health check data available.</p>
     {/if}
+</div>
+<!-- Back to Home link -->
+<div class="mt-8 flex justify-center">
+    <a
+        href="/"
+        class="flex items-center text-blue-600 hover:text-blue-800"
+        data-transaction-name="Back to Home"
+    >
+        <svg
+            xmlns="http://www.w3.org/2000/svg"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke-width="1.5"
+            stroke="currentColor"
+            class="w-6 h-6 mr-2"
+        >
+            <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                d="m2.25 12 8.954-8.955c.44-.439 1.152-.439 1.591 0L21.75 12M4.5 9.75v10.125c0 .621.504 1.125 1.125 1.125H9.75v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21h4.125c.621 0 1.125-.504 1.125-1.125V9.75M8.25 21h8.25"
+            />
+        </svg>
+        Back to Home
+    </a>
 </div>

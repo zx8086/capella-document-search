@@ -1,6 +1,6 @@
 /* src/lib/collectionManager.ts */
 
-import { log, err } from "../utils/unifiedLogger";
+import { log, err } from "$utils/unifiedLogger";
 
 interface Collection {
   bucket: string;

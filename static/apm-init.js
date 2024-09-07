@@ -17,9 +17,7 @@
           breakdownMetrics: true,
           centralConfig: true,
           distributedTracingOrigins:
-            config.VITE_ELASTIC_APM_DISTRIBUTED_TRACING_ORIGINS?.split(",").map(
-              (origin) => origin.trim(),
-            ),
+            config.VITE_ELASTIC_APM_DISTRIBUTED_TRACING_ORIGINS,
           transactionSampleRate: 1.0,
         });
         console.log("Elastic APM initialized successfully.");

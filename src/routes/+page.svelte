@@ -12,7 +12,7 @@
 
     import { key } from "$lib/context/tracker";
     import { browser } from "$app/environment";
-    import { frontendConfig } from "../config";
+    import { frontendConfig } from "$frontendConfig";
 
     interface Collection {
         bucket: string;
@@ -27,6 +27,21 @@
     }
 
     const { getTracker } = getContext(key);
+
+    function trackClick(elementName: string, action: string) {
+        if (browser) {
+            const tracker = getTracker();
+            if (tracker) {
+                tracker.event("User_Interaction", {
+                    type: "click",
+                    element: elementName,
+                    action: action,
+                    page: "Document Search",
+                    timestamp: new Date().toISOString(),
+                });
+            }
+        }
+    }
 
     onMount(async () => {
         try {
@@ -196,6 +211,7 @@
 
     function closeExampleModal(): void {
         showExampleModal = false;
+        trackClick("ExampleModal", "Close");
     }
 
     function resetFileInput(): void {
@@ -211,6 +227,7 @@
     function handleSubmit(
         event: Event,
     ): (result: { type: string; data?: any; error?: string }) => Promise<void> {
+        trackClick("SearchButton", isSearchMode ? "Search" : "FileUpload");
         buttonState = "searching";
         processing = true;
         errorMessage = "";
@@ -314,6 +331,7 @@
     function openTooltipModal(tooltipContent: string): void {
         currentTooltip = tooltipContent;
         modalIsOpen = true;
+        trackClick("TooltipModal", "Open");
     }
 
     $: buttonClass = isSearchMode
@@ -339,6 +357,10 @@
     function toggleMode(): void {
         isSearchMode = !isSearchMode;
         resetForm();
+        trackClick(
+            "ModeToggle",
+            isSearchMode ? "SwitchToSearch" : "SwitchToUpload",
+        );
         if (browser) {
             const tracker = getTracker();
             if (tracker) {
@@ -388,10 +410,12 @@
 
     function selectAllCollections(): void {
         selectedCollections = [...allCollections];
+        trackClick("CollectionSelector", "SelectAll");
     }
 
     function deselectAllCollections(): void {
         selectedCollections = [];
+        trackClick("CollectionSelector", "DeselectAll");
     }
 
     function resetSearch(): void {
@@ -509,6 +533,7 @@
                                     type="search"
                                     id="documentKey"
                                     name="documentKey"
+                                    data-transaction-name="Enter Document Key"
                                     bind:value={documentKey}
                                     on:input={() => {
                                         searchPerformed = false;
@@ -553,6 +578,7 @@
                                                 id="fileInput"
                                                 name="file"
                                                 type="file"
+                                                data-transaction-name="Select File"
                                                 class="sr-only"
                                                 aria-describedby="validFileFormats"
                                                 accept=".csv"
@@ -618,6 +644,7 @@
                         <button
                             type="button"
                             on:click={toggleMode}
+                            data-transaction-name="Toggle Search Mode"
                             class="p-2 bg-gray-200 rounded-full hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-tommy-red animate-pulse"
                             title={isSearchMode
                                 ? "Switch to Upload Mode"
@@ -652,12 +679,14 @@
                                 <button
                                     type="button"
                                     on:click={selectAllCollections}
+                                    data-transaction-name="Select All Collections"
                                     class="px-3 py-1 bg-[#00174f] text-white rounded hover:bg-[#00174f]/80 mr-2"
                                     >Select All</button
                                 >
                                 <button
                                     type="button"
                                     on:click={deselectAllCollections}
+                                    data-transaction-name="Deselect All Collections"
                                     class="px-3 py-1 bg-[#00174f] text-white rounded hover:bg-[#00174f]/80"
                                     >Deselect All</button
                                 >
@@ -709,6 +738,7 @@
                                                 <input
                                                     id={`toggle-${collection.bucket}-${collection.scope_name}-${collection.collection_name}`}
                                                     type="checkbox"
+                                                    data-transaction-name={`Toggle Collection: ${collection.collection_name}`}
                                                     class="peer sr-only"
                                                     role="switch"
                                                     checked={isSelected(
@@ -740,6 +770,9 @@
                 <div class="flex justify-center">
                     <button
                         type="submit"
+                        data-transaction-name={isSearchMode
+                            ? "Search Document"
+                            : "Upload File"}
                         disabled={isSearchMode
                             ? buttonState === "searching" ||
                               buttonState === "results"

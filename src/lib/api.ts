@@ -1,7 +1,7 @@
 /* src/lib/api.ts */
 
 import { log } from "$utils/unifiedLogger";
-import backendConfig from "../backend-config";
+import backendConfig from "$backendConfig";
 
 const API_BASE_URL = backendConfig.capella.API_BASE_URL;
 const ORG_ID = backendConfig.capella.ORG_ID;
@@ -9,13 +9,14 @@ const PROJECT_ID = backendConfig.capella.PROJECT_ID;
 const CLUSTER_ID = backendConfig.capella.CLUSTER_ID;
 const BUCKET_ID = backendConfig.capella.BUCKET_ID;
 const AUTH_TOKEN = backendConfig.capella.AUTH_TOKEN;
-log("Environment Variables:");
-log("API_BASE_URL:", { API_BASE_URL });
-log("ORG_ID:", { ORG_ID });
-log("PROJECT_ID:", { PROJECT_ID });
-log("CLUSTER_ID:", { CLUSTER_ID });
-log("BUCKET_ID:", { BUCKET_ID });
-log("AUTH_TOKEN:", AUTH_TOKEN ? "Set" : "Not set");
+
+log("Environment Variables");
+log("API_BASE_URL:", { meta: { API_BASE_URL } });
+log("ORG_ID:", { meta: { ORG_ID } });
+log("PROJECT_ID:", { meta: { PROJECT_ID } });
+log("CLUSTER_ID:", { meta: { CLUSTER_ID } });
+log("BUCKET_ID:", { meta: { BUCKET_ID } });
+log("AUTH_TOKEN:", { meta: AUTH_TOKEN ? "Set" : "Not set" });
 
 const headers = new Headers({
   Authorization: `Bearer ${AUTH_TOKEN}`,

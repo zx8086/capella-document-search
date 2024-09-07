@@ -1,6 +1,6 @@
-/* src/config.ts */
+/* src/frontend-config.ts */
 
-import { getEnvOrThrow, getEnvNumberOrThrow } from "./utils";
+import { getEnvOrThrow, getEnvNumberOrThrow } from "$utils";
 import type { FrontendConfig } from "./models/types";
 
 const frontendConfig: FrontendConfig = {

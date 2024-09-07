@@ -5,10 +5,6 @@ import type { BackendConfig } from "./models/types";
 
 const backendConfig: BackendConfig = {
   application: {
-    HEALTH_CHECK_PORT: getEnvNumberOrThrow("HEALTH_CHECK_PORT"),
-    HEALTH_CHECK_LOG_INTERVAL: getEnvNumberOrThrow("HEALTH_CHECK_LOG_INTERVAL"),
-    HEALTH_CHECK_INTERVAL: getEnvNumberOrThrow("HEALTH_CHECK_INTERVAL"),
-    CRON_SCHEDULE: getEnvOrThrow("CRON_SCHEDULE"),
     LOG_LEVEL: getEnvOrThrow("LOG_LEVEL"),
     LOG_MAX_SIZE: getEnvOrThrow("LOG_MAX_SIZE"),
     LOG_MAX_FILES: getEnvOrThrow("LOG_MAX_FILES"),
@@ -31,14 +27,6 @@ const backendConfig: BackendConfig = {
     METRICS_ENDPOINT: getEnvOrThrow("METRICS_ENDPOINT"),
     LOGS_ENDPOINT: getEnvOrThrow("LOGS_ENDPOINT"),
     METRIC_READER_INTERVAL: getEnvNumberOrThrow("METRIC_READER_INTERVAL"),
-    CONSOLE_METRIC_READER_INTERVAL: getEnvNumberOrThrow(
-      "CONSOLE_METRIC_READER_INTERVAL",
-    ),
-  },
-  messaging: {
-    ALERT_TYPE: getEnvOrThrow("ALERT_TYPE"),
-    SLACK_WEBHOOK_URL: getEnvOrThrow("SLACK_WEBHOOK_URL"),
-    TEAMS_WEBHOOK_URL: getEnvOrThrow("TEAMS_WEBHOOK_URL"),
   },
 };
 

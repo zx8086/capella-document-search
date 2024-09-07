@@ -20,7 +20,6 @@ import { BatchSpanProcessor } from "@opentelemetry/sdk-trace-base";
 import {
   MeterProvider,
   PeriodicExportingMetricReader,
-  ConsoleMetricExporter,
 } from "@opentelemetry/sdk-metrics";
 import {
   LoggerProvider,

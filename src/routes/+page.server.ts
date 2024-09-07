@@ -14,7 +14,7 @@ import {
   initializeDatabase,
 } from "$lib/db/dbOperations";
 import { log, err } from "../utils/serverLogger";
-import backendConfig from "../backend-config";
+import backendConfig from "$backendConfig";
 
 const YOUR_GRAPHQL_ENDPOINT = backendConfig.application.GRAPHQL_ENDPOINT;
 const client = new ApolloClient({
@@ -25,9 +25,9 @@ const client = new ApolloClient({
 initializeDatabase();
 
 export const load: PageServerLoad = async () => {
-  console.log("Calling getFormattedCollections");
+  log("Calling function - getFormattedCollections()");
   const collections = getFormattedCollections();
-  console.log("Retrieved collections:", collections);
+  log("Retrieved collections:", { meta: { collections } });
   return { collections };
 };
 
@@ -39,7 +39,7 @@ export const actions: Actions = {
       const documentKey = data.get("documentKey") as string;
       const keys = [documentKey];
 
-      log("Keys:", { keys });
+      log("Keys:", { meta: { keys } });
 
       const formattedCollections = selectedCollections.map(
         ({ bucket, scope_name, collection_name }) => ({
@@ -78,7 +78,7 @@ export const actions: Actions = {
         (result) => result.data !== null,
       ).length;
 
-      log("Found Collections", { foundCollectionsCount });
+      log("Found Collections", { meta: { foundCollectionsCount } });
       return {
         type: "success",
         data: response.data,
@@ -110,14 +110,14 @@ export const actions: Actions = {
         throw error(400, "No file uploaded");
       }
 
-      log("File received:", file.name);
+      log("File received:", file);
 
       const content = await file.text();
       const documentKeys = content
         .split(",")
         .map((key) => key.trim())
         .filter(Boolean);
-      log("Document keys extracted:", { documentKeys });
+      log("Document keys extracted", { meta: { documentKeys } });
 
       const DOCUMENT_KEY_LIMIT = 50;
       if (documentKeys.length > DOCUMENT_KEY_LIMIT) {
