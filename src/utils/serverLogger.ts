@@ -4,7 +4,7 @@ import winston from "winston";
 import { ecsFormat } from "@elastic/ecs-winston-format";
 import { OpenTelemetryTransportV3 } from "@opentelemetry/winston-transport";
 import DailyRotateFile from "winston-daily-rotate-file";
-import backendConfig from "../backend-config";
+import backendConfig from "$backendConfig";
 
 const logger = winston.createLogger({
   level: backendConfig.application.LOG_LEVEL,

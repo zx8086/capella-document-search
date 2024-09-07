@@ -17,7 +17,9 @@ export default defineConfig({
     alias: {
       $lib: path.resolve("./src/lib"),
       $utils: path.resolve("./src/utils"),
-      $config: path.resolve("./src/backend-config.ts"),
+      models: path.resolve("./src/models"),
+      $frontendConfig: path.resolve("./src/frontend-config.ts"),
+      $backendConfig: path.resolve("./src/backend-config.ts"),
     },
   },
   ssr: {

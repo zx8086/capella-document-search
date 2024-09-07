@@ -1,10 +1,10 @@
 /* src/lib/db/dbOperations.ts */
 
 import { Database, Statement } from "bun:sqlite";
-import { log, err } from "../../utils/unifiedLogger";
+import { log, err } from "$utils/unifiedLogger";
 import path from "path";
 import fs from "fs";
-import backendConfig from "../../backend-config";
+import backendConfig from "$backendConfig";
 
 let db: Database | null = null;
 let insertScopeStmt: Statement | null = null;
@@ -111,7 +111,7 @@ export function insertScope(bucket: string, scopeName: string) {
     throw new Error("Database not initialized");
   }
   const result = insertScopeStmt.run(bucket, scopeName);
-  log(`Inserted scope: ${bucket}.${scopeName}, Result:`, result);
+  log(`Inserted scope: ${bucket}.${scopeName}, Result:`, { meta: { result } });
   return result;
 }
 
@@ -126,7 +126,7 @@ export function insertCollection(
   const result = insertCollectionStmt.run(bucket, scopeName, collectionName);
   log(
     `Inserted collection: ${bucket}.${scopeName}.${collectionName}, Result:`,
-    result,
+    { meta: { result } },
   );
   return result;
 }
@@ -136,7 +136,9 @@ export function getAllCollections() {
     throw new Error("Database not initialized");
   }
   const results = getAllCollectionsStmt.all();
-  log("Retrieved collections - function getAllCollections:", results);
+  log("Retrieved collections - function getAllCollections:", {
+    meta: { results },
+  });
   return results;
 }
 
@@ -174,7 +176,7 @@ export function insertTooltip(
   );
   log(
     `Inserted tooltip for: ${bucket}.${scopeName}.${collectionName}, Result:`,
-    result,
+    { meta: { result } },
   );
   return result;
 }

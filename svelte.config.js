@@ -12,7 +12,8 @@ const config = {
     alias: {
       $lib: path.resolve("./src/lib"),
       $utils: path.resolve("./src/utils"),
-      $config: path.resolve("./src/backend-config.ts"),
+      $frontendConfig: path.resolve("./src/frontend-config.ts"),
+      $backendConfig: path.resolve("./src/backend-config.ts"),
     },
   },
 };

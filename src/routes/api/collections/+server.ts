@@ -48,14 +48,14 @@ export async function POST() {
           item.collection,
           `This is a mock tooltip for ${item.bucket}.${item.scope}.${item.collection}`,
         );
-        log("Scope insertion result:", { scopeResult });
-        log("Collection insertion result:", { collectionResult });
-        log("Tooltip insertion result:", { tooltipResult });
+        log("Scope insertion result:", { meta: { scopeResult } });
+        log("Collection insertion result:", { meta: { collectionResult } });
+        log("Tooltip insertion result:", { meta: { tooltipResult } });
         insertedCount++;
       }
     })();
 
-    log("Inserted items count:", { insertedCount });
+    log("Inserted items count:", { meta: { insertedCount } });
     const allCollections = getAllCollectionsWithTooltips();
     log("All collections with tooltips after insertion:");
     return json({
