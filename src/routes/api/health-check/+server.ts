@@ -50,16 +50,56 @@ async function checkDatabase(): Promise<{ status: string; message?: string }> {
   }
 }
 
-export async function GET() {
+async function checkInternalAPI(
+  fetch: Function,
+): Promise<{ status: string; message?: string }> {
+  try {
+    log("GET: /api/collections");
+    const response = await fetch("/api/collections");
+    if (!response.ok) {
+      const errorText = await response.text();
+      err(
+        `Failed to fetch collections. Status: ${response.status}, Error: ${errorText}`,
+      );
+      throw new Error(
+        `Failed to fetch collections. Status: ${response.status}, Error: ${errorText}`,
+      );
+    }
+    const collections = await response.json();
+    log(`Fetched collections successfully. Count: ${collections.length}`);
+    return {
+      status: "OK",
+      message: `Internal API is working. Retrieved ${collections.length} collections.`,
+    };
+  } catch (error) {
+    err("Internal API health check failed:", error);
+    return {
+      status: "ERROR",
+      message: error instanceof Error ? error.message : String(error),
+    };
+  }
+}
+
+export async function GET({ url, fetch }) {
   log("GET request received for health check");
+  const checkType = url.searchParams.get("type") || "simple";
+  const isSimpleCheck = checkType === "simple";
+
   const healthStatus: Record<string, { status: string; message?: string }> = {};
 
-  const checks = [
-    { name: "Capella API", check: checkCapellaAPI },
-    { name: "Database", check: checkDatabase },
+  const simpleChecks = [
+    { name: "SQLite Database", check: checkDatabase },
+    { name: "Internal Collections API", check: () => checkInternalAPI(fetch) },
   ];
 
-  const checkPromises = checks.map(async ({ name, check }) => {
+  const detailedChecks = [
+    ...simpleChecks,
+    { name: "External Capella API", check: checkCapellaAPI },
+  ];
+
+  const checksToRun = isSimpleCheck ? simpleChecks : detailedChecks;
+
+  const checkPromises = checksToRun.map(async ({ name, check }) => {
     try {
       const result = await Promise.race([
         check(),
@@ -101,5 +141,12 @@ export async function GET() {
     ? "OK"
     : "ERROR";
 
-  return json({ status: overallStatus, checks: healthStatus }, { status: 200 });
+  return json(
+    {
+      status: overallStatus,
+      checks: healthStatus,
+      checkType: isSimpleCheck ? "simple" : "detailed",
+    },
+    { status: 200 },
+  );
 }
