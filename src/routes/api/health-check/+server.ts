@@ -4,7 +4,7 @@ import { json } from "@sveltejs/kit";
 import { log, err } from "$utils/unifiedLogger";
 import {
   initializeDatabase,
-  getFormattedCollections,
+  getAllCollectionsWithTooltips,
 } from "$lib/db/dbOperations";
 import { getAllScopes } from "$lib/api";
 
@@ -36,8 +36,11 @@ async function checkCapellaAPI(): Promise<{
 async function checkDatabase(): Promise<{ status: string; message?: string }> {
   try {
     initializeDatabase();
-    await getFormattedCollections();
-    return { status: "OK" };
+    const collections = await getAllCollectionsWithTooltips();
+    return {
+      status: "OK",
+      message: `Retrieved ${collections.length} collections with tooltips.`,
+    };
   } catch (error) {
     err("Database health check failed:", error);
     return {

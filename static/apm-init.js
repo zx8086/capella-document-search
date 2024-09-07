@@ -1,40 +1,69 @@
 /* static/apm-init.js */
 
-import { frontendConfig } from "./src/config";
+(function () {
+  console.log("APM init script loaded");
 
-document.addEventListener("DOMContentLoaded", function () {
-  const apmConfig = frontendConfig.elasticApm;
-
-  console.log("APM Config:", apmConfig);
-
-  console.log("Full APM Config:", JSON.stringify(apmConfig, null, 2));
-  console.log(
-    "Distributed Tracing Origins:",
-    apmConfig.VITE_ELASTIC_APM_DISTRIBUTED_TRACING_ORIGINS.split(",").map(
-      (origin) => origin.trim(),
-    ),
-  );
-
-  if (window.elasticApm) {
-    try {
-      window.elasticApm.init({
-        serviceName: apmConfig.VITE_ELASTIC_APM_SERVICE_NAME,
-        serverUrl: apmConfig.VITE_ELASTIC_APM_SERVER_URL,
-        serviceVersion: apmConfig.VITE_ELASTIC_APM_SERVICE_VERSION,
-        environment: apmConfig.VITE_ELASTIC_APM_ENVIRONMENT,
-        active: true,
-        logLevel: "debug",
-        breakdownMetrics: true,
-        centralConfig: true,
-        distributedTracingOrigins:
-          apmConfig.VITE_ELASTIC_APM_DISTRIBUTED_TRACING_ORIGINS,
-        transactionSampleRate: 1.0,
-      });
-      console.log("Elastic APM initialized.");
-    } catch (e) {
-      console.error("Error initializing Elastic APM RUM:", e);
+  function initAPM(config) {
+    console.log("Initializing APM with config:", config);
+    if (window.elasticApm) {
+      try {
+        console.log("Attempting to initialize Elastic APM");
+        window.elasticApm.init({
+          serviceName: config.VITE_ELASTIC_APM_SERVICE_NAME,
+          serverUrl: config.VITE_ELASTIC_APM_SERVER_URL,
+          serviceVersion: config.VITE_ELASTIC_APM_SERVICE_VERSION,
+          environment: config.VITE_ELASTIC_APM_ENVIRONMENT,
+          active: true,
+          logLevel: "debug",
+          breakdownMetrics: true,
+          centralConfig: true,
+          distributedTracingOrigins:
+            config.VITE_ELASTIC_APM_DISTRIBUTED_TRACING_ORIGINS?.split(",").map(
+              (origin) => origin.trim(),
+            ),
+          transactionSampleRate: 1.0,
+        });
+        console.log("Elastic APM initialized successfully.");
+      } catch (e) {
+        console.error("Error initializing Elastic APM RUM:", e);
+      }
+    } else {
+      console.error(
+        "Elastic APM RUM script not loaded correctly. window.elasticApm is:",
+        window.elasticApm,
+      );
     }
-  } else {
-    console.error("Elastic APM RUM script not loaded correctly.");
   }
-});
+
+  function waitForEnv(callback, maxAttempts = 10, interval = 500) {
+    let attempts = 0;
+
+    function checkEnv() {
+      console.log("Checking for ENV, attempt:", attempts + 1);
+      if (window.ENV) {
+        console.log("ENV loaded:", window.ENV);
+        callback(window.ENV);
+      } else if (attempts < maxAttempts) {
+        attempts++;
+        console.log(`Waiting for ENV to load... Attempt ${attempts}`);
+        setTimeout(checkEnv, interval);
+      } else {
+        console.error("ENV not loaded after maximum attempts");
+      }
+    }
+
+    if (
+      window.location.hostname === "localhost" ||
+      window.location.hostname === "127.0.0.1"
+    ) {
+      console.log(
+        "Development environment detected. APM initialization skipped.",
+      );
+    } else {
+      checkEnv();
+    }
+  }
+
+  // Start checking for ENV
+  waitForEnv(initAPM);
+})();

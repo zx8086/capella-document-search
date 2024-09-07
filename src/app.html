@@ -6,9 +6,22 @@
         <meta charset="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <link rel="icon" href="%sveltekit.assets%/favicon.png" />
-        <script src="/elastic-apm-rum.umd.js"></script>
-        <script type="module" src="/apm-init.js"></script>
         %sveltekit.head%
+        <!-- Load Elastic APM RUM script -->
+        <script src="%sveltekit.assets%/elastic-apm-rum.umd.js"></script>
+        <!-- Conditionally load runtime-config.js in production -->
+        <script>
+            if (
+                window.location.hostname !== "localhost" &&
+                window.location.hostname !== "127.0.0.1"
+            ) {
+                var script = document.createElement("script");
+                script.src = "%sveltekit.assets%/runtime-config.js";
+                document.head.appendChild(script);
+            }
+        </script>
+        <!-- Load APM initialization script -->
+        <script src="%sveltekit.assets%/apm-init.js"></script>
     </head>
     <body data-sveltekit-preload-data="hover">
         <div style="display: contents">%sveltekit.body%</div>

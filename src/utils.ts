@@ -2,7 +2,6 @@
 
 let isBrowser = false;
 
-// Check if we're in a browser environment
 try {
   isBrowser = Boolean(window);
 } catch (e) {
@@ -12,10 +11,8 @@ try {
 export function getEnvOrThrow(key: string): string {
   let value;
   if (isBrowser) {
-    // Client-side
     value = import.meta.env[key];
   } else {
-    // Server-side
     value = process.env[key];
   }
 

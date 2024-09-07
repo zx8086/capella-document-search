@@ -41,6 +41,20 @@ export default defineConfig({
   },
   define: {
     "process.env.ENABLE_OPENTELEMETRY": JSON.stringify(enableOpenTelemetry),
+    "import.meta.env.VITE_ELASTIC_APM_SERVICE_NAME": JSON.stringify(
+      process.env.VITE_ELASTIC_APM_SERVICE_NAME,
+    ),
+    "import.meta.env.VITE_ELASTIC_APM_SERVER_URL": JSON.stringify(
+      process.env.VITE_ELASTIC_APM_SERVER_URL,
+    ),
+    "import.meta.env.VITE_ELASTIC_APM_SERVICE_VERSION": JSON.stringify(
+      process.env.VITE_ELASTIC_APM_SERVICE_VERSION,
+    ),
+    "import.meta.env.VITE_ELASTIC_APM_ENVIRONMENT": JSON.stringify(
+      process.env.VITE_ELASTIC_APM_ENVIRONMENT,
+    ),
+    "import.meta.env.VITE_ELASTIC_APM_DISTRIBUTED_TRACING_ORIGINS":
+      JSON.stringify(process.env.VITE_ELASTIC_APM_DISTRIBUTED_TRACING_ORIGINS),
   },
   esbuild: {
     target: "esnext",
