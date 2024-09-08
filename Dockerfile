@@ -84,6 +84,20 @@ COPY --from=builder /app/build ./build
 COPY --from=builder /app/src ./src
 COPY package.json bunfig.toml svelte.config.js vite.config.ts ./
 
+# Add the secret mounting here
+RUN --mount=type=secret,id=org_id \
+    --mount=type=secret,id=project_id \
+    --mount=type=secret,id=cluster_id \
+    --mount=type=secret,id=bucket_id \
+    --mount=type=secret,id=auth_token \
+    --mount=type=secret,id=openreplay_key \
+    echo "ORG_ID=$(cat /run/secrets/org_id)" >> /app/.env && \
+    echo "PROJECT_ID=$(cat /run/secrets/project_id)" >> /app/.env && \
+    echo "CLUSTER_ID=$(cat /run/secrets/cluster_id)" >> /app/.env && \
+    echo "BUCKET_ID=$(cat /run/secrets/bucket_id)" >> /app/.env && \
+    echo "AUTH_TOKEN=$(cat /run/secrets/auth_token)" >> /app/.env && \
+    echo "VITE_OPENREPLAY_PROJECT_KEY=$(cat /run/secrets/openreplay_key)" >> /app/.env
+
 # Copy Elastic APM RUM script and debug wrapper
 COPY static/elastic-apm-rum.umd.js /app/build/client/elastic-apm-rum.umd.js
 COPY static/elastic-apm-rum-debug-wrapper.js /app/elastic-apm-rum-debug-wrapper.js
