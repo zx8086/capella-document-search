@@ -145,3 +145,26 @@ jobs:
             --env-file .env \
             -e HEALTH_CHECK_PORT=3000 \
             zx8086/capella-document-search:latest
+
+      - name: Cleanup
+        if: always()
+        run: |
+          # Remove the .env file
+          rm -f .env
+
+          # Remove SARIF files
+          rm -f snyk.sarif snyk-docker.sarif
+
+          # Remove any dangling Docker images
+          docker image prune -f
+
+          # Optionally, remove the built image if you don't need it anymore
+          # docker rmi zx8086/capella-document-search:latest
+
+          # Remove any unused Docker volumes
+          docker volume prune -f
+
+          # Optionally, you can also clean up unused Docker networks
+          # docker network prune -f
+
+          echo "Cleanup completed"
