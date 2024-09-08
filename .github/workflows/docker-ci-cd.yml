@@ -19,16 +19,13 @@ jobs:
       - name: Install Snyk CLI
         run: bun add -g snyk
 
-      # Snyk scan for package.json
+      # Snyk scan for Bun project
       - name: Run Snyk to check for vulnerabilities
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
         run: |
-          bun run snyk test --file=package.json --json | tee snyk-results.json || true
-          echo '{"$schema":"https://raw.githubusercontent.com/oasis-tcs/sarif-spec/master/Schemata/sarif-schema-2.1.0.json","version":"2.1.0","runs":[{"tool":{"driver":{"name":"Snyk","informationUri":"https://snyk.io","rules":[]}},"results":[]}]}' > snyk.sarif
-          if [ -s snyk-results.json ]; then
-            jq -r '.vulnerabilities[] | {"ruleId": .id, "level": "warning", "message": {"text": .title}, "locations": [{"physicalLocation": {"artifactLocation": {"uri": "package.json"}, "region": {"startLine": 1, "startColumn": 1}}}]}' snyk-results.json | jq -s '{"$schema":"https://raw.githubusercontent.com/oasis-tcs/sarif-spec/master/Schemata/sarif-schema-2.1.0.json","version":"2.1.0","runs":[{"tool":{"driver":{"name":"Snyk","informationUri":"https://snyk.io","rules":[]}},"results":.}]}' > snyk.sarif
-          fi
+          snyk test --all-projects --detection-depth=1 --sarif-file-output=snyk.sarif || true
+          # The '|| true' ensures the step doesn't fail if vulnerabilities are found
 
       # Upload Snyk results to GitHub Code Scanning
       - name: Upload result to GitHub Code Scanning
@@ -89,13 +86,7 @@ jobs:
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
         run: |
-          bun run snyk container test zx8086/capella-document-search:latest --file=Dockerfile --json | tee docker-snyk-results.json || true
-          jq -r '.vulnerabilities[] | {"ruleId": .id, "level": "warning", "message": {"text": .title}, "locations": [{"physicalLocation": {"artifactLocation": {"uri": "Dockerfile"}, "region": {"startLine": 1, "startColumn": 1}}}]}' docker-snyk-results.json | jq -s '{"$schema":"https://raw.githubusercontent.com/oasis-tcs/sarif-spec/master/Schemata/sarif-schema-2.1.0.json","version":"2.1.0","runs":[{"tool":{"driver":{"name":"Snyk","informationUri":"https://snyk.io","rules":[]}},"results":.}]}' > docker-snyk.sarif
-
-      - name: Upload Docker scan result to GitHub Code Scanning
-        uses: github/codeql-action/upload-sarif@v3
-        with:
-          sarif_file: docker-snyk.sarif
+          snyk container test zx8086/capella-document-search:latest --file=Dockerfile --severity-threshold=high || true
 
       - name: Deploy container
         run: |
