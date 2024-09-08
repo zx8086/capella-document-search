@@ -31,8 +31,8 @@ jobs:
           file: ./Dockerfile
           push: true
           tags: zx8086/capella-document-search:latest
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          # cache-from: type=gha
+          # cache-to: type=gha,mode=max
 
       - name: Deploy container
         run: |

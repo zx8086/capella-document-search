@@ -1,12 +1,12 @@
 /* src/models/types.ts */
 
 export interface ApplicationConfig {
-  ENABLE_FILE_LOGGING: boolean;
   LOG_LEVEL: string;
   LOG_MAX_SIZE: string;
   LOG_MAX_FILES: string;
   GRAPHQL_ENDPOINT: string;
   DB_DATA_DIR: string;
+  ENABLE_FILE_LOGGING: boolean;
 }
 
 export interface CapellaConfig {

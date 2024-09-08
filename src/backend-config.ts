@@ -9,12 +9,12 @@ import type { BackendConfig } from "./models/types";
 
 const backendConfig: BackendConfig = {
   application: {
-    ENABLE_FILE_LOGGING: getEnvBooleanOrThrow("ENABLE_FILE_LOGGING"),
     LOG_LEVEL: getEnvOrThrow("LOG_LEVEL"),
     LOG_MAX_SIZE: getEnvOrThrow("LOG_MAX_SIZE"),
     LOG_MAX_FILES: getEnvOrThrow("LOG_MAX_FILES"),
     GRAPHQL_ENDPOINT: getEnvOrThrow("GRAPHQL_ENDPOINT"),
     DB_DATA_DIR: getEnvOrThrow("DB_DATA_DIR"),
+    ENABLE_FILE_LOGGING: getEnvBooleanOrThrow("ENABLE_FILE_LOGGING"),
   },
   capella: {
     API_BASE_URL: getEnvOrThrow("API_BASE_URL"),
