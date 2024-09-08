@@ -100,7 +100,7 @@ jobs:
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
         run: |
-          bun run snyk container test zx8086/capella-document-search:latest --file=Dockerfile --severity-threshold=high || true
+          docker run --rm -e SNYK_TOKEN -v /var/run/docker.sock:/var/run/docker.sock -v $(pwd):/app snyk/snyk:docker snyk container test zx8086/capella-document-search:latest --file=/app/Dockerfile --severity-threshold=high || true
 
       - name: Deploy container
         run: |
