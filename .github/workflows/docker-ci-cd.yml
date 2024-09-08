@@ -46,7 +46,7 @@ jobs:
           AUTH_TOKEN: ${{ secrets.AUTH_TOKEN }}
           VITE_OPENREPLAY_PROJECT_KEY: ${{ secrets.VITE_OPENREPLAY_PROJECT_KEY }}
         run: |
-          snyk test --file=package.json --debug || true
+          bun run snyk test --file=package.json --debug || true
 
       - name: Log in to Docker Hub
         uses: docker/login-action@v3
