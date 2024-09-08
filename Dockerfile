@@ -1,6 +1,7 @@
 #Dockerfile
 
 # Use the official Bun image
+# Use the official Bun image
 FROM oven/bun:1 AS base
 WORKDIR /app
 
@@ -54,13 +55,12 @@ ENV VITE_ELASTIC_APM_SERVICE_VERSION=${VITE_ELASTIC_APM_SERVICE_VERSION}
 ENV VITE_ELASTIC_APM_ENVIRONMENT=${VITE_ELASTIC_APM_ENVIRONMENT}
 ENV VITE_ELASTIC_APM_DISTRIBUTED_TRACING_ORIGINS=${VITE_ELASTIC_APM_DISTRIBUTED_TRACING_ORIGINS}
 
-
 # Install dependencies
 FROM base AS deps
 COPY package.json bun.lockb ./
 RUN bun install --frozen-lockfile
 
-# Build the application
+# Prepare the application
 FROM base AS builder
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
@@ -68,8 +68,7 @@ COPY . .
 # Production image
 FROM base AS release
 COPY --from=deps /app/node_modules ./node_modules
-COPY --from=builder /app/build ./build
-COPY --from=builder /app/src ./src
+COPY --from=builder /app ./
 COPY package.json bunfig.toml svelte.config.js vite.config.ts ./
 
 # Add the secret mounting here
