@@ -4,6 +4,11 @@ on:
   push:
     branches: ["master"]
 
+# Add this permissions block at the top level of your workflow
+permissions:
+  contents: read
+  security-events: write
+
 jobs:
   build-and-deploy:
     runs-on: self-hosted
@@ -49,9 +54,10 @@ jobs:
           bun run snyk test --file=package.json --sarif-file-output=snyk.sarif || true
 
       - name: Upload Snyk scan results to GitHub Code Scanning
-        uses: github/codeql-action/upload-sarif@v2
+        uses: github/codeql-action/upload-sarif@v3
         with:
           sarif_file: snyk.sarif
+          category: snyk-code
 
       - name: Log in to Docker Hub
         uses: docker/login-action@v3
@@ -108,9 +114,10 @@ jobs:
           docker run --rm -e SNYK_TOKEN -v /var/run/docker.sock:/var/run/docker.sock -v $(pwd):/app snyk/snyk:docker snyk container test zx8086/capella-document-search:latest --file=/app/Dockerfile --severity-threshold=high --sarif-file-output=/app/snyk-docker.sarif || true
 
       - name: Upload Docker Snyk scan results to GitHub Code Scanning
-        uses: github/codeql-action/upload-sarif@v2
+        uses: github/codeql-action/upload-sarif@v3
         with:
           sarif_file: snyk-docker.sarif
+          category: snyk-docker
 
       - name: Deploy container
         run: |
