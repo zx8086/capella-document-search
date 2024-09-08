@@ -1,7 +1,7 @@
 #Dockerfile
 
 # Use the official Bun image
-FROM oven/bun:latest AS base
+FROM oven/bun:1.0.25 AS base
 WORKDIR /app
 
 # Add build arguments for non-sensitive data
