@@ -26,71 +26,41 @@ jobs:
 
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
-        env:
-          DB_DATA_DIR: /app/data
-          ENABLE_OPENTELEMETRY: true
-          ENABLE_FILE_LOGGING: true
-          LOG_LEVEL: debug
-          LOG_MAX_SIZE: 20m
-          LOG_MAX_FILES: 14d
-          GRAPHQL_ENDPOINT: http://host.docker.internal:4000/graphql
-          API_BASE_URL: https://cloudapi.cloud.couchbase.com/v4
-          ORG_ID: ${{ secrets.ORG_ID }}
-          PROJECT_ID: ${{ secrets.PROJECT_ID }}
-          CLUSTER_ID: ${{ secrets.CLUSTER_ID }}
-          BUCKET_ID: ${{ secrets.BUCKET_ID }}
-          AUTH_TOKEN: ${{ secrets.AUTH_TOKEN }}
-          SERVICE_NAME: Capella Document Search
-          SERVICE_VERSION: 2.0.0
-          DEPLOYMENT_ENVIRONMENT: production
-          TRACES_ENDPOINT: https://otel-http-traces.siobytes.com
-          METRICS_ENDPOINT: https://otel-http-metrics.siobytes.com
-          LOGS_ENDPOINT: https://otel-http-logs.siobytes.com
-          METRIC_READER_INTERVAL: 1800000
-          VITE_OPENREPLAY_PROJECT_KEY: ${{ secrets.VITE_OPENREPLAY_PROJECT_KEY }}
-          VITE_OPENREPLAY_INGEST_POINT: https://api.openreplay.com/ingest
-          VITE_FILE_UPLOAD_LIMIT: 50
-          VITE_ELASTIC_APM_SERVICE_NAME: Capella Document Search
-          VITE_ELASTIC_APM_SERVER_URL: https://apm.siobytes.com
-          VITE_ELASTIC_APM_SERVICE_VERSION: 2.0.0
-          VITE_ELASTIC_APM_ENVIRONMENT: production
-          VITE_ELASTIC_APM_DISTRIBUTED_TRACING_ORIGINS: "['*']"
-          HEALTH_CHECK_PORT: 3000
         with:
           context: .
           file: ./Dockerfile
           push: true
           tags: zx8086/capella-document-search:latest
           build-args: |
-            DB_DATA_DIR
-            ENABLE_OPENTELEMETRY
-            ENABLE_FILE_LOGGING
-            LOG_LEVEL
-            LOG_MAX_SIZE
-            LOG_MAX_FILES
-            GRAPHQL_ENDPOINT
-            API_BASE_URL
-            ORG_ID
-            PROJECT_ID
-            CLUSTER_ID
-            BUCKET_ID
-            AUTH_TOKEN
-            SERVICE_NAME
-            SERVICE_VERSION
-            DEPLOYMENT_ENVIRONMENT
-            TRACES_ENDPOINT
-            METRICS_ENDPOINT
-            LOGS_ENDPOINT
-            METRIC_READER_INTERVAL
-            VITE_OPENREPLAY_PROJECT_KEY
-            VITE_OPENREPLAY_INGEST_POINT
-            VITE_FILE_UPLOAD_LIMIT
-            VITE_ELASTIC_APM_SERVICE_NAME
-            VITE_ELASTIC_APM_SERVER_URL
-            VITE_ELASTIC_APM_SERVICE_VERSION
-            VITE_ELASTIC_APM_ENVIRONMENT
-            VITE_ELASTIC_APM_DISTRIBUTED_TRACING_ORIGINS
-            HEALTH_CHECK_PORT
+            DB_DATA_DIR=/app/data
+            ENABLE_OPENTELEMETRY=true
+            ENABLE_FILE_LOGGING=true
+            LOG_LEVEL=debug
+            LOG_MAX_SIZE=20m
+            LOG_MAX_FILES=14d
+            GRAPHQL_ENDPOINT=http://host.docker.internal:4000/graphql
+            API_BASE_URL=https://cloudapi.cloud.couchbase.com/v4
+            ORG_ID=${{ secrets.ORG_ID }}
+            PROJECT_ID=${{ secrets.PROJECT_ID }}
+            CLUSTER_ID=${{ secrets.CLUSTER_ID }}
+            BUCKET_ID=${{ secrets.BUCKET_ID }}
+            AUTH_TOKEN=${{ secrets.AUTH_TOKEN }}
+            SERVICE_NAME=Capella Document Search
+            SERVICE_VERSION=2.0.0
+            DEPLOYMENT_ENVIRONMENT=production
+            TRACES_ENDPOINT=https://otel-http-traces.siobytes.com
+            METRICS_ENDPOINT=https://otel-http-metrics.siobytes.com
+            LOGS_ENDPOINT=https://otel-http-logs.siobytes.com
+            METRIC_READER_INTERVAL=1800000
+            VITE_OPENREPLAY_PROJECT_KEY=${{ secrets.VITE_OPENREPLAY_PROJECT_KEY }}
+            VITE_OPENREPLAY_INGEST_POINT=https://api.openreplay.com/ingest
+            VITE_FILE_UPLOAD_LIMIT=50
+            VITE_ELASTIC_APM_SERVICE_NAME=Capella Document Search
+            VITE_ELASTIC_APM_SERVER_URL=https://apm.siobytes.com
+            VITE_ELASTIC_APM_SERVICE_VERSION=2.0.0
+            VITE_ELASTIC_APM_ENVIRONMENT=production
+            VITE_ELASTIC_APM_DISTRIBUTED_TRACING_ORIGINS="['*']"
+            HEALTH_CHECK_PORT=3000
 
       - name: Deploy container
         run: |
