@@ -8,6 +8,14 @@ try {
   // Not in a browser environment
 }
 
+export function getEnvBooleanOrThrow(key: string): boolean {
+  const value = process.env[key];
+  if (value === undefined) {
+    throw new Error(`Environment variable ${key} is not defined`);
+  }
+  return value.toLowerCase() === "true";
+}
+
 export function getEnvOrThrow(key: string): string {
   let value;
   if (isBrowser) {
