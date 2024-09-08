@@ -61,12 +61,13 @@ jobs:
           EOF
 
       - name: Run Snyk checks
+        continue-on-error: true
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
         run: |
           export $(grep -v '^#' .env | xargs)
-          bun run snyk test --file=package.json --sarif-file-output=snyk.sarif || true
-          bun run snyk monitor --file=package.json || true
+          bun run snyk test --file=package.json --sarif-file-output=snyk.sarif
+          bun run snyk monitor --file=package.json
 
       - name: Upload Snyk scan results to GitHub Code Scanning
         if: hashFiles('snyk.sarif') != ''
@@ -118,12 +119,14 @@ jobs:
           VITE_OPENREPLAY_PROJECT_KEY: ${{ secrets.VITE_OPENREPLAY_PROJECT_KEY }}
 
       - name: Run Snyk to check Docker image for vulnerabilities
+        continue-on-error: true
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
         run: |
-          docker run --rm -e SNYK_TOKEN -v /var/run/docker.sock:/var/run/docker.sock -v $(pwd):/app snyk/snyk:docker snyk container test zx8086/capella-document-search:latest --file=/app/Dockerfile --severity-threshold=high --sarif-file-output=/app/snyk-docker.sarif || true
+          docker run --rm -e SNYK_TOKEN -v /var/run/docker.sock:/var/run/docker.sock -v $(pwd):/app snyk/snyk:docker snyk container test zx8086/capella-document-search:latest --file=/app/Dockerfile --severity-threshold=high --sarif-file-output=/app/snyk-docker.sarif
 
       - name: Run Snyk monitor for Docker image
+        continue-on-error: true
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
         run: |

@@ -505,6 +505,7 @@
                 method="POST"
                 action={isSearchMode ? "?/searchDocuments" : "?/uploadFile"}
                 class="space-y-6"
+                data-transaction-name="Enter Document Key"
                 enctype="multipart/form-data"
             >
                 <!-- Search Bar / File Upload -->
