@@ -53,6 +53,12 @@ jobs:
         run: |
           bun run snyk test --file=package.json --sarif-file-output=snyk.sarif || true
 
+      - name: Run Snyk monitor
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        run: |
+          bun run snyk monitor --file=package.json || true
+
       - name: Upload Snyk scan results to GitHub Code Scanning
         uses: github/codeql-action/upload-sarif@v3
         with:
@@ -112,6 +118,12 @@ jobs:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
         run: |
           docker run --rm -e SNYK_TOKEN -v /var/run/docker.sock:/var/run/docker.sock -v $(pwd):/app snyk/snyk:docker snyk container test zx8086/capella-document-search:latest --file=/app/Dockerfile --severity-threshold=high --sarif-file-output=/app/snyk-docker.sarif || true
+
+      - name: Run Snyk monitor for Docker image
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        run: |
+          docker run --rm -e SNYK_TOKEN -v /var/run/docker.sock:/var/run/docker.sock -v $(pwd):/app snyk/snyk:docker snyk container monitor zx8086/capella-document-search:latest --file=/app/Dockerfile || true
 
       - name: Upload Docker Snyk scan results to GitHub Code Scanning
         uses: github/codeql-action/upload-sarif@v3
