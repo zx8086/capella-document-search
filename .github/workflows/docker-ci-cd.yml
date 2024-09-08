@@ -1,0 +1,60 @@
+name: Docker CI/CD on Self-Hosted Runner
+
+on:
+  push:
+    branches: ["main"]
+
+jobs:
+  build-and-deploy:
+    runs-on: self-hosted
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKER_HUB_USERNAME }}
+          password: ${{ secrets.DOCKER_HUB_ACCESS_TOKEN }}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v4
+        with:
+          context: .
+          push: true
+          tags: zx8086/capella-document-search:latest
+
+      - name: Deploy container
+        run: |
+          docker stop capella-document-search || true
+          docker rm capella-document-search || true
+          docker run -d --name capella-document-search \
+            -p 3000:3000 \
+            -e DB_DATA_DIR=/app/data \
+            -e ENABLE_OPENTELEMETRY=true \
+            -e ENABLE_FILE_LOGGING=true \
+            -e LOG_LEVEL='debug' \
+            -e LOG_MAX_SIZE='20m' \
+            -e LOG_MAX_FILES='14d' \
+            -e GRAPHQL_ENDPOINT=http://host.docker.internal:4000/graphql \
+            -e API_BASE_URL='https://cloudapi.cloud.couchbase.com/v4' \
+            -e ORG_ID='${{ secrets.ORG_ID }}' \
+            -e PROJECT_ID='${{ secrets.PROJECT_ID }}' \
+            -e CLUSTER_ID='${{ secrets.CLUSTER_ID }}' \
+            -e BUCKET_ID='${{ secrets.BUCKET_ID }}' \
+            -e AUTH_TOKEN='${{ secrets.AUTH_TOKEN }}' \
+            -e SERVICE_NAME='Capella Document Search' \
+            -e SERVICE_VERSION='2.0.0' \
+            -e DEPLOYMENT_ENVIRONMENT='production' \
+            -e TRACES_ENDPOINT='https://otel-http-traces.siobytes.com' \
+            -e METRICS_ENDPOINT='https://otel-http-metrics.siobytes.com' \
+            -e LOGS_ENDPOINT='https://otel-http-logs.siobytes.com' \
+            -e METRIC_READER_INTERVAL=1800000 \
+            -e VITE_OPENREPLAY_PROJECT_KEY='${{ secrets.VITE_OPENREPLAY_PROJECT_KEY }}' \
+            -e VITE_OPENREPLAY_INGEST_POINT='https://api.openreplay.com/ingest' \
+            -e VITE_FILE_UPLOAD_LIMIT=50 \
+            -e VITE_ELASTIC_APM_SERVICE_NAME='Capella Document Search' \
+            -e VITE_ELASTIC_APM_SERVER_URL='https://apm.siobytes.com' \
+            -e VITE_ELASTIC_APM_SERVICE_VERSION='2.0.0' \
+            -e VITE_ELASTIC_APM_ENVIRONMENT='production' \
+            -e VITE_ELASTIC_APM_DISTRIBUTED_TRACING_ORIGINS="['*']" \
+            zx8086/capella-document-search:latest

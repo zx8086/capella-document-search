@@ -489,11 +489,8 @@
 </script>
 
 <svelte:head>
-    <title>Capella Document Search - Homepage</title>
-    <meta
-        name="transaction-name"
-        content="Capella Document Search - Homepage"
-    />
+    <title>Capella Document Search</title>
+    <meta name="Capella Document Search" content="Capella Document Search" />
 </svelte:head>
 
 <div class="min-h-screen flex flex-col bg-white dark:bg-[#2C2C2C] mb-20 mt-5">

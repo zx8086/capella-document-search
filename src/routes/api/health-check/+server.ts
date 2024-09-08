@@ -21,11 +21,11 @@ type CheckResult = {
 async function checkCapellaAPI(): Promise<CheckResult> {
   const startTime = Date.now();
   try {
-    const scopes = await getAllScopes();
+    const collections = await getAllScopes();
     const duration = Date.now() - startTime;
     return {
       status: "OK",
-      message: `Retrieved ${scopes.length} scopes.`,
+      message: `External API is working. Retrieved ${collections.length} collections.`,
       responseTime: duration,
     };
   } catch (error) {
