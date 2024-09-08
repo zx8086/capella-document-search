@@ -1,7 +1,19 @@
 #Dockerfile
 
-# Use the official Bun image
-FROM oven/bun:1.0.25 AS base
+FROM alpine:3.19
+
+# Install dependencies
+RUN apk add --no-cache curl unzip
+
+# Install Bun
+RUN curl -fsSL https://bun.sh/install | bash
+
+# Add Bun to PATH
+ENV PATH="/root/.bun/bin:${PATH}"
+
+# Verify Bun installation
+RUN bun --version
+
 WORKDIR /app
 
 # Add build arguments for non-sensitive data
