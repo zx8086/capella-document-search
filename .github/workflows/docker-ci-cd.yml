@@ -15,18 +15,21 @@ jobs:
         with:
           bun-version: latest
 
-      # Snyk scan for Node.js project
+      # Install Snyk CLI
+      - name: Install Snyk CLI
+        run: npm install -g snyk
+
+      # Snyk scan for Bun project
       - name: Run Snyk to check for vulnerabilities
-        uses: snyk/actions/node@master
-        continue-on-error: true
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
-        with:
-          args: --sarif-file-output=snyk.sarif
+        run: |
+          snyk test --all-projects --detection-depth=1 --sarif-file-output=snyk.sarif || true
+          # The '|| true' ensures the step doesn't fail if vulnerabilities are found
 
       # Upload Snyk results to GitHub Code Scanning
       - name: Upload result to GitHub Code Scanning
-        uses: github/codeql-action/upload-sarif@v2
+        uses: github/codeql-action/upload-sarif@v3
         with:
           sarif_file: snyk.sarif
 
@@ -80,13 +83,10 @@ jobs:
 
       # Snyk scan for Docker image
       - name: Run Snyk to check Docker image for vulnerabilities
-        uses: snyk/actions/docker@master
-        continue-on-error: true
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
-        with:
-          image: zx8086/capella-document-search:latest
-          args: --file=Dockerfile --severity-threshold=high
+        run: |
+          snyk container test zx8086/capella-document-search:latest --file=Dockerfile --severity-threshold=high || true
 
       - name: Deploy container
         run: |
