@@ -64,7 +64,6 @@ RUN bun install --frozen-lockfile
 FROM base AS builder
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
-RUN bun run build
 
 # Production image
 FROM base AS release
@@ -86,6 +85,9 @@ RUN --mount=type=secret,id=org_id \
     echo "BUCKET_ID=$(cat /run/secrets/bucket_id)" >> /app/.env && \
     echo "AUTH_TOKEN=$(cat /run/secrets/auth_token)" >> /app/.env && \
     echo "VITE_OPENREPLAY_PROJECT_KEY=$(cat /run/secrets/openreplay_key)" >> /app/.env
+
+# Now run the build after secrets are set
+RUN bun run build
 
 # Copy Elastic APM RUM script and debug wrapper
 COPY static/elastic-apm-rum.umd.js /app/build/client/elastic-apm-rum.umd.js
