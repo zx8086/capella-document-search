@@ -82,9 +82,11 @@ jobs:
             if [[ ! "$line" =~ ^\s*# && -n "$line" ]]; then
               key=$(echo "$line" | cut -d '=' -f1)
               value=$(echo "$line" | cut -d '=' -f2-)
-              build_args="$build_args --build-arg $key='$value'"
+              build_args="$build_args --build-arg ${key}='${value}'"
             fi
           done < .env
+
+          echo "Debug: build_args=$build_args"
 
           docker buildx build \
             --push \
