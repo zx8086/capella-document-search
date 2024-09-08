@@ -17,7 +17,7 @@ jobs:
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
         run: |
-          bun run snyk test --file=package.json --package-manager=bun || true
+          docker run --rm -e SNYK_TOKEN -v $(pwd):/app snyk/snyk:bun snyk test --file=/app/package.json --package-manager=bun || true
 
       - name: Log in to Docker Hub
         uses: docker/login-action@v3
