@@ -1,4 +1,4 @@
-/* src/utils.ts */
+/* src/utils/getEnv.ts */
 
 let isBrowser = false;
 
