@@ -310,10 +310,8 @@
                     buttonState = "ready";
                 }
             } catch (e) {
-                console.error("Error in handleSubmit:", e);
-                toast.error(`Error: ${e.message}`, {
-                    duration: Infinity,
-                });
+                const errorMessage = e instanceof Error ? e.message : String(e);
+                toast.error(`Error: ${errorMessage}`, { duration: Infinity });
                 buttonState = "ready";
             } finally {
                 processing = false;
@@ -938,7 +936,6 @@ IMAGE_70_C51_LV04F1003GPDE</pre>
             {/if}
 
             {#if isSearchMode && searchResults.length > 0}
-                <h2 class="mt-4 mb-6"></h2>
                 {#each sortedResults as result}
                     <DocumentDisplay
                         bucket={result.bucket}

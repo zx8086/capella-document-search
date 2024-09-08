@@ -4,7 +4,7 @@ import {
   getEnvOrThrow,
   getEnvNumberOrThrow,
   getEnvBooleanOrThrow,
-} from "$utils";
+} from "./utils";
 import type { BackendConfig } from "./models/types";
 
 const backendConfig: BackendConfig = {

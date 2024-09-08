@@ -38,7 +38,9 @@
     $: hasData = data !== null && Object.keys(data).length > 0;
 </script>
 
-<div class="border rounded-md p-4 mb-4 w-full relative drop-shadow-lg bg-white">
+<div
+    class="border rounded-md p-4 mt-6 mb-4 w-full relative drop-shadow-lg bg-white"
+>
     {#if hasData}
         <span class="absolute -top-1 -right-1 flex h-3 w-3">
             <span
