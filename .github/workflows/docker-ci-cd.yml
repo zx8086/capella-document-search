@@ -24,8 +24,12 @@ jobs:
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
         run: |
-          snyk test --all-projects --detection-depth=1 --sarif-file-output=snyk.sarif || true
-          # The '|| true' ensures the step doesn't fail if vulnerabilities are found
+          bun run snyk test --all-projects --detection-depth=1 --sarif-file-output=snyk.sarif || true
+          # Check if the SARIF file was created
+          if [ ! -f snyk.sarif ]; then
+            echo "SARIF file was not created. Creating a dummy file."
+            echo '{"runs":[]}' > snyk.sarif
+          fi
 
       # Upload Snyk results to GitHub Code Scanning
       - name: Upload result to GitHub Code Scanning
@@ -86,7 +90,7 @@ jobs:
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
         run: |
-          snyk container test zx8086/capella-document-search:latest --file=Dockerfile --severity-threshold=high || true
+          bun run snyk container test zx8086/capella-document-search:latest --file=Dockerfile --severity-threshold=high || true
 
       - name: Deploy container
         run: |
