@@ -2,10 +2,11 @@ version: v1.25.0
 ignore: {}
 exclude:
   global:
-    - src/**/*.ts
-    - src/**/*.js
-    - src/**/*.svelte
+    - src/**/*
+    - build/**/*
+    - static/**/*
     - '**/*.test.ts'
     - '**/*.test.js'
     - '**/*.spec.ts'
     - '**/*.spec.js'
+    - '**/*.svelte'

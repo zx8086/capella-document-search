@@ -16,17 +16,8 @@ jobs:
       - name: Run Snyk to check for vulnerabilities
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
-          # Add minimal required environment variables or mock values
-          LOG_LEVEL: "info"
-          ENABLE_FILE_LOGGING: "false"
-          ENABLE_OPENTELEMETRY: "false"
-          DB_DATA_DIR: "/app/data"
-          VITE_FILE_UPLOAD_LIMIT: "50"
-          API_BASE_URL: "https://example.com"
-          SERVICE_NAME: "Test Service"
-          DEPLOYMENT_ENVIRONMENT: "test"
         run: |
-          bun run snyk test --all-projects --detection-depth=1 --package-manager=bun || true
+          bun run snyk test --file=package.json --package-manager=bun || true
 
       - name: Log in to Docker Hub
         uses: docker/login-action@v3
