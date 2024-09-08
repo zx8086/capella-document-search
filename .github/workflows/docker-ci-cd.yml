@@ -77,21 +77,21 @@ jobs:
 
       - name: Build and push Docker image
         run: |
-          build_args=""
+          declare -a build_args=()
           while IFS= read -r line || [[ -n "$line" ]]; do
             if [[ ! "$line" =~ ^\s*# && -n "$line" ]]; then
               key=$(echo "$line" | cut -d '=' -f1)
               value=$(echo "$line" | cut -d '=' -f2-)
-              build_args="$build_args --build-arg ${key}='${value}'"
+              build_args+=("--build-arg" "${key}=${value}")
             fi
           done < .env
 
-          echo "Debug: build_args=$build_args"
+          echo "Debug: build_args=${build_args[*]}"
 
           docker buildx build \
             --push \
             -t zx8086/capella-document-search:latest \
-            $build_args \
+            "${build_args[@]}" \
             --secret id=org_id,env=ORG_ID \
             --secret id=project_id,env=PROJECT_ID \
             --secret id=cluster_id,env=CLUSTER_ID \
