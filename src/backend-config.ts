@@ -1,10 +1,15 @@
 /* src/backend-config.ts */
 
-import { getEnvOrThrow, getEnvNumberOrThrow } from "./utils";
+import {
+  getEnvOrThrow,
+  getEnvNumberOrThrow,
+  getEnvBooleanOrThrow,
+} from "./utils";
 import type { BackendConfig } from "./models/types";
 
 const backendConfig: BackendConfig = {
   application: {
+    ENABLE_FILE_LOGGING: getEnvBooleanOrThrow("ENABLE_FILE_LOGGING"),
     LOG_LEVEL: getEnvOrThrow("LOG_LEVEL"),
     LOG_MAX_SIZE: getEnvOrThrow("LOG_MAX_SIZE"),
     LOG_MAX_FILES: getEnvOrThrow("LOG_MAX_FILES"),

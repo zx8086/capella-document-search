@@ -1,6 +1,7 @@
 /* src/models/types.ts */
 
 export interface ApplicationConfig {
+  ENABLE_FILE_LOGGING: boolean;
   LOG_LEVEL: string;
   LOG_MAX_SIZE: string;
   LOG_MAX_FILES: string;

@@ -6,22 +6,17 @@ import { OpenTelemetryTransportV3 } from "@opentelemetry/winston-transport";
 import DailyRotateFile from "winston-daily-rotate-file";
 import backendConfig from "$backendConfig";
 
-const logger = winston.createLogger({
-  level: backendConfig.application.LOG_LEVEL,
-  format: ecsFormat({
-    convertReqRes: true,
-    apmIntegration: true,
+// Define the transports array
+const transports: winston.transport[] = [
+  new winston.transports.Console(),
+  new OpenTelemetryTransportV3({
+    level: backendConfig.application.LOG_LEVEL,
   }),
-  transports: [
-    new winston.transports.Console(),
-    new OpenTelemetryTransportV3({
-      level: backendConfig.application.LOG_LEVEL,
-    }),
-  ],
-});
+];
 
-if (typeof process !== "undefined" && process.env.NODE_ENV === "production") {
-  logger.add(
+// Add file logging if ENABLE_FILE_LOGGING is set to 'true'
+if (process.env.ENABLE_FILE_LOGGING === "true") {
+  transports.push(
     new DailyRotateFile({
       filename: "logs/application-%DATE%.log",
       datePattern: "YYYY-MM-DD",
@@ -31,6 +26,16 @@ if (typeof process !== "undefined" && process.env.NODE_ENV === "production") {
     }),
   );
 }
+
+// Create the logger
+const logger = winston.createLogger({
+  level: backendConfig.application.LOG_LEVEL,
+  format: ecsFormat({
+    convertReqRes: true,
+    apmIntegration: true,
+  }),
+  transports: transports,
+});
 
 export function log(message: string, meta?: any): void {
   logger.info(message, meta);

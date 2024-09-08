@@ -16,9 +16,9 @@ import {
 import { log, err } from "../utils/serverLogger";
 import backendConfig from "$backendConfig";
 
-const YOUR_GRAPHQL_ENDPOINT = backendConfig.application.GRAPHQL_ENDPOINT;
+const GRAPHQL_ENDPOINT = backendConfig.application.GRAPHQL_ENDPOINT;
 const client = new ApolloClient({
-  link: createHttpLink({ uri: YOUR_GRAPHQL_ENDPOINT, fetch }),
+  link: createHttpLink({ uri: GRAPHQL_ENDPOINT, fetch }),
   cache: new InMemoryCache(),
 });
 

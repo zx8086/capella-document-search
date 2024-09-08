@@ -488,6 +488,14 @@
     }
 </script>
 
+<svelte:head>
+    <title>Capella Document Search - Homepage</title>
+    <meta
+        name="transaction-name"
+        content="Capella Document Search - Homepage"
+    />
+</svelte:head>
+
 <div class="min-h-screen flex flex-col bg-white dark:bg-[#2C2C2C] mb-20 mt-5">
     <!-- Logo Section -->
     <div class="text-center py-4">
@@ -829,6 +837,7 @@
                             </h3>
                             <button
                                 on:click={closeExampleModal}
+                                data-transaction-name="Close Example Modal"
                                 class="text-white hover:text-gray-200 focus:outline-none"
                                 aria-label="close modal"
                             >
@@ -915,6 +924,7 @@ IMAGE_70_C51_LV04F1003GPDE</pre>
                         <div class="flex justify-end bg-gray-100 px-6 py-4">
                             <button
                                 on:click={closeExampleModal}
+                                data-transaction-name="Close Example Modal"
                                 type="button"
                                 class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
                             >
@@ -986,6 +996,7 @@ IMAGE_70_C51_LV04F1003GPDE</pre>
                 </h3>
                 <button
                     on:click={() => (modalIsOpen = false)}
+                    data-transaction-name="Tooltip Modal"
                     aria-label="close modal"
                 >
                     <svg
@@ -1014,6 +1025,7 @@ IMAGE_70_C51_LV04F1003GPDE</pre>
                 <button
                     on:click={() => (modalIsOpen = false)}
                     type="button"
+                    data-transaction-name="Tooltip Modal"
                     class="cursor-pointer whitespace-nowrap rounded-xl bg-blue-700 px-4 py-2 text-center text-sm font-medium tracking-wide text-slate-100 transition hover:opacity-75 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-700 active:opacity-100 active:outline-offset-0 dark:bg-blue-600 dark:text-slate-100 dark:focus-visible:outline-blue-600"
                 >
                     Close

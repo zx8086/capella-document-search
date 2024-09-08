@@ -9,6 +9,7 @@
         console.log("Attempting to initialize Elastic APM");
         window.elasticApm.init({
           serviceName: config.VITE_ELASTIC_APM_SERVICE_NAME,
+          pageLoadTransactionName: "/homepage",
           serverUrl: config.VITE_ELASTIC_APM_SERVER_URL,
           serviceVersion: config.VITE_ELASTIC_APM_SERVICE_VERSION,
           environment: config.VITE_ELASTIC_APM_ENVIRONMENT,

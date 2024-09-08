@@ -149,6 +149,7 @@
                                 <details class="mt-2">
                                     <summary
                                         class="cursor-pointer text-blue-600 hover:text-blue-800 flex items-center"
+                                        data-transaction-name={`View ${result.found ? "Matched" : "Not Matched"} Collections`}
                                     >
                                         <svg
                                             xmlns="http://www.w3.org/2000/svg"
@@ -193,6 +194,7 @@
                                 <details class="mt-2">
                                     <summary
                                         class="cursor-pointer text-blue-600 hover:text-blue-800 flex items-center"
+                                        data-transaction-name={`View ${result.found ? "Matched" : "Not Matched"} Collections`}
                                     >
                                         <svg
                                             xmlns="http://www.w3.org/2000/svg"
@@ -235,6 +237,7 @@
                     on:click={() => downloadCSV("found")}
                     class="p-2 rounded-full bg-green-100 hover:bg-green-200 transition-colors duration-200"
                     title="Download Found Keys"
+                    data-transaction-name="Download Found Document Keys"
                 >
                     <svg
                         xmlns="http://www.w3.org/2000/svg"
@@ -260,6 +263,7 @@
                     on:click={() => downloadCSV("notFound")}
                     class="p-2 rounded-full bg-red-100 hover:bg-red-200 transition-colors duration-200"
                     title="Download Not Found Keys"
+                    data-transaction-name="Download Not Found Document Keys"
                 >
                     <svg
                         xmlns="http://www.w3.org/2000/svg"

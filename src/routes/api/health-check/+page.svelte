@@ -38,6 +38,7 @@
     }
 
     onMount(fetchHealthCheck);
+    $: transactionName = `API Health Check Page - ${checkType} Check`;
 </script>
 
 <svelte:head>
@@ -45,6 +46,7 @@
         >API Health Check - {checkType.charAt(0).toUpperCase() +
             checkType.slice(1)}</title
     >
+    <meta name="transaction-name" content={transactionName} />
 </svelte:head>
 
 <div class="container mx-auto px-4 py-8">
@@ -54,6 +56,7 @@
         <button
             on:click={toggleCheckType}
             class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded"
+            data-transaction-name={`Switch to ${checkType === "Simple" ? "Detailed" : "Simple"} Check`}
         >
             Switch to {checkType === "Simple" ? "Detailed" : "Simple"} Check
         </button>

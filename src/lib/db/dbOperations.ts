@@ -151,10 +151,6 @@ export function getFormattedCollections() {
     scope: string;
     collection: string;
   }>;
-  // console.log(
-  //   "Retrieved formatted collections - function getFormattedCollections:",
-  //   results,
-  // );
   log("Retrieved formatted collections - function getFormattedCollections:");
   return results;
 }
