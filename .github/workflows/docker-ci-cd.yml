@@ -24,14 +24,8 @@ jobs:
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
         run: |
-          snyk test --all-projects --detection-depth=1 --sarif-file-output=snyk.sarif || true
+          bun run snyk test --all-projects --detection-depth=1 || true
           # The '|| true' ensures the step doesn't fail if vulnerabilities are found
-
-      # Upload Snyk results to GitHub Code Scanning
-      - name: Upload result to GitHub Code Scanning
-        uses: github/codeql-action/upload-sarif@v3
-        with:
-          sarif_file: snyk.sarif
 
       - name: Log in to Docker Hub
         uses: docker/login-action@v3
@@ -86,7 +80,7 @@ jobs:
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
         run: |
-          snyk container test zx8086/capella-document-search:latest --file=Dockerfile --severity-threshold=high || true
+          bun run snyk container test zx8086/capella-document-search:latest --file=Dockerfile --severity-threshold=high || true
 
       - name: Deploy container
         run: |
