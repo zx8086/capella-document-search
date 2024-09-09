@@ -4,7 +4,7 @@
 FROM alpine:3.19 AS bun-installer
 
 # Install necessary dependencies
-RUN apk add --no-cache curl unzip bash
+RUN apk add --no-cache curl bash libstdc++ gcompat
 
 # Set Bun version
 ARG BUN_VERSION=latest
@@ -14,11 +14,11 @@ RUN curl -fsSL https://bun.sh/install | bash
 
 # Set Bun environment variables
 ENV BUN_INSTALL="/root/.bun"
-ENV PATH="$BUN_INSTALL/bin:$PATH"
+ENV PATH="/root/.bun/bin:$PATH"
 
 # Verify Bun installation
 RUN echo "Bun version:" && \
-    $BUN_INSTALL/bin/bun --version
+    bun --version
 
 # Stage 2: Base image
 FROM alpine:3.19 AS base
@@ -27,15 +27,15 @@ FROM alpine:3.19 AS base
 COPY --from=bun-installer /root/.bun /root/.bun
 
 # Install additional dependencies
-RUN apk add --no-cache ca-certificates bash
+RUN apk add --no-cache ca-certificates bash libstdc++ gcompat
 
 # Set Bun environment variables
 ENV BUN_INSTALL="/root/.bun"
-ENV PATH="$BUN_INSTALL/bin:$PATH"
+ENV PATH="/root/.bun/bin:$PATH"
 
 # Verify Bun installation in the base image
 RUN echo "Bun version:" && \
-    $BUN_INSTALL/bin/bun --version
+    bun --version
 
 # Set working directory
 WORKDIR /app
