@@ -3,8 +3,8 @@
 # Stage 1: Install Bun
 FROM bitnami/minideb:bullseye AS bun-installer
 
-# Install curl and other necessary dependencies
-RUN install_packages curl ca-certificates
+# Install curl, unzip, and other necessary dependencies
+RUN install_packages curl ca-certificates unzip
 
 # Install Bun using the official installation script
 RUN curl -fsSL https://bun.sh/install | bash
@@ -25,7 +25,7 @@ COPY --from=bun-installer /root/.bun /root/.bun
 ENV PATH="/root/.bun/bin:${PATH}"
 
 # Install additional dependencies if needed
-RUN install_packages ca-certificates
+RUN install_packages curl ca-certificates unzip
 
 # Verify Bun installation in the base image
 RUN bun --version
