@@ -11,8 +11,33 @@
     import type { Options } from "@openreplay/tracker";
     import { frontendConfig } from "$frontendConfig";
     import { writable } from "svelte/store";
+    import videojs from "video.js";
+    import VideoPlayerCarousel from "$lib/components/VideoPlayerCarousel.svelte";
 
     let tracker: any | null = null;
+
+    let showVideoCarousel = false;
+    let idleTimer: ReturnType<typeof setTimeout> | null = null;
+
+    function resetIdleTimer() {
+        if (idleTimer) clearTimeout(idleTimer);
+        showVideoCarousel = false;
+        idleTimer = setTimeout(() => {
+            showVideoCarousel = true;
+        }, 120000); // 120 seconds for production
+    }
+
+    function handleUserActivity() {
+        if (showVideoCarousel) {
+            showVideoCarousel = false;
+        }
+        resetIdleTimer();
+    }
+
+    function handleExitFullScreen() {
+        showVideoCarousel = false;
+        resetIdleTimer();
+    }
 
     // Dark mode store
     const darkMode = writable(false);
@@ -138,6 +163,13 @@
     }
 
     onMount(async () => {
+        resetIdleTimer();
+        if (browser) {
+            window.addEventListener("mousemove", handleUserActivity);
+            window.addEventListener("keydown", handleUserActivity);
+            window.addEventListener("click", handleUserActivity);
+            window.addEventListener("scroll", handleUserActivity);
+        }
         startAutoplay();
         // Initialize dark mode from local storage
         if (browser) {
@@ -162,7 +194,6 @@
                         plan: "free",
                     },
                 });
-                console.log("OpenReplay tracker started successfully");
             }
         } catch (error) {
             console.error("Failed to initialize OpenReplay:", error);
@@ -170,9 +201,28 @@
     });
 
     onDestroy(() => {
+        if (idleTimer) clearTimeout(idleTimer);
+        if (browser) {
+            window.removeEventListener("mousemove", handleUserActivity);
+            window.removeEventListener("keydown", handleUserActivity);
+            window.removeEventListener("click", handleUserActivity);
+            window.removeEventListener("scroll", handleUserActivity);
+        }
         if (autoplayInterval) clearInterval(autoplayInterval);
     });
+
+    const videos = [
+        "/idle-videos/X1_Single_Lewis_Hamilton-GENERIC_1280x730.mp4",
+        "/idle-videos/FA24_TH_T1_OCTOBER_DUO_10_B_ PAID_ LOGO_SOUND_1920_1080.mp4",
+        "/idle-videos/FA24_TH_T1_SEPTEMBER_ABBEY_6_C_ECOM_ NO LOGO_SOUND_3412_1892.mp4",
+    ];
 </script>
+
+<VideoPlayerCarousel
+    {videos}
+    isVisible={showVideoCarousel}
+    on:exit={handleExitFullScreen}
+/>
 
 <div class="flex flex-col min-h-screen">
     <!-- Header Section -->
