@@ -12,11 +12,13 @@ ARG BUN_VERSION=latest
 # Install Bun
 RUN curl -fsSL https://bun.sh/install | bash
 
-# Add Bun to PATH
-ENV PATH="/root/.bun/bin:${PATH}"
+# Set Bun environment variables
+ENV BUN_INSTALL="/root/.bun"
+ENV PATH="$BUN_INSTALL/bin:$PATH"
 
 # Verify Bun installation
-RUN bun --version
+RUN echo "Bun version:" && \
+    $BUN_INSTALL/bin/bun --version
 
 # Stage 2: Base image
 FROM alpine:3.19 AS base
@@ -27,11 +29,13 @@ COPY --from=bun-installer /root/.bun /root/.bun
 # Install additional dependencies
 RUN apk add --no-cache ca-certificates bash
 
-# Add Bun to PATH
-ENV PATH="/root/.bun/bin:${PATH}"
+# Set Bun environment variables
+ENV BUN_INSTALL="/root/.bun"
+ENV PATH="$BUN_INSTALL/bin:$PATH"
 
 # Verify Bun installation in the base image
-RUN bun --version
+RUN echo "Bun version:" && \
+    $BUN_INSTALL/bin/bun --version
 
 # Set working directory
 WORKDIR /app
