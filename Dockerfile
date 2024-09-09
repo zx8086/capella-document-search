@@ -1,6 +1,6 @@
 #Dockerfile
 
-# use the official Bun image
+# use the official Alpine image
 FROM alpine:3.19 AS base
 
 # Install necessary dependencies
@@ -20,6 +20,7 @@ ENV PATH=/usr/local/bin:$PATH
 # Verify Bun installation
 RUN bun --version
 
+# The rest of your Dockerfile remains the same
 WORKDIR /app
 
 # Add build arguments for non-sensitive data
