@@ -1,42 +1,31 @@
 #Dockerfile
 
-# Stage 1: Download and install latest Bun
-FROM alpine:3.19 AS bun-installer
+# Stage 1: Install Bun
+FROM ubuntu:22.04 AS bun-installer
 
-# Install necessary dependencies
-RUN apk add --no-cache curl jq
+# Install curl and other necessary dependencies
+RUN apt-get update && apt-get install -y curl unzip
 
-ARG TARGETARCH
+# Install Bun using the official installation script
+RUN curl -fsSL https://bun.sh/install | bash
 
-# Download and install latest Bun
-RUN ARCH=$([ "${TARGETARCH}" = "arm64" ] && echo "aarch64" || echo "x64") && \
-    LATEST_VERSION=$(curl -s https://api.github.com/repos/oven-sh/bun/releases/latest | jq -r .tag_name | sed 's/bun-v//') && \
-    echo "Latest Bun version: ${LATEST_VERSION}" && \
-    curl -fsSL "https://github.com/oven-sh/bun/releases/download/bun-v${LATEST_VERSION}/bun-linux-${ARCH}.zip" -o bun.zip && \
-    unzip bun.zip && \
-    mv bun-linux-${ARCH}/bun /usr/local/bin/bun && \
-    chmod +x /usr/local/bin/bun && \
-    rm -rf bun-linux-${ARCH} bun.zip
-
-# Set PATH to include Bun
-ENV PATH="/usr/local/bin:${PATH}"
+# Add Bun to PATH
+ENV PATH="/root/.bun/bin:${PATH}"
 
 # Verify Bun installation
-RUN echo $PATH && \
-    ls -l /usr/local/bin/bun && \
-    /usr/local/bin/bun --version
+RUN bun --version
 
 # Stage 2: Base image
-FROM alpine:3.19 AS base
+FROM ubuntu:22.04 AS base
 
 # Copy Bun from the installer stage
-COPY --from=bun-installer /usr/local/bin/bun /usr/local/bin/bun
+COPY --from=bun-installer /root/.bun /root/.bun
+
+# Add Bun to PATH
+ENV PATH="/root/.bun/bin:${PATH}"
 
 # Install additional dependencies if needed
-RUN apk add --no-cache ca-certificates bash
-
-# Set PATH to include Bun
-ENV PATH="/usr/local/bin:${PATH}"
+RUN apt-get update && apt-get install -y ca-certificates
 
 # Verify Bun installation in the base image
 RUN bun --version
