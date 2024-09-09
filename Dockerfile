@@ -1,7 +1,7 @@
 #Dockerfile
 
 # Stage 1: Download and install latest Bun
-FROM alpine:3.19 AS bun-installer
+FROM node:18-alpine AS bun-installer
 
 # Install necessary dependencies
 RUN apk add --no-cache curl jq
@@ -19,10 +19,10 @@ RUN ARCH=$([ "${TARGETARCH}" = "arm64" ] && echo "aarch64" || echo "x64") && \
     rm -rf bun-linux-${ARCH} bun.zip
 
 # Verify Bun installation
-RUN /usr/local/bin/bun --version
+RUN bun --version
 
 # Stage 2: Base image
-FROM alpine:3.19 AS base
+FROM node:18-alpine AS base
 
 # Copy Bun from the installer stage
 COPY --from=bun-installer /usr/local/bin/bun /usr/local/bin/bun
@@ -38,6 +38,7 @@ RUN bun --version
 
 # Set working directory
 WORKDIR /app
+
 
 # Add build arguments for non-sensitive data
 ARG ENABLE_FILE_LOGGING
@@ -89,17 +90,17 @@ ENV VITE_ELASTIC_APM_SERVICE_VERSION=${VITE_ELASTIC_APM_SERVICE_VERSION}
 ENV VITE_ELASTIC_APM_ENVIRONMENT=${VITE_ELASTIC_APM_ENVIRONMENT}
 ENV VITE_ELASTIC_APM_DISTRIBUTED_TRACING_ORIGINS=${VITE_ELASTIC_APM_DISTRIBUTED_TRACING_ORIGINS}
 
-# Install dependencies
+# Stage 3: Dependencies
 FROM base AS deps
 COPY package.json bun.lockb ./
 RUN bun install --frozen-lockfile
 
-# Prepare the application
+# Stage 4: Builder
 FROM base AS builder
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
-# Production image
+# Stage 5: Release
 FROM base AS release
 COPY --from=deps /app/node_modules ./node_modules
 COPY --from=builder /app ./
