@@ -116,7 +116,7 @@ COPY /static/generate-runtime-config.sh /app/generate-runtime-config.sh
 RUN chmod +x /app/generate-runtime-config.sh
 
 # Ensure the src/data directory exists
-RUN mkdir -p /app/src/data && chown -R root:root /app/src/data
+RUN mkdir -p /app/src/data && chown -R bun:bun /app/src/data
 
 # Create a script to set global variables and start the application
 RUN echo '#!/bin/sh\n\
