@@ -3,8 +3,11 @@
 # Stage 1: Install Bun
 FROM bitnami/minideb:bullseye AS bun-installer
 
-# Install curl, unzip, and other necessary dependencies
-RUN install_packages curl ca-certificates unzip
+# Update and upgrade all packages, including zlib
+RUN install_packages curl ca-certificates unzip && \
+    apt-get update && \
+    apt-get upgrade -y && \
+    apt-get install -y zlib1g
 
 # Install Bun using the official installation script
 RUN curl -fsSL https://bun.sh/install | bash
@@ -18,14 +21,16 @@ RUN bun --version
 # Stage 2: Base image
 FROM bitnami/minideb:bullseye AS base
 
+# Update and upgrade all packages, including zlib
+RUN apt-get update && \
+    apt-get upgrade -y && \
+    apt-get install -y zlib1g ca-certificates
+
 # Copy Bun from the installer stage
 COPY --from=bun-installer /root/.bun /root/.bun
 
 # Add Bun to PATH
 ENV PATH="/root/.bun/bin:${PATH}"
-
-# Install additional dependencies if needed
-RUN install_packages curl ca-certificates unzip
 
 # Verify Bun installation in the base image
 RUN bun --version
