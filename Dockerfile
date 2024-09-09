@@ -1,41 +1,34 @@
 #Dockerfile
 
 # Stage 1: Install Bun
-FROM alpine:3.19 AS bun-installer
+FROM ubuntu:22.04 AS bun-installer
 
-# Install necessary dependencies
-RUN apk add --no-cache curl bash libstdc++ gcompat
+# Install curl and other necessary dependencies
+RUN apt-get update && apt-get install -y curl unzip
 
-# Set Bun version
-ARG BUN_VERSION=latest
-
-# Install Bun
+# Install Bun using the official installation script
 RUN curl -fsSL https://bun.sh/install | bash
 
-# Set Bun environment variables
-ENV BUN_INSTALL="/root/.bun"
-ENV PATH="/root/.bun/bin:$PATH"
+# Add Bun to PATH
+ENV PATH="/root/.bun/bin:${PATH}"
 
 # Verify Bun installation
-RUN echo "Bun version:" && \
-    bun --version
+RUN bun --version
 
 # Stage 2: Base image
-FROM alpine:3.19 AS base
+FROM ubuntu:22.04 AS base
 
 # Copy Bun from the installer stage
 COPY --from=bun-installer /root/.bun /root/.bun
 
-# Install additional dependencies
-RUN apk add --no-cache ca-certificates bash libstdc++ gcompat
+# Add Bun to PATH
+ENV PATH="/root/.bun/bin:${PATH}"
 
-# Set Bun environment variables
-ENV BUN_INSTALL="/root/.bun"
-ENV PATH="/root/.bun/bin:$PATH"
+# Install additional dependencies if needed
+RUN apt-get update && apt-get install -y ca-certificates
 
 # Verify Bun installation in the base image
-RUN echo "Bun version:" && \
-    bun --version
+RUN bun --version
 
 # Set working directory
 WORKDIR /app
