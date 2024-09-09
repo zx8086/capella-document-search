@@ -1,7 +1,24 @@
 #Dockerfile
 
 # use the official Bun image
-FROM oven/bun:latest AS base
+FROM alpine:3.19 AS base
+
+# Install necessary dependencies
+RUN apk add --no-cache ca-certificates curl unzip bash
+
+# Install Bun
+ARG BUN_VERSION=1.0.30
+ARG TARGETARCH
+RUN ARCH=$([ "$TARGETARCH" = "arm64" ] && echo "aarch64" || echo "x64") \
+    && curl -fsSL "https://github.com/oven-sh/bun/releases/download/bun-v${BUN_VERSION}/bun-linux-${ARCH}.zip" -o bun.zip \
+    && unzip -j -d /usr/local/bin bun.zip && chmod +x /usr/local/bin/bun \
+    && rm bun.zip
+
+# Add Bun to PATH
+ENV PATH=/usr/local/bin:$PATH
+
+# Verify Bun installation
+RUN bun --version
 
 WORKDIR /app
 
@@ -109,7 +126,7 @@ COPY /static/generate-runtime-config.sh /app/generate-runtime-config.sh
 RUN chmod +x /app/generate-runtime-config.sh
 
 # Ensure the src/data directory exists
-RUN mkdir -p /app/src/data && chown -R bun:bun /app/src/data
+RUN mkdir -p /app/src/data && chown -R root:root /app/src/data
 
 # Create a script to set global variables and start the application
 RUN echo '#!/bin/sh\n\
