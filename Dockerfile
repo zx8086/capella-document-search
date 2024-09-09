@@ -26,9 +26,23 @@ RUN echo $PATH && \
     ls -l /usr/local/bin/bun && \
     /usr/local/bin/bun --version
 
+# Stage 2: Base image
+FROM alpine:3.19 AS base
+
+# Copy Bun from the installer stage
+COPY --from=bun-installer /usr/local/bin/bun /usr/local/bin/bun
+
+# Install additional dependencies if needed
+RUN apk add --no-cache ca-certificates bash
+
+# Set PATH to include Bun
+ENV PATH="/usr/local/bin:${PATH}"
+
+# Verify Bun installation in the base image
+RUN bun --version
+
 # Set working directory
 WORKDIR /app
-
 
 # Add build arguments for non-sensitive data
 ARG ENABLE_FILE_LOGGING
