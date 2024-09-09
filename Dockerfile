@@ -6,10 +6,13 @@ FROM alpine:3.19 AS base
 # Install necessary dependencies and Bun
 RUN apk add --no-cache curl bash && \
     curl -fsSL https://bun.sh/install | bash && \
-    ln -s ~/.bun/bin/bun /usr/local/bin/bun
+    ln -s /root/.bun/bin/bun /usr/local/bin/bun
 
 # Add Bun to PATH
 ENV PATH="/root/.bun/bin:${PATH}"
+
+# Verify Bun installation
+RUN bun --version
 
 WORKDIR /app
 
