@@ -14,10 +14,15 @@ import {
   ATTR_SERVICE_VERSION,
   SEMRESATTRS_DEPLOYMENT_ENVIRONMENT,
 } from "@opentelemetry/semantic-conventions";
-import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-http";
+// import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-http";
 import { OTLPMetricExporter } from "@opentelemetry/exporter-metrics-otlp-http";
 import { OTLPLogExporter } from "@opentelemetry/exporter-logs-otlp-http";
 import { BatchSpanProcessor } from "@opentelemetry/sdk-trace-base";
+
+import { MonitoredOTLPTraceExporter } from "./MonitoredOTLPTraceExporter";
+import { MonitoredOTLPMetricExporter } from "./MonitoredOTLPMetricExporter";
+import { MonitoredOTLPLogExporter } from "./MonitoredOTLPLogExporter";
+
 import {
   MeterProvider,
   PeriodicExportingMetricReader,
@@ -49,6 +54,11 @@ const resource = new Resource({
     backendConfig.openTelemetry.DEPLOYMENT_ENVIRONMENT,
 });
 
+const commonConfig = {
+  timeoutMillis: 120000, // 2 minutes
+  concurrencyLimit: 100,
+};
+
 if (INSTRUMENTATION_ENABLED) {
   try {
     console.log("Initializing OpenTelemetry SDK...");
@@ -56,32 +66,65 @@ if (INSTRUMENTATION_ENABLED) {
     // Set up diagnostics logging with increased verbosity
     diag.setLogger(new DiagConsoleLogger(), DiagLogLevel.INFO);
 
+    // class TolerantOTLPTraceExporter extends OTLPTraceExporter {
+    //   async send(
+    //     items: ReadableSpan[],
+    //     onSuccess: () => void,
+    //     onError: (error: Error) => void,
+    //   ): Promise<void> {
+    //     try {
+    //       await super.send(items, onSuccess, (error) => {
+    //         if (error.message.includes("Request timed out")) {
+    //           console.warn(
+    //             "Ignoring timeout error as data is likely sent successfully",
+    //           );
+    //           onSuccess(); // Treat as success since data is getting through
+    //         } else {
+    //           onError(error);
+    //         }
+    //       });
+    //     } catch (error) {
+    //       if (
+    //         error instanceof Error &&
+    //         error.message.includes("Request timed out")
+    //       ) {
+    //         console.warn(
+    //           "Ignoring timeout error as data is likely sent successfully",
+    //         );
+    //         onSuccess(); // Treat as success since data is getting through
+    //       } else {
+    //         onError(error instanceof Error ? error : new Error(String(error)));
+    //       }
+    //     }
+    //   }
+    // }
+
     // Create OTLP exporters with updated configurations
-    const traceExporter = new OTLPTraceExporter({
+    const traceExporter = new MonitoredOTLPTraceExporter({
+      ...commonConfig,
       url: backendConfig.openTelemetry.TRACES_ENDPOINT,
-      concurrencyLimit: 50,
       headers: { "Content-Type": "application/json" },
-      timeoutMillis: 30000,
     });
 
-    const otlpMetricExporter = new OTLPMetricExporter({
+    const otlpMetricExporter = new MonitoredOTLPMetricExporter({
+      ...commonConfig,
       url: backendConfig.openTelemetry.METRICS_ENDPOINT,
       headers: { "Content-Type": "application/json" },
-      timeoutMillis: 30000,
     });
 
-    const logExporter = new OTLPLogExporter({
+    const logExporter = new MonitoredOTLPLogExporter({
+      ...commonConfig,
       url: backendConfig.openTelemetry.LOGS_ENDPOINT,
       headers: { "Content-Type": "application/json" },
-      timeoutMillis: 30000,
     });
 
     // Set up LoggerProvider
     const loggerProvider = new LoggerProvider({ resource });
     loggerProvider.addLogRecordProcessor(
       new BatchLogRecordProcessor(logExporter, {
-        maxExportBatchSize: 512,
-        scheduledDelayMillis: 5000,
+        maxExportBatchSize: 256, // Reduced from 512
+        scheduledDelayMillis: 1000, // Reduced from 5000
+        exportTimeoutMillis: 30000,
       }),
     );
     api.logs.setGlobalLoggerProvider(loggerProvider);
@@ -99,6 +142,25 @@ if (INSTRUMENTATION_ENABLED) {
 
     // Set this MeterProvider to be global to the app being instrumented.
     metrics.setGlobalMeterProvider(meterProvider);
+
+    // // Create a meter
+    // meter = metrics.getMeter(
+    //   backendConfig.openTelemetry.SERVICE_NAME,
+    //   backendConfig.openTelemetry.SERVICE_VERSION,
+    // );
+
+    // // Create HTTP request count metric
+    // const httpRequestCounter = meter.createCounter('http_requests_total', {
+    //   description: 'Count of HTTP requests',
+    // });
+
+    // // Create HTTP response time histogram
+    // const httpResponseTimeHistogram = meter.createHistogram('http_response_time_seconds', {
+    //   description: 'HTTP response time in seconds',
+    // });
+
+    // Set this MeterProvider to be global to the app being instrumented.
+    // metrics.setGlobalMeterProvider(meterProvider);
 
     // Create a BatchSpanProcessor with custom configuration
     const batchSpanProcessor = new BatchSpanProcessor(traceExporter, {
