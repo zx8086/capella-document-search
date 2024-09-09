@@ -3,15 +3,14 @@
 # Use Alpine 3.19 as the base image
 FROM alpine:3.19 AS base
 
-# Install necessary dependencies, install Bun, and verify installation
-RUN apk add --no-cache curl unzip bash && \
+# Install necessary dependencies and Bun
+RUN apk add --no-cache curl unzip bash ca-certificates && \
     curl -fsSL https://bun.sh/install | bash && \
     mv /root/.bun /usr/local/bun && \
-    ln -s /usr/local/bun/bin/bun /usr/local/bin/bun && \
-    echo 'export BUN_INSTALL="/usr/local/bun"' >> /etc/profile.d/bun.sh && \
-    echo 'export PATH="/usr/local/bun/bin:$PATH"' >> /etc/profile.d/bun.sh && \
-    . /etc/profile.d/bun.sh && \
-    bun --version
+    ln -s /usr/local/bun/bin/bun /usr/local/bin/bun
+
+# Add Bun to PATH
+ENV PATH="/usr/local/bun/bin:${PATH}"
 
 WORKDIR /app
 
