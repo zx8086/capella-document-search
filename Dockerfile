@@ -4,13 +4,12 @@
 FROM alpine:3.19 AS base
 
 # Install necessary dependencies and Bun
-RUN apk add --no-cache curl unzip bash ca-certificates && \
+RUN apk add --no-cache curl bash && \
     curl -fsSL https://bun.sh/install | bash && \
-    mv /root/.bun /usr/local/bun && \
-    ln -s /usr/local/bun/bin/bun /usr/local/bin/bun
+    ln -s ~/.bun/bin/bun /usr/local/bin/bun
 
 # Add Bun to PATH
-ENV PATH="/usr/local/bun/bin:${PATH}"
+ENV PATH="/root/.bun/bin:${PATH}"
 
 WORKDIR /app
 
@@ -118,9 +117,9 @@ COPY /static/generate-runtime-config.sh /app/generate-runtime-config.sh
 RUN chmod +x /app/generate-runtime-config.sh
 
 # Ensure the src/data directory exists
-RUN mkdir -p /app/src/data && chown -R root:root /app/src/data
+RUN mkdir -p /app/src/data && chown -R bun:bun /app/src/data
 
-# Modify the start script (no need to source profile anymore)
+# Create a script to set global variables and start the application
 RUN echo '#!/bin/sh\n\
     echo "ENABLE_OPENTELEMETRY is set to: $ENABLE_OPENTELEMETRY"\n\
     if [ "$ENABLE_OPENTELEMETRY" = "true" ]; then\n\
