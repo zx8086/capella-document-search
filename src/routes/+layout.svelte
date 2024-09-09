@@ -11,10 +11,11 @@
     import type { Options } from "@openreplay/tracker";
     import { frontendConfig } from "$frontendConfig";
     import { writable } from "svelte/store";
-    import videojs from "video.js";
+    // import videojs from "video.js";
     import VideoPlayerCarousel from "$lib/components/VideoPlayerCarousel.svelte";
 
     let tracker: any | null = null;
+    let isTrackerInitialized = false;
 
     let showVideoCarousel = false;
     let idleTimer: ReturnType<typeof setTimeout> | null = null;
@@ -35,21 +36,23 @@
     }
 
     function handleExitFullScreen() {
-        showVideoCarousel = false;
-        resetIdleTimer();
+        setTimeout(() => {
+            showVideoCarousel = false;
+            resetIdleTimer();
+        }, 2000); // This should match the duration in VideoPlayerCarousel
     }
 
     const darkMode = writable(false);
 
-    function toggleDarkMode() {
-        darkMode.update((value) => {
-            const newValue = !value;
-            if (browser) {
-                localStorage.setItem("theme", newValue ? "dark" : "light");
-            }
-            return newValue;
-        });
-    }
+    // function toggleDarkMode() {
+    //     darkMode.update((value) => {
+    //         const newValue = !value;
+    //         if (browser) {
+    //             localStorage.setItem("theme", newValue ? "dark" : "light");
+    //         }
+    //         return newValue;
+    //     });
+    // }
 
     function applyDarkMode(isDark: boolean) {
         if (browser) {
@@ -66,38 +69,49 @@
     }
 
     async function initializeTracker() {
+        if (isTrackerInitialized) return tracker;
         if (browser) {
-            const TrackerClass = await initTracker();
-            if (TrackerClass) {
-                tracker = new TrackerClass({
-                    projectKey:
-                        frontendConfig.openreplay.VITE_OPENREPLAY_PROJECT_KEY,
-                    ingestPoint:
-                        frontendConfig.openreplay.VITE_OPENREPLAY_INGEST_POINT,
-                    obscureTextNumbers: false,
-                    obscureTextEmails: true,
-                    __DISABLE_SECURE_MODE: true,
-                    network: {
-                        capturePayload: true,
-                        sessionTokenHeader: false,
-                        failuresOnly: false,
-                        ignoreHeaders: [
-                            "Authorization",
-                            "Cookie",
-                            "Set-Cookie",
-                        ],
-                        captureInIframes: false,
-                    },
-                    capturePerformance: true,
-                    respectDoNotTrack: false,
-                    verbose: true,
-                    console: {
-                        enabled: true,
-                        level: ["log", "info", "warn", "error"],
-                    },
-                } as Options);
+            try {
+                const TrackerClass = await initTracker();
+                if (TrackerClass) {
+                    tracker = new TrackerClass({
+                        projectKey:
+                            frontendConfig.openreplay
+                                .VITE_OPENREPLAY_PROJECT_KEY,
+                        ingestPoint:
+                            frontendConfig.openreplay
+                                .VITE_OPENREPLAY_INGEST_POINT,
+                        obscureTextNumbers: false,
+                        obscureTextEmails: true,
+                        __DISABLE_SECURE_MODE: true,
+                        network: {
+                            capturePayload: true,
+                            sessionTokenHeader: false,
+                            failuresOnly: false,
+                            ignoreHeaders: [
+                                "Authorization",
+                                "Cookie",
+                                "Set-Cookie",
+                            ],
+                            captureInIframes: false,
+                        },
+                        capturePerformance: true,
+                        respectDoNotTrack: false,
+                        verbose: true,
+                        console: {
+                            enabled: true,
+                            level: ["log", "info", "warn", "error"],
+                        },
+                    } as Options);
+                }
+            } catch (error) {
+                console.warn(
+                    "OpenReplay initialization failed:",
+                    error instanceof Error ? error.message : String(error),
+                );
             }
         }
+        isTrackerInitialized = true;
         return tracker;
     }
 
@@ -140,10 +154,10 @@
         currentQuoteIndex = (currentQuoteIndex + 1) % quotes.length;
     }
 
-    function previousQuote() {
-        currentQuoteIndex =
-            (currentQuoteIndex - 1 + quotes.length) % quotes.length;
-    }
+    // function previousQuote() {
+    //     currentQuoteIndex =
+    //         (currentQuoteIndex - 1 + quotes.length) % quotes.length;
+    // }
 
     function startAutoplay() {
         if (autoplayInterval) clearInterval(autoplayInterval);
@@ -167,17 +181,16 @@
             window.addEventListener("scroll", handleUserActivity);
         }
         startAutoplay();
-        // Initialize dark mode from local storage
-        if (browser) {
-            const savedTheme = localStorage.getItem("theme");
-            const prefersDark = window.matchMedia(
-                "(prefers-color-scheme: dark)",
-            ).matches;
-            const isDark =
-                savedTheme === "dark" || (!savedTheme && prefersDark);
-            darkMode.set(isDark);
-            applyDarkMode(isDark);
-        }
+        // if (browser) {
+        //     const savedTheme = localStorage.getItem("theme");
+        //     const prefersDark = window.matchMedia(
+        //         "(prefers-color-scheme: dark)",
+        //     ).matches;
+        //     const isDark =
+        //         savedTheme === "dark" || (!savedTheme && prefersDark);
+        //     darkMode.set(isDark);
+        //     applyDarkMode(isDark);
+        // }
 
         try {
             const trackerInstance = await initializeTracker();
@@ -191,7 +204,10 @@
                 });
             }
         } catch (error) {
-            console.error("Failed to initialize OpenReplay:", error);
+            console.warn(
+                "Failed to start OpenReplay:",
+                error instanceof Error ? error.message : String(error),
+            );
         }
     });
 

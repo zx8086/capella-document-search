@@ -26,7 +26,8 @@
         data: any;
     }
 
-    const { getTracker } = getContext(key);
+    // const { getTracker } = getContext(key);
+    const { getTracker } = getContext(key) as { getTracker: () => any };
 
     function trackClick(elementName: string, action: string) {
         if (browser) {
