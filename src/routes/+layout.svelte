@@ -213,11 +213,8 @@
 
     const videos = [
         "/idle-videos/X1_Single_Lewis_Hamilton-GENERIC_1280x730.mp4",
-        "/idle-videos/X1_Single_George_Russel-GENERIC_1920x1080_Logo.mp4",
         "/idle-videos/FA24_TH_T1_OCTOBER_DUO_10_B_ PAID_ LOGO_SOUND_1920_1080.mp4",
         "/idle-videos/FA24_TH_T1_SEPTEMBER_ABBEY_6_C_ECOM_ NO LOGO_SOUND_3412_1892.mp4",
-        "/idle-videos/PAID_MEDIA_DIGITAL_OOH_TOMMY_STRAY_KIDS_15sec_002_1920x1080_MP4_Audio_NoLogo.mp4",
-        "/idle-videos/PAID_MEDIA_TOMMY_STRAY_KIDS_10sec_001_1920x1080_MP4_Audio_Logo.mp4",
     ];
 </script>
 
