@@ -1,26 +1,42 @@
 #Dockerfile
 
-# use the official Alpine image
-FROM alpine:3.19 AS base
+# Stage 1: Download and install Bun
+FROM alpine:3.19 AS bun-installer
 
 # Install necessary dependencies
-RUN apk add --no-cache ca-certificates curl unzip bash
+RUN apk add --no-cache curl unzip
 
-# Install Bun
+# Set Bun version and architecture
 ARG BUN_VERSION=1.0.30
 ARG TARGETARCH
-RUN ARCH=$([ "$TARGETARCH" = "arm64" ] && echo "aarch64" || echo "x64") \
-    && curl -fsSL "https://github.com/oven-sh/bun/releases/download/bun-v${BUN_VERSION}/bun-linux-${ARCH}.zip" -o bun.zip \
-    && unzip -j -d /usr/local/bin bun.zip && chmod +x /usr/local/bin/bun \
-    && rm bun.zip
 
-# Add Bun to PATH
-ENV PATH=/usr/local/bin:$PATH
+# Download and install Bun
+RUN ARCH=$([ "${TARGETARCH}" = "arm64" ] && echo "aarch64" || echo "x64") && \
+    curl -fsSL "https://github.com/oven-sh/bun/releases/download/bun-v${BUN_VERSION}/bun-linux-${ARCH}.zip" -o bun.zip && \
+    unzip bun.zip && \
+    mv bun-linux-${ARCH}/bun /usr/local/bin/bun && \
+    chmod +x /usr/local/bin/bun && \
+    rm -rf bun-linux-${ARCH} bun.zip
 
 # Verify Bun installation
+RUN /usr/local/bin/bun --version
+
+# Stage 2: Final image
+FROM alpine:3.19
+
+# Copy Bun from the installer stage
+COPY --from=bun-installer /usr/local/bin/bun /usr/local/bin/bun
+
+# Install additional dependencies if needed
+RUN apk add --no-cache ca-certificates bash
+
+# Set PATH to include Bun
+ENV PATH="/usr/local/bin:${PATH}"
+
+# Verify Bun installation in the final image
 RUN bun --version
 
-# The rest of your Dockerfile remains the same
+# Set working directory
 WORKDIR /app
 
 # Add build arguments for non-sensitive data
