@@ -6,14 +6,14 @@ FROM alpine:3.19 AS base
 # Install necessary dependencies
 RUN apk add --no-cache curl unzip bash
 
-# Install Bun
-RUN curl -fsSL https://bun.sh/install | bash
-
-# Add Bun to PATH
-ENV PATH="/root/.bun/bin:${PATH}"
+# Install Bun and add it to PATH
+RUN curl -fsSL https://bun.sh/install | bash && \
+    echo 'export BUN_INSTALL="/root/.bun"' >> /etc/profile && \
+    echo 'export PATH="/root/.bun/bin:$PATH"' >> /etc/profile && \
+    . /etc/profile
 
 # Verify Bun installation
-RUN bun --version
+RUN . /etc/profile && bun --version
 
 WORKDIR /app
 
@@ -70,7 +70,7 @@ ENV VITE_ELASTIC_APM_DISTRIBUTED_TRACING_ORIGINS=${VITE_ELASTIC_APM_DISTRIBUTED_
 # Install dependencies
 FROM base AS deps
 COPY package.json bun.lockb ./
-RUN bun install --frozen-lockfile
+RUN . /etc/profile && bun install --frozen-lockfile
 
 # Prepare the application
 FROM base AS builder
@@ -98,7 +98,7 @@ RUN --mount=type=secret,id=org_id \
     echo "VITE_OPENREPLAY_PROJECT_KEY=$(cat /run/secrets/openreplay_key)" >> /app/.env
 
 # Now run the build after secrets are set
-RUN bun run build
+RUN . /etc/profile && bun run build
 
 # Copy Elastic APM RUM script and debug wrapper
 COPY static/elastic-apm-rum.umd.js /app/build/client/elastic-apm-rum.umd.js
@@ -121,10 +121,11 @@ COPY /static/generate-runtime-config.sh /app/generate-runtime-config.sh
 RUN chmod +x /app/generate-runtime-config.sh
 
 # Ensure the src/data directory exists
-RUN mkdir -p /app/src/data && chown -R bun:bun /app/src/data
+RUN mkdir -p /app/src/data && chown -R root:root /app/src/data
 
-# Create a script to set global variables and start the application
+# Modify the start script to source the profile
 RUN echo '#!/bin/sh\n\
+    . /etc/profile\n\
     echo "ENABLE_OPENTELEMETRY is set to: $ENABLE_OPENTELEMETRY"\n\
     if [ "$ENABLE_OPENTELEMETRY" = "true" ]; then\n\
     echo "globalThis.INSTRUMENTATION_ENABLED = true;" > /app/set-global.js\n\
@@ -146,4 +147,4 @@ EXPOSE 3000
 WORKDIR /app
 
 # Run the application
-CMD ["/app/start.sh"]
+CMD ["/bin/sh", "-c", ". /etc/profile && /app/start.sh"]
