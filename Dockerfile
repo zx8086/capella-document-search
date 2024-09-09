@@ -1,10 +1,10 @@
 #Dockerfile
 
 # Stage 1: Install Bun
-FROM ubuntu:22.04 AS bun-installer
+FROM bitnami/minideb:bullseye AS bun-installer
 
 # Install curl and other necessary dependencies
-RUN apt-get update && apt-get install -y curl unzip
+RUN install_packages curl ca-certificates
 
 # Install Bun using the official installation script
 RUN curl -fsSL https://bun.sh/install | bash
@@ -16,7 +16,7 @@ ENV PATH="/root/.bun/bin:${PATH}"
 RUN bun --version
 
 # Stage 2: Base image
-FROM ubuntu:22.04 AS base
+FROM bitnami/minideb:bullseye AS base
 
 # Copy Bun from the installer stage
 COPY --from=bun-installer /root/.bun /root/.bun
@@ -25,7 +25,7 @@ COPY --from=bun-installer /root/.bun /root/.bun
 ENV PATH="/root/.bun/bin:${PATH}"
 
 # Install additional dependencies if needed
-RUN apt-get update && apt-get install -y ca-certificates
+RUN install_packages ca-certificates
 
 # Verify Bun installation in the base image
 RUN bun --version
