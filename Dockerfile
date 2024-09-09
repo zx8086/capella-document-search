@@ -1,18 +1,18 @@
 #Dockerfile
 
-# Stage 1: Download and install Bun
+# Stage 1: Download and install latest Bun
 FROM alpine:3.19 AS bun-installer
 
 # Install necessary dependencies
-RUN apk add --no-cache curl unzip
+RUN apk add --no-cache curl jq
 
-# Set Bun version and architecture
-ARG BUN_VERSION=1.0.30
 ARG TARGETARCH
 
-# Download and install Bun
+# Download and install latest Bun
 RUN ARCH=$([ "${TARGETARCH}" = "arm64" ] && echo "aarch64" || echo "x64") && \
-    curl -fsSL "https://github.com/oven-sh/bun/releases/download/bun-v${BUN_VERSION}/bun-linux-${ARCH}.zip" -o bun.zip && \
+    LATEST_VERSION=$(curl -s https://api.github.com/repos/oven-sh/bun/releases/latest | jq -r .tag_name | sed 's/bun-v//') && \
+    echo "Latest Bun version: ${LATEST_VERSION}" && \
+    curl -fsSL "https://github.com/oven-sh/bun/releases/download/bun-v${LATEST_VERSION}/bun-linux-${ARCH}.zip" -o bun.zip && \
     unzip bun.zip && \
     mv bun-linux-${ARCH}/bun /usr/local/bin/bun && \
     chmod +x /usr/local/bin/bun && \
@@ -21,8 +21,8 @@ RUN ARCH=$([ "${TARGETARCH}" = "arm64" ] && echo "aarch64" || echo "x64") && \
 # Verify Bun installation
 RUN /usr/local/bin/bun --version
 
-# Stage 2: Final image
-FROM alpine:3.19
+# Stage 2: Base image
+FROM alpine:3.19 AS base
 
 # Copy Bun from the installer stage
 COPY --from=bun-installer /usr/local/bin/bun /usr/local/bin/bun
