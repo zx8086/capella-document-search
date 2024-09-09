@@ -1,9 +1,10 @@
 #Dockerfile
 
-FROM alpine:3.19
+# Use Alpine 3.19 as the base image
+FROM alpine:3.19 AS base
 
-# Install dependencies
-RUN apk add --no-cache curl unzip
+# Install necessary dependencies
+RUN apk add --no-cache curl unzip bash
 
 # Install Bun
 RUN curl -fsSL https://bun.sh/install | bash
