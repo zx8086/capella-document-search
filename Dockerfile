@@ -1,12 +1,15 @@
 #Dockerfile
 
 # Stage 1: Install Bun
-FROM ubuntu:22.04 AS bun-installer
+FROM alpine:3.19 AS bun-installer
 
-# Install curl and other necessary dependencies
-RUN apt-get update && apt-get install -y curl unzip
+# Install necessary dependencies
+RUN apk add --no-cache curl unzip bash
 
-# Install Bun using the official installation script
+# Set Bun version
+ARG BUN_VERSION=latest
+
+# Install Bun
 RUN curl -fsSL https://bun.sh/install | bash
 
 # Add Bun to PATH
@@ -16,16 +19,16 @@ ENV PATH="/root/.bun/bin:${PATH}"
 RUN bun --version
 
 # Stage 2: Base image
-FROM ubuntu:22.04 AS base
+FROM alpine:3.19 AS base
 
 # Copy Bun from the installer stage
 COPY --from=bun-installer /root/.bun /root/.bun
 
+# Install additional dependencies
+RUN apk add --no-cache ca-certificates bash
+
 # Add Bun to PATH
 ENV PATH="/root/.bun/bin:${PATH}"
-
-# Install additional dependencies if needed
-RUN apt-get update && apt-get install -y ca-certificates
 
 # Verify Bun installation in the base image
 RUN bun --version
