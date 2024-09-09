@@ -8,12 +8,13 @@ RUN apk add --no-cache curl unzip bash
 
 # Install Bun and add it to PATH
 RUN curl -fsSL https://bun.sh/install | bash && \
-    echo 'export BUN_INSTALL="/root/.bun"' >> /etc/profile && \
-    echo 'export PATH="/root/.bun/bin:$PATH"' >> /etc/profile && \
-    . /etc/profile
+    mv /root/.bun /usr/local/bun && \
+    ln -s /usr/local/bun/bin/bun /usr/local/bin/bun && \
+    echo 'export BUN_INSTALL="/usr/local/bun"' >> /etc/profile.d/bun.sh && \
+    echo 'export PATH="/usr/local/bun/bin:$PATH"' >> /etc/profile.d/bun.sh
 
 # Verify Bun installation
-RUN . /etc/profile && bun --version
+RUN . /etc/profile.d/bun.sh && bun --version
 
 WORKDIR /app
 
@@ -70,7 +71,7 @@ ENV VITE_ELASTIC_APM_DISTRIBUTED_TRACING_ORIGINS=${VITE_ELASTIC_APM_DISTRIBUTED_
 # Install dependencies
 FROM base AS deps
 COPY package.json bun.lockb ./
-RUN . /etc/profile && bun install --frozen-lockfile
+RUN . /etc/profile.d/bun.sh && bun install --frozen-lockfile
 
 # Prepare the application
 FROM base AS builder
@@ -98,7 +99,7 @@ RUN --mount=type=secret,id=org_id \
     echo "VITE_OPENREPLAY_PROJECT_KEY=$(cat /run/secrets/openreplay_key)" >> /app/.env
 
 # Now run the build after secrets are set
-RUN . /etc/profile && bun run build
+RUN . /etc/profile.d/bun.sh && bun run build
 
 # Copy Elastic APM RUM script and debug wrapper
 COPY static/elastic-apm-rum.umd.js /app/build/client/elastic-apm-rum.umd.js
@@ -123,9 +124,9 @@ RUN chmod +x /app/generate-runtime-config.sh
 # Ensure the src/data directory exists
 RUN mkdir -p /app/src/data && chown -R root:root /app/src/data
 
-# Modify the start script to source the profile
+# Modify the start script to source the Bun profile
 RUN echo '#!/bin/sh\n\
-    . /etc/profile\n\
+    . /etc/profile.d/bun.sh\n\
     echo "ENABLE_OPENTELEMETRY is set to: $ENABLE_OPENTELEMETRY"\n\
     if [ "$ENABLE_OPENTELEMETRY" = "true" ]; then\n\
     echo "globalThis.INSTRUMENTATION_ENABLED = true;" > /app/set-global.js\n\
@@ -147,4 +148,4 @@ EXPOSE 3000
 WORKDIR /app
 
 # Run the application
-CMD ["/bin/sh", "-c", ". /etc/profile && /app/start.sh"]
+CMD ["/bin/sh", "-c", ". /etc/profile.d/bun.sh && /app/start.sh"]
