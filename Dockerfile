@@ -1,39 +1,13 @@
 #Dockerfile
 
-# Stage 1: Install Bun
-FROM bitnami/minideb:bullseye AS bun-installer
-
-# Update and upgrade all packages, including zlib
-RUN install_packages curl ca-certificates unzip && \
-    apt-get update && \
-    apt-get upgrade -y && \
-    apt-get install -y zlib1g
-
-# Install Bun using the official installation script
-RUN curl -fsSL https://bun.sh/install | bash
-
-# Add Bun to PATH
-ENV PATH="/root/.bun/bin:${PATH}"
-
-# Verify Bun installation
-RUN bun --version
-
-# Stage 2: Base image
-FROM bitnami/minideb:bullseye AS base
-
-# Update and upgrade all packages, including zlib
-RUN apt-get update && \
-    apt-get upgrade -y && \
-    apt-get install -y zlib1g ca-certificates
-
-# Copy Bun from the installer stage
-COPY --from=bun-installer /root/.bun /root/.bun
-
-# Add Bun to PATH
-ENV PATH="/root/.bun/bin:${PATH}"
-
-# Verify Bun installation in the base image
-RUN bun --version
+# Use the official Bun image
+# Note: As of the last check, this image contains a known vulnerability:
+# Critical severity vulnerability found in zlib/zlib1g
+# Description: Integer Overflow or Wraparound
+# Info: https://security.snyk.io/vuln/SNYK-DEBIAN11-ZLIB-6008961
+# This vulnerability is present in the base image and cannot be immediately resolved.
+# Regular checks should be performed to see if an updated base image resolves this issue.
+FROM oven/bun:latest AS base
 
 # Set working directory
 WORKDIR /app
