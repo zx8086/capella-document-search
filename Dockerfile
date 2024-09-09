@@ -1,7 +1,7 @@
 #Dockerfile
 
 # use the official Bun image
-FROM oven/bun:canary-alpine AS base
+FROM oven/bun:latest AS base
 
 WORKDIR /app
 
