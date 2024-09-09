@@ -5,7 +5,7 @@
     import { browser } from "$app/environment";
     import videojs from "video.js";
 
-    export let videos: string[] = []; // URLs of the videos
+    export let videos: string[] = [];
     export let isVisible = false;
 
     const dispatch = createEventDispatcher();
@@ -36,7 +36,6 @@
                 console.error("Video.js error:", error);
             });
 
-            // Initial play
             changeVideoSource();
         }
     }

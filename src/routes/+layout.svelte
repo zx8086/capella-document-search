@@ -39,10 +39,8 @@
         resetIdleTimer();
     }
 
-    // Dark mode store
     const darkMode = writable(false);
 
-    // Function to toggle dark mode
     function toggleDarkMode() {
         darkMode.update((value) => {
             const newValue = !value;
@@ -53,7 +51,6 @@
         });
     }
 
-    // Function to apply dark mode
     function applyDarkMode(isDark: boolean) {
         if (browser) {
             if (isDark) {
@@ -64,7 +61,6 @@
         }
     }
 
-    // Subscribe to dark mode changes
     $: if (browser) {
         applyDarkMode($darkMode);
     }
@@ -183,7 +179,6 @@
             applyDarkMode(isDark);
         }
 
-        // Initialize OpenReplay tracker
         try {
             const trackerInstance = await initializeTracker();
             if (trackerInstance) {
