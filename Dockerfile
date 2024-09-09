@@ -1,7 +1,7 @@
 #Dockerfile
 
 # Stage 1: Download and install latest Bun
-FROM node:18-alpine AS bun-installer
+FROM alpine:3.19 AS bun-installer
 
 # Install necessary dependencies
 RUN apk add --no-cache curl jq
@@ -18,23 +18,13 @@ RUN ARCH=$([ "${TARGETARCH}" = "arm64" ] && echo "aarch64" || echo "x64") && \
     chmod +x /usr/local/bin/bun && \
     rm -rf bun-linux-${ARCH} bun.zip
 
-# Verify Bun installation
-RUN bun --version
-
-# Stage 2: Base image
-FROM node:18-alpine AS base
-
-# Copy Bun from the installer stage
-COPY --from=bun-installer /usr/local/bin/bun /usr/local/bin/bun
-
-# Install additional dependencies if needed
-RUN apk add --no-cache ca-certificates bash
-
 # Set PATH to include Bun
 ENV PATH="/usr/local/bin:${PATH}"
 
-# Verify Bun installation in the final image
-RUN bun --version
+# Verify Bun installation
+RUN echo $PATH && \
+    ls -l /usr/local/bin/bun && \
+    /usr/local/bin/bun --version
 
 # Set working directory
 WORKDIR /app
