@@ -64,39 +64,6 @@ if (INSTRUMENTATION_ENABLED) {
     // Set up diagnostics logging with increased verbosity
     diag.setLogger(new DiagConsoleLogger(), DiagLogLevel.INFO);
 
-    // class TolerantOTLPTraceExporter extends OTLPTraceExporter {
-    //   async send(
-    //     items: ReadableSpan[],
-    //     onSuccess: () => void,
-    //     onError: (error: Error) => void,
-    //   ): Promise<void> {
-    //     try {
-    //       await super.send(items, onSuccess, (error) => {
-    //         if (error.message.includes("Request timed out")) {
-    //           console.warn(
-    //             "Ignoring timeout error as data is likely sent successfully",
-    //           );
-    //           onSuccess(); // Treat as success since data is getting through
-    //         } else {
-    //           onError(error);
-    //         }
-    //       });
-    //     } catch (error) {
-    //       if (
-    //         error instanceof Error &&
-    //         error.message.includes("Request timed out")
-    //       ) {
-    //         console.warn(
-    //           "Ignoring timeout error as data is likely sent successfully",
-    //         );
-    //         onSuccess(); // Treat as success since data is getting through
-    //       } else {
-    //         onError(error instanceof Error ? error : new Error(String(error)));
-    //       }
-    //     }
-    //   }
-    // }
-
     // Create OTLP exporters with updated configurations
     const traceExporter = new MonitoredOTLPTraceExporter({
       ...commonConfig,

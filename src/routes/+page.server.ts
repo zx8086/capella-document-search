@@ -15,7 +15,7 @@ import {
 } from "$lib/db/dbOperations";
 import { log, err } from "../utils/serverLogger";
 import backendConfig from "$backendConfig";
-import { collections } from "../stores/collectionsStore";
+// import { collections } from "../stores/collectionsStore";
 import type { PageData } from "./$types";
 
 export let data: PageData;
@@ -55,7 +55,7 @@ export const load: PageServerLoad = async () => {
     collection_name: c.collection,
   }));
 
-  return { collections: mappedCollections };
+  return { data };
 };
 
 export const actions: Actions = {
