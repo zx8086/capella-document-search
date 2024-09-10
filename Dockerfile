@@ -6,13 +6,12 @@
 # Description: Integer Overflow or Wraparound
 # Info: https://security.snyk.io/vuln/SNYK-DEBIAN11-ZLIB-6008961
 # This vulnerability is present in the base image and cannot be immediately resolved.
-# Regular checks should be performed to see if an updated base image resolves this issue.
 FROM oven/bun:latest AS base
 
 # Set working directory
 WORKDIR /app
 
-# Add build arguments for non-sensitive data
+# Add build arguments
 ARG ENABLE_FILE_LOGGING
 ARG LOG_LEVEL
 ARG LOG_MAX_SIZE
@@ -37,7 +36,7 @@ ARG VITE_ELASTIC_APM_SERVICE_VERSION
 ARG VITE_ELASTIC_APM_ENVIRONMENT
 ARG VITE_ELASTIC_APM_DISTRIBUTED_TRACING_ORIGINS
 
-# Set environment variables for non-sensitive data
+# Set environment variables
 ENV ENABLE_FILE_LOGGING=${ENABLE_FILE_LOGGING}
 ENV LOG_LEVEL=${LOG_LEVEL}
 ENV LOG_MAX_SIZE=${LOG_MAX_SIZE}
@@ -62,17 +61,17 @@ ENV VITE_ELASTIC_APM_SERVICE_VERSION=${VITE_ELASTIC_APM_SERVICE_VERSION}
 ENV VITE_ELASTIC_APM_ENVIRONMENT=${VITE_ELASTIC_APM_ENVIRONMENT}
 ENV VITE_ELASTIC_APM_DISTRIBUTED_TRACING_ORIGINS=${VITE_ELASTIC_APM_DISTRIBUTED_TRACING_ORIGINS}
 
-# Stage 3: Dependencies
+# Dependencies
 FROM base AS deps
 COPY package.json bun.lockb ./
 RUN bun install --frozen-lockfile
 
-# Stage 4: Builder
+# Builder
 FROM base AS builder
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
-# Stage 5: Release
+# Release
 FROM base AS release
 COPY --from=deps /app/node_modules ./node_modules
 COPY --from=builder /app ./
@@ -92,7 +91,7 @@ RUN --mount=type=secret,id=org_id \
     echo "AUTH_TOKEN=$(cat /run/secrets/auth_token)" >> /app/.env && \
     echo "VITE_OPENREPLAY_PROJECT_KEY=$(cat /run/secrets/openreplay_key)" >> /app/.env
 
-# Now run the build after secrets are set
+# Ru build after secrets are set in .env file
 RUN bun run build
 
 # Copy Elastic APM RUM script and debug wrapper

@@ -93,7 +93,7 @@ async function checkInternalAPI(fetch: Function): Promise<CheckResult> {
 
 export async function GET({ url, fetch }: { url: URL; fetch: Function }) {
   log("GET request received for health check");
-  const checkType = url.searchParams.get("type") || "simple";
+  const checkType = url.searchParams.get("type") || "Simple";
   const isSimpleCheck = checkType === "Simple";
 
   const healthStatus: Record<string, CheckResult> = {};

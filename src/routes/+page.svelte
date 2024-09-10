@@ -3,7 +3,7 @@
 <script lang="ts">
     // import type { Options } from "@openreplay/tracker";
     import { enhance } from "$app/forms";
-    import { onMount, getContext } from "svelte";
+    import { onMount, onDestroy, getContext } from "svelte";
     // import { getCollections } from "$lib/collectionManager";
     import { toast } from "svelte-sonner";
     import DocumentDisplay from "$lib/components/DocumentDisplay.svelte";
@@ -14,6 +14,33 @@
     import { key } from "$lib/context/tracker";
     import { browser } from "$app/environment";
     import { frontendConfig } from "$frontendConfig";
+
+    import IdleVideoCarousel from "$lib/components/IdleVideoCarousel.svelte";
+
+    // let showVideoCarousel = false;
+    // let idleTimer: ReturnType<typeof setTimeout> | null = null;
+
+    // function resetIdleTimer() {
+    //     if (idleTimer) clearTimeout(idleTimer);
+    //     showVideoCarousel = false;
+    //     idleTimer = setTimeout(() => {
+    //         showVideoCarousel = true;
+    //     }, 120000); // 120 seconds for production
+    // }
+
+    // function handleUserActivity() {
+    //     if (showVideoCarousel) {
+    //         showVideoCarousel = false;
+    //     }
+    //     resetIdleTimer();
+    // }
+
+    // function handleExitFullScreen() {
+    //     setTimeout(() => {
+    //         showVideoCarousel = false;
+    //         resetIdleTimer();
+    //     }, 2000); // This should match the duration in VideoPlayerCarousel
+    // }
 
     import { collections, type Collection } from "../stores/collectionsStore";
 
@@ -52,6 +79,14 @@
     let errorMessage: string = "";
 
     onMount(() => {
+        // resetIdleTimer();
+        // if (browser) {
+        //     window.addEventListener("mousemove", handleUserActivity);
+        //     window.addEventListener("keydown", handleUserActivity);
+        //     window.addEventListener("click", handleUserActivity);
+        //     window.addEventListener("scroll", handleUserActivity);
+        // }
+
         const unsubscribe = collections.subscribe((fetchedCollections) => {
             console.log("Fetched collections:", fetchedCollections);
 
@@ -104,6 +139,16 @@
             unsubscribe();
         };
     });
+
+    // onDestroy(() => {
+    //     if (idleTimer) clearTimeout(idleTimer);
+    //     if (browser) {
+    //         window.removeEventListener("mousemove", handleUserActivity);
+    //         window.removeEventListener("keydown", handleUserActivity);
+    //         window.removeEventListener("click", handleUserActivity);
+    //         window.removeEventListener("scroll", handleUserActivity);
+    //     }
+    // });
 
     let showDebugInfo: boolean = false;
     let debugInfo = "";
@@ -522,13 +567,38 @@
             sortedResults = [];
         }
     }
+
+    function handleCarouselStart() {
+        console.log("Carousel started on another page");
+    }
+
+    function handleCarouselEnd() {
+        console.log("Carousel ended on another page");
+    }
+
+    const videos = [
+        "/idle-videos/X1_Single_Lewis_Hamilton-GENERIC_1280x730.mp4",
+        "/idle-videos/FA24_TH_T1_OCTOBER_DUO_10_B_ PAID_ LOGO_SOUND_1920_1080.mp4",
+        "/idle-videos/ECOM_TOMMY_STRAY_KIDS_6sec_001_3412x1892_MP4_Audio_NoLogo.mp4",
+        "/idle-videos/FA24_TH_T1_SEPTEMBER_ABBEY_6_C_ECOM_ NO LOGO_SOUND_3412_1892.mp4",
+        "/idle-videos/X1_DUO_GR_LH-GENERIC_1280x730.mp4",
+        "/idle-videos/ECOM_TOMMY_STRAY_KIDS_6sec_002_3412x1892_MP4_Audio_NoLogo.mp4",
+        "/idle-videos/FA24_TH_T1_OCTOBER_DUO_6_A_ECOM_ NO LOGO_SOUND_3412_1892.mp4",
+        "/idle-videos/ECOM_TOMMY_STRAY_KIDS_6sec_003_3412x1892_MP4_Audio_NoLogo.mp4",
+        "/idle-videos/FA24_TH_T1_SEPTEMBER_PATRIC_6_B_ECOM_ NO LOGO_SOUND_3412_1892.mp4",
+    ];
 </script>
 
 <svelte:head>
     <title>Capella Document Search</title>
     <meta name="Capella Document Search" content="Capella Document Search" />
 </svelte:head>
-
+<IdleVideoCarousel
+    {videos}
+    idleTime={120000}
+    on:carouselStart={handleCarouselStart}
+    on:carouselEnd={handleCarouselEnd}
+/>
 <div class="min-h-screen flex flex-col bg-white dark:bg-[#2C2C2C] mb-20 mt-5">
     <!-- Logo Section -->
     <div class="text-center py-4">

@@ -43,31 +43,20 @@
         }
     }
 
-    function changeVideoSource() {
+    async function changeVideoSource() {
         if (player && videos[currentVideoIndex]) {
             player.src({ type: "video/mp4", src: videos[currentVideoIndex] });
-            player.play().catch((error: any) => {
-                console.warn("Autoplay was prevented:", error);
-            });
+            try {
+                await player.play();
+            } catch (error) {
+                console.info(
+                    "Autoplay was prevented. Muting and trying again.",
+                );
+                player.muted(true);
+                await player.play();
+            }
         }
     }
-
-    // function exitFullScreen() {
-    //     opacity = 0;
-    //     setTimeout(() => {
-    //         dispatch("exit");
-    //     }, 2000); // Wait for 2 seconds before dispatching exit
-    // }
-
-    // function fadeOut() {
-    //     const fadeInterval = setInterval(() => {
-    //         opacity -= 0.05; // Adjust this value to control fade speed
-    //         if (opacity <= 0) {
-    //             clearInterval(fadeInterval);
-    //             dispatch("exit");
-    //         }
-    //     }, 50); // Adjust this value to control fade smoothness
-    // }
 
     function handleUserActivity(event: MouseEvent | KeyboardEvent) {
         event.stopPropagation();
@@ -101,7 +90,7 @@
     $: if (isVisible && browser) {
         window.addEventListener("mousemove", handleUserActivity);
         window.addEventListener("keydown", handleUserActivity);
-        isExiting = false; // Reset isExiting when becoming visible
+        isExiting = false;
     } else if (!isVisible && browser) {
         window.removeEventListener("mousemove", handleUserActivity);
         window.removeEventListener("keydown", handleUserActivity);
@@ -126,9 +115,12 @@
                 bind:this={videoElement}
                 class="video-js vjs-default-skin vjs-big-play-centered w-full h-full object-cover"
                 preload="auto"
+                playsinline
+                autoplay
                 use:initializeVideoJS
             >
                 <source src={videos[currentVideoIndex]} type="video/mp4" />
+                <track kind="captions" src="" srclang="en" label="English" />
             </video>
         </div>
     </div>
