@@ -17,31 +17,6 @@
 
     import IdleVideoCarousel from "$lib/components/IdleVideoCarousel.svelte";
 
-    // let showVideoCarousel = false;
-    // let idleTimer: ReturnType<typeof setTimeout> | null = null;
-
-    // function resetIdleTimer() {
-    //     if (idleTimer) clearTimeout(idleTimer);
-    //     showVideoCarousel = false;
-    //     idleTimer = setTimeout(() => {
-    //         showVideoCarousel = true;
-    //     }, 120000); // 120 seconds for production
-    // }
-
-    // function handleUserActivity() {
-    //     if (showVideoCarousel) {
-    //         showVideoCarousel = false;
-    //     }
-    //     resetIdleTimer();
-    // }
-
-    // function handleExitFullScreen() {
-    //     setTimeout(() => {
-    //         showVideoCarousel = false;
-    //         resetIdleTimer();
-    //     }, 2000); // This should match the duration in VideoPlayerCarousel
-    // }
-
     import { collections, type Collection } from "../stores/collectionsStore";
 
     interface Collection {
@@ -595,7 +570,7 @@
 </svelte:head>
 <IdleVideoCarousel
     {videos}
-    idleTime={120000}
+    idleTime={60000}
     on:carouselStart={handleCarouselStart}
     on:carouselEnd={handleCarouselEnd}
 />

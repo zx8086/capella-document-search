@@ -4,7 +4,7 @@
     import VideoPlayerCarousel from "./VideoPlayerCarousel.svelte";
 
     export let videos: string[] = [];
-    export let idleTime: number = 120000; // Default to 120 seconds
+    export let idleTime: number = 10000; // 10 seconds for testing
 
     const dispatch = createEventDispatcher();
 
@@ -15,6 +15,7 @@
         if (idleTimer) clearTimeout(idleTimer);
         showVideoCarousel = false;
         idleTimer = setTimeout(() => {
+            console.log("Idle time reached, showing video carousel");
             showVideoCarousel = true;
             dispatch("carouselStart");
         }, idleTime);
@@ -22,6 +23,7 @@
 
     function handleUserActivity() {
         if (showVideoCarousel) {
+            console.log("Hiding video carousel due to user activity");
             showVideoCarousel = false;
             dispatch("carouselEnd");
         }
@@ -29,24 +31,25 @@
     }
 
     function handleExitFullScreen() {
-        setTimeout(() => {
-            showVideoCarousel = false;
-            resetIdleTimer();
-            dispatch("carouselEnd");
-        }, 2000); // This should match the duration in VideoPlayerCarousel
+        console.log("Exiting full screen");
+        showVideoCarousel = false;
+        resetIdleTimer();
+        dispatch("carouselEnd");
     }
 
     onMount(() => {
-        resetIdleTimer();
+        console.log("IdleVideoCarousel mounted");
         if (browser) {
             window.addEventListener("mousemove", handleUserActivity);
             window.addEventListener("keydown", handleUserActivity);
             window.addEventListener("click", handleUserActivity);
             window.addEventListener("scroll", handleUserActivity);
         }
+        resetIdleTimer();
     });
 
     onDestroy(() => {
+        console.log("IdleVideoCarousel destroyed");
         if (idleTimer) clearTimeout(idleTimer);
         if (browser) {
             window.removeEventListener("mousemove", handleUserActivity);
