@@ -15,6 +15,12 @@ import {
 } from "$lib/db/dbOperations";
 import { log, err } from "../utils/serverLogger";
 import backendConfig from "$backendConfig";
+import { collections } from "../stores/collectionsStore";
+import type { PageData } from "./$types";
+
+export let data: PageData;
+
+import type { Collection } from "../stores/collectionsStore";
 
 const GRAPHQL_ENDPOINT = backendConfig.application.GRAPHQL_ENDPOINT;
 const client = new ApolloClient({
@@ -22,20 +28,43 @@ const client = new ApolloClient({
   cache: new InMemoryCache(),
 });
 
+interface FormattedCollection {
+  bucket: string;
+  scope: string;
+  collection: string;
+}
+
+interface SearchResult {
+  bucket: string;
+  scope: string;
+  collection: string;
+  data: any;
+  timeTaken: number;
+}
+
 initializeDatabase();
 
 export const load: PageServerLoad = async () => {
   log("Calling function - getFormattedCollections()");
-  const collections = getFormattedCollections();
-  log("Retrieved collections:", { meta: { collections } });
-  return { collections };
+  const fetchedCollections = getFormattedCollections();
+  log("Retrieved collections:", { meta: { collections: fetchedCollections } });
+
+  const mappedCollections: Collection[] = fetchedCollections.map((c) => ({
+    bucket: c.bucket,
+    scope_name: c.scope,
+    collection_name: c.collection,
+  }));
+
+  return { collections: mappedCollections };
 };
 
 export const actions: Actions = {
   searchDocuments: async ({ request }) => {
     try {
       const data = await request.formData();
-      const selectedCollections = JSON.parse(data.get("collections") as string);
+      const selectedCollections = JSON.parse(
+        data.get("collections") as string,
+      ) as Collection[];
       const documentKey = data.get("documentKey") as string;
       const keys = [documentKey];
 
@@ -73,7 +102,7 @@ export const actions: Actions = {
         fetchPolicy: "no-cache",
       });
 
-      const searchResults = response.data.searchDocuments;
+      const searchResults: SearchResult[] = response.data.searchDocuments;
       const foundCollectionsCount = searchResults.filter(
         (result) => result.data !== null,
       ).length;
@@ -84,13 +113,15 @@ export const actions: Actions = {
         data: response.data,
         foundCollectionsCount: foundCollectionsCount,
       };
-    } catch (error) {
+    } catch (error: unknown) {
       err("Error in searchDocuments action:", error);
-      if (error.graphQLErrors) {
-        err("GraphQL Errors:", error.graphQLErrors);
-      }
-      if (error.networkError) {
-        err("Network Error:", error.networkError);
+      if (error instanceof Error) {
+        if ("graphQLErrors" in error) {
+          err("GraphQL Errors:", (error as any).graphQLErrors);
+        }
+        if ("networkError" in error) {
+          err("Network Error:", (error as any).networkError);
+        }
       }
       return {
         type: "error",
@@ -161,17 +192,27 @@ export const actions: Actions = {
           const searchResults = response.data.searchDocuments;
 
           const foundCollections = searchResults.filter(
-            (result) => result.data !== null,
+            (result: any) => result.data !== null,
           );
           const notFoundCollections = searchResults.filter(
-            (result) => result.data === null,
+            (result: any) => result.data === null,
           );
 
           return {
             documentKey: key,
             found: foundCollections.length > 0,
             foundIn: foundCollections.map(
-              ({ bucket, scope, collection, timeTaken }) => ({
+              ({
+                bucket,
+                scope,
+                collection,
+                timeTaken,
+              }: {
+                bucket: string;
+                scope: string;
+                collection: string;
+                timeTaken: number;
+              }) => ({
                 bucket,
                 scope,
                 collection,
@@ -179,7 +220,15 @@ export const actions: Actions = {
               }),
             ),
             notFoundIn: notFoundCollections.map(
-              ({ bucket, scope, collection }) => ({
+              ({
+                bucket,
+                scope,
+                collection,
+              }: {
+                bucket: string;
+                scope: string;
+                collection: string;
+              }) => ({
                 bucket,
                 scope,
                 collection,

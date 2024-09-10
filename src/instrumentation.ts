@@ -14,14 +14,11 @@ import {
   ATTR_SERVICE_VERSION,
   SEMRESATTRS_DEPLOYMENT_ENVIRONMENT,
 } from "@opentelemetry/semantic-conventions";
-// import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-http";
-import { OTLPMetricExporter } from "@opentelemetry/exporter-metrics-otlp-http";
-import { OTLPLogExporter } from "@opentelemetry/exporter-logs-otlp-http";
 import { BatchSpanProcessor } from "@opentelemetry/sdk-trace-base";
 
-import { MonitoredOTLPTraceExporter } from "./MonitoredOTLPTraceExporter";
-import { MonitoredOTLPMetricExporter } from "./MonitoredOTLPMetricExporter";
-import { MonitoredOTLPLogExporter } from "./MonitoredOTLPLogExporter";
+import { MonitoredOTLPTraceExporter } from "./otlp/MonitoredOTLPTraceExporter";
+import { MonitoredOTLPMetricExporter } from "./otlp/MonitoredOTLPMetricExporter";
+import { MonitoredOTLPLogExporter } from "./otlp/MonitoredOTLPLogExporter";
 
 import {
   MeterProvider,
@@ -35,6 +32,7 @@ import { getNodeAutoInstrumentations } from "@opentelemetry/auto-instrumentation
 import { WinstonInstrumentation } from "@opentelemetry/instrumentation-winston";
 import { GraphQLInstrumentation } from "@opentelemetry/instrumentation-graphql";
 import * as api from "@opentelemetry/api-logs";
+
 import backendConfig from "./backend-config";
 
 const INSTRUMENTATION_ENABLED = process.env.ENABLE_OPENTELEMETRY === "true";

@@ -4,15 +4,18 @@
     // import type { Options } from "@openreplay/tracker";
     import { enhance } from "$app/forms";
     import { onMount, getContext } from "svelte";
-    import { getCollections } from "$lib/collectionManager";
+    // import { getCollections } from "$lib/collectionManager";
     import { toast } from "svelte-sonner";
     import DocumentDisplay from "$lib/components/DocumentDisplay.svelte";
     import FileUploadResults from "$lib/components/FileUploadResults.svelte";
     import Papa from "papaparse";
+    import { page } from "$app/stores";
 
     import { key } from "$lib/context/tracker";
     import { browser } from "$app/environment";
     import { frontendConfig } from "$frontendConfig";
+
+    import { collections, type Collection } from "../stores/collectionsStore";
 
     interface Collection {
         bucket: string;
@@ -44,22 +47,26 @@
         }
     }
 
-    onMount(async () => {
-        try {
-            if (browser) {
-                const tracker = getTracker();
-                if (tracker) {
-                    tracker.event("Page_View", {
-                        page: "Document Search",
-                        category: "Navigation",
-                        action: "View",
-                    });
-                }
-            }
+    let allCollections: Collection[] = [];
+    let selectedCollections: Collection[] = [];
+    let errorMessage: string = "";
 
-            console.log("Fetching collections...");
-            allCollections = await getCollections();
-            console.log("Fetched collections:", allCollections);
+    onMount(() => {
+        const unsubscribe = collections.subscribe((fetchedCollections) => {
+            console.log("Fetched collections:", fetchedCollections);
+
+            // Sort the fetched collections
+            allCollections = fetchedCollections.sort((a, b) => {
+                // First, sort by scope_name
+                if (a.scope_name < b.scope_name) return -1;
+                if (a.scope_name > b.scope_name) return 1;
+
+                // If scope_name is the same, sort by collection_name
+                if (a.collection_name < b.collection_name) return -1;
+                if (a.collection_name > b.collection_name) return 1;
+
+                return 0;
+            });
 
             selectedCollections = allCollections.map(
                 ({ bucket, scope_name, collection_name }) => ({
@@ -68,16 +75,34 @@
                     collection_name,
                 }),
             );
+
             console.log("Selected collections:", selectedCollections);
 
             // Force a UI update
             allCollections = [...allCollections];
             selectedCollections = [...selectedCollections];
-        } catch (error) {
-            console.error("Error in onMount:", error);
-            errorMessage =
-                "Failed to fetch collections or initialize tracker. Please try again later.";
+        });
+
+        if (browser) {
+            const tracker = getTracker();
+            if (tracker) {
+                tracker.event("Page_View", {
+                    page: "Document Search",
+                    category: "Navigation",
+                    action: "View",
+                });
+            }
         }
+
+        // Initialize the store with data from the server
+        const pageData = $page.data;
+        if (pageData && pageData.collections) {
+            collections.set(pageData.collections);
+        }
+
+        return () => {
+            unsubscribe();
+        };
     });
 
     let showDebugInfo: boolean = false;
@@ -85,12 +110,13 @@
 
     let documentKey: string = "";
     let processing: boolean = false;
-    let errorMessage: string = "";
     let searchPerformed = false;
     let sortedResults: any[] = [];
 
-    let allCollections: Collection[] = [];
-    let selectedCollections: Collection[] = [];
+    // let allCollections: Collection[] = [];
+    // let selectedCollections: Collection[] = [];
+    // let errorMessage: string = "";
+
     let searchResults: SearchResult[] = [];
 
     let modalIsOpen: boolean = false;
@@ -454,13 +480,24 @@
     function groupCollectionsByScope(
         collections: Collection[],
     ): Record<string, Collection[]> {
-        return collections.reduce((acc, collection) => {
-            if (!acc[collection.scope_name]) {
-                acc[collection.scope_name] = [];
-            }
-            acc[collection.scope_name].push(collection);
-            return acc;
-        }, {});
+        const sorted = collections.sort((a, b) => {
+            if (a.scope_name < b.scope_name) return -1;
+            if (a.scope_name > b.scope_name) return 1;
+            if (a.collection_name < b.collection_name) return -1;
+            if (a.collection_name > b.collection_name) return 1;
+            return 0;
+        });
+
+        return sorted.reduce(
+            (acc, collection) => {
+                if (!acc[collection.scope_name]) {
+                    acc[collection.scope_name] = [];
+                }
+                acc[collection.scope_name].push(collection);
+                return acc;
+            },
+            {} as Record<string, Collection[]>,
+        );
     }
 
     $: groupedCollections = groupCollectionsByScope(allCollections);
