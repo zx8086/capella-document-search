@@ -15,10 +15,6 @@ import {
 } from "$lib/db/dbOperations";
 import { log, err } from "../utils/serverLogger";
 import backendConfig from "$backendConfig";
-// import { collections } from "../stores/collectionsStore";
-// import type { PageData } from "./$types";
-
-// export let data: PageData;
 
 import type { Collection } from "../stores/collectionsStore";
 
