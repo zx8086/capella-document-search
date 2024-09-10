@@ -4,7 +4,7 @@
     import VideoPlayerCarousel from "./VideoPlayerCarousel.svelte";
 
     export let videos: string[] = [];
-    export let idleTime: number = 10000; // 10 seconds for testing
+    export let idleTime: number = 120000; // 120 seconds
 
     const dispatch = createEventDispatcher();
 

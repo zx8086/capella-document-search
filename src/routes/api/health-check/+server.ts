@@ -8,8 +8,8 @@ import {
 } from "$lib/db/dbOperations";
 import { getAllScopes } from "$lib/api";
 
-const INDIVIDUAL_CHECK_TIMEOUT = 10000; // 10 seconds timeout for most checks
-const CAPELLA_API_TIMEOUT = 15000; // 15 seconds timeout for Capella API
+const INDIVIDUAL_CHECK_TIMEOUT = 15000; // 15 seconds timeout for most checks
+const CAPELLA_API_TIMEOUT = 30000; // 30 seconds timeout for Capella API
 const GLOBAL_CHECK_TIMEOUT = 60000; // 60 seconds timeout for the entire health check
 
 type CheckResult = {
