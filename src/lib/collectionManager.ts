@@ -2,12 +2,7 @@
 
 import { log, err } from "$utils/unifiedLogger";
 import { collections } from "../stores/collectionsStore";
-
-interface Collection {
-  bucket: string;
-  scope: string;
-  collection: string;
-}
+import type { Collection } from "../models";
 
 export async function seedCollections() {
   log("function seedCollections called from collectionManager");

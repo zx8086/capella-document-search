@@ -1,13 +1,7 @@
 /* src/stores/collectionsStore.ts */
 
 import { writable } from "svelte/store";
-
-export interface Collection {
-  bucket: string;
-  scope_name: string;
-  collection_name: string;
-  tooltip_content?: string | null;
-}
+import type { Collection } from "../models";
 
 function createCollectionsStore() {
   const { subscribe, set, update } = writable<Collection[]>([]);
