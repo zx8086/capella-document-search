@@ -1,6 +1,7 @@
 /* src/lib/collectionManager.ts */
 
 import { log, err } from "$utils/unifiedLogger";
+import { collections } from "../stores/collectionsStore";
 
 interface Collection {
   bucket: string;
@@ -9,11 +10,14 @@ interface Collection {
 }
 
 export async function seedCollections() {
-  log("function seedCollections called");
+  log("function seedCollections called from collectionManager");
   try {
     log("POST: /api/collections");
     const response = await fetch("/api/collections", { method: "POST" });
     const result = await response.json();
+    if (result.success) {
+      await collections.fetchCollections();
+    }
 
     if (!response.ok) {
       err(
@@ -38,7 +42,7 @@ export async function seedCollections() {
 }
 
 export async function getCollections(): Promise<Collection[]> {
-  console.log("getCollections function called");
+  console.log("getCollections function called from collectionManager");
   try {
     console.log("Fetching collections from /api/collections");
     const response = await fetch("/api/collections");

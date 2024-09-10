@@ -13,6 +13,9 @@
     import { writable } from "svelte/store";
     // import videojs from "video.js";
     import VideoPlayerCarousel from "$lib/components/VideoPlayerCarousel.svelte";
+    import { collections } from "../stores/collectionsStore";
+
+    let pollInterval: number;
 
     let tracker: any | null = null;
     let isTrackerInitialized = false;
@@ -209,6 +212,15 @@
                 error instanceof Error ? error.message : String(error),
             );
         }
+
+        // Add the following lines for collection polling
+        collections.fetchCollections(); // Initial fetch
+        pollInterval = setInterval(
+            () => {
+                collections.fetchCollections();
+            },
+            60 * 60 * 1000,
+        ); // Poll every 60 minutes
     });
 
     onDestroy(() => {
@@ -220,6 +232,9 @@
             window.removeEventListener("scroll", handleUserActivity);
         }
         if (autoplayInterval) clearInterval(autoplayInterval);
+
+        // Add this line to clear the polling interval
+        if (pollInterval) clearInterval(pollInterval);
     });
 
     const videos = [

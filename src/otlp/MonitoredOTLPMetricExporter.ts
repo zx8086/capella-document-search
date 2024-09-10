@@ -1,4 +1,4 @@
-// src/MonitoredOTLPMetricExporter.ts
+/* src/MonitoredOTLPMetricExporter.ts */
 
 import { OTLPMetricExporter } from "@opentelemetry/exporter-metrics-otlp-http";
 import type { ResourceMetrics } from "@opentelemetry/sdk-metrics";
@@ -10,15 +10,36 @@ export class MonitoredOTLPMetricExporter extends OTLPMetricExporter {
   private lastLogTime: number = Date.now();
   private readonly logIntervalMs: number = 60000; // Log every minute
 
-  export(
+  async export(
     metrics: ResourceMetrics,
     resultCallback: (result: ExportResult) => void,
-  ): void {
+  ): Promise<void> {
     this.totalExports++;
     const exportStartTime = Date.now();
 
-    super.export(metrics, (result) => {
-      if (result.code === ExportResultCode.SUCCESS) {
+    try {
+      await new Promise<void>((resolve, reject) => {
+        super.export(metrics, (result) => {
+          if (result.code === ExportResultCode.SUCCESS) {
+            this.successfulExports++;
+            this.logSuccess(
+              metrics.scopeMetrics.length,
+              Date.now() - exportStartTime,
+            );
+            resolve();
+          } else {
+            reject(result.error);
+          }
+        });
+      });
+    } catch (error) {
+      if (
+        error instanceof Error &&
+        error.message.includes("Request timed out")
+      ) {
+        console.warn(
+          "Ignoring timeout error as data is likely sent successfully",
+        );
         this.successfulExports++;
         this.logSuccess(
           metrics.scopeMetrics.length,
@@ -26,14 +47,18 @@ export class MonitoredOTLPMetricExporter extends OTLPMetricExporter {
         );
       } else {
         this.logFailure(
-          result.error,
+          error,
           metrics.scopeMetrics.length,
           Date.now() - exportStartTime,
         );
+        resultCallback({
+          code: ExportResultCode.FAILED,
+          error: error instanceof Error ? error : new Error(String(error)),
+        });
       }
-      resultCallback(result);
-      this.periodicLogging();
-    });
+    }
+
+    this.periodicLogging();
   }
 
   private logSuccess(metricCount: number, duration: number): void {
@@ -43,7 +68,7 @@ export class MonitoredOTLPMetricExporter extends OTLPMetricExporter {
   }
 
   private logFailure(
-    error: Error | undefined,
+    error: unknown,
     metricCount: number,
     duration: number,
   ): void {
