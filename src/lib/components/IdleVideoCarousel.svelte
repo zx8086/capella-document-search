@@ -1,3 +1,5 @@
+<!-- src/lib/components/IdleVideoCarousel.svelte -->
+
 <script lang="ts">
     import { onMount, onDestroy, createEventDispatcher } from "svelte";
     import { browser } from "$app/environment";
@@ -15,7 +17,7 @@
         if (idleTimer) clearTimeout(idleTimer);
         showVideoCarousel = false;
         idleTimer = setTimeout(() => {
-            console.log("Idle time reached, showing video carousel");
+            console.debug("Idle time reached, showing video carousel");
             showVideoCarousel = true;
             dispatch("carouselStart");
         }, idleTime);
@@ -23,7 +25,7 @@
 
     function handleUserActivity() {
         if (showVideoCarousel) {
-            console.log("Hiding video carousel due to user activity");
+            console.debug("Hiding video carousel due to user activity");
             showVideoCarousel = false;
             dispatch("carouselEnd");
         }
@@ -31,14 +33,14 @@
     }
 
     function handleExitFullScreen() {
-        console.log("Exiting full screen");
+        console.debug("Exiting full screen");
         showVideoCarousel = false;
         resetIdleTimer();
         dispatch("carouselEnd");
     }
 
     onMount(() => {
-        console.log("IdleVideoCarousel mounted");
+        console.debug("IdleVideoCarousel mounted");
         if (browser) {
             window.addEventListener("mousemove", handleUserActivity);
             window.addEventListener("keydown", handleUserActivity);
@@ -49,7 +51,7 @@
     });
 
     onDestroy(() => {
-        console.log("IdleVideoCarousel destroyed");
+        console.debug("IdleVideoCarousel destroyed");
         if (idleTimer) clearTimeout(idleTimer);
         if (browser) {
             window.removeEventListener("mousemove", handleUserActivity);

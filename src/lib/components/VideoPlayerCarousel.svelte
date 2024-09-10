@@ -25,7 +25,7 @@
 
     function initializeVideo(element: HTMLVideoElement) {
         if (!isInitialized) {
-            console.log("Initializing video");
+            console.debug("Initializing video");
             videoElement = element;
             videoElement.muted = true;
             videoElement.addEventListener("ended", handleVideoEnded);
@@ -34,16 +34,16 @@
     }
 
     function handleVideoEnded() {
-        console.log("Video ended, moving to next");
+        console.debug("Video ended, moving to next");
         currentVideoIndex = (currentVideoIndex + 1) % videos.length;
-        console.log("New index:", currentVideoIndex);
+        console.debug("New index:", currentVideoIndex);
         isPlaying = false;
         loadAndPlayVideo();
     }
 
     function loadAndPlayVideo() {
         if (videoElement && videos[currentVideoIndex] && !isPlaying) {
-            console.log("Loading video:", videos[currentVideoIndex]);
+            console.debug("Loading video:", videos[currentVideoIndex]);
             videoElement.src = getVideoPath(videos[currentVideoIndex]);
             videoElement.load();
             playVideo();
@@ -52,12 +52,12 @@
 
     function playVideo() {
         if (videoElement && !isPlaying) {
-            console.log("Attempting to play video");
+            console.debug("Attempting to play video");
             isPlaying = true;
             videoElement
                 .play()
                 .then(() => {
-                    console.log("Video started playing");
+                    console.debug("Video started playing");
                     isPlaying = true;
                 })
                 .catch((error) => {

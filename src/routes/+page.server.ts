@@ -16,27 +16,13 @@ import {
 import { log, err } from "../utils/serverLogger";
 import backendConfig from "$backendConfig";
 
-import type { Collection } from "../stores/collectionsStore";
+import type { Collection, SearchResult } from "../models";
 
 const GRAPHQL_ENDPOINT = backendConfig.application.GRAPHQL_ENDPOINT;
 const client = new ApolloClient({
   link: createHttpLink({ uri: GRAPHQL_ENDPOINT, fetch }),
   cache: new InMemoryCache(),
 });
-
-interface FormattedCollection {
-  bucket: string;
-  scope: string;
-  collection: string;
-}
-
-interface SearchResult {
-  bucket: string;
-  scope: string;
-  collection: string;
-  data: any;
-  timeTaken: number;
-}
 
 initializeDatabase();
 
