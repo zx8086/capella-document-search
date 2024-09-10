@@ -97,7 +97,6 @@
         }
         if (videoElement) {
             videoElement.removeEventListener("ended", handleVideoEnded);
-            videoElement.removeEventListener("canplay", handleCanPlay);
         }
     });
 

@@ -1,10 +1,8 @@
 <!-- src/routes/+page.svelte-->
 
 <script lang="ts">
-    // import type { Options } from "@openreplay/tracker";
     import { enhance } from "$app/forms";
-    import { onMount, onDestroy, getContext } from "svelte";
-    // import { getCollections } from "$lib/collectionManager";
+    import { onMount, getContext } from "svelte";
     import { toast } from "svelte-sonner";
     import DocumentDisplay from "$lib/components/DocumentDisplay.svelte";
     import FileUploadResults from "$lib/components/FileUploadResults.svelte";
@@ -15,23 +13,16 @@
     import { browser } from "$app/environment";
     import { frontendConfig } from "$frontendConfig";
 
+    import { videos } from "../stores/videoStore";
     import IdleVideoCarousel from "$lib/components/IdleVideoCarousel.svelte";
 
     import { collections, type Collection } from "../stores/collectionsStore";
-
-    interface Collection {
-        bucket: string;
-        scope_name: string;
-        collection_name: string;
-        tooltip_content?: string | null;
-    }
 
     interface SearchResult {
         collection: string;
         data: any;
     }
 
-    // const { getTracker } = getContext(key);
     const { getTracker } = getContext(key) as { getTracker: () => any };
 
     function trackClick(elementName: string, action: string) {
@@ -54,14 +45,6 @@
     let errorMessage: string = "";
 
     onMount(() => {
-        // resetIdleTimer();
-        // if (browser) {
-        //     window.addEventListener("mousemove", handleUserActivity);
-        //     window.addEventListener("keydown", handleUserActivity);
-        //     window.addEventListener("click", handleUserActivity);
-        //     window.addEventListener("scroll", handleUserActivity);
-        // }
-
         const unsubscribe = collections.subscribe((fetchedCollections) => {
             console.log("Fetched collections:", fetchedCollections);
 
@@ -115,27 +98,13 @@
         };
     });
 
-    // onDestroy(() => {
-    //     if (idleTimer) clearTimeout(idleTimer);
-    //     if (browser) {
-    //         window.removeEventListener("mousemove", handleUserActivity);
-    //         window.removeEventListener("keydown", handleUserActivity);
-    //         window.removeEventListener("click", handleUserActivity);
-    //         window.removeEventListener("scroll", handleUserActivity);
-    //     }
-    // });
-
     let showDebugInfo: boolean = false;
-    let debugInfo = "";
+    // let debugInfo = "";
 
     let documentKey: string = "";
     let processing: boolean = false;
     let searchPerformed = false;
     let sortedResults: any[] = [];
-
-    // let allCollections: Collection[] = [];
-    // let selectedCollections: Collection[] = [];
-    // let errorMessage: string = "";
 
     let searchResults: SearchResult[] = [];
 
@@ -550,18 +519,6 @@
     function handleCarouselEnd() {
         console.log("Carousel ended on another page");
     }
-
-    const videos = [
-        "X1_Single_Lewis_Hamilton-GENERIC_1280x730.mp4",
-        "FA24_TH_T1_OCTOBER_DUO_10_B_ PAID_ LOGO_SOUND_1920_1080.mp4",
-        "ECOM_TOMMY_STRAY_KIDS_6sec_001_3412x1892_MP4_Audio_NoLogo.mp4",
-        "FA24_TH_T1_SEPTEMBER_ABBEY_6_C_ECOM_ NO LOGO_SOUND_3412_1892.mp4",
-        "X1_DUO_GR_LH-GENERIC_1280x730.mp4",
-        "ECOM_TOMMY_STRAY_KIDS_6sec_002_3412x1892_MP4_Audio_NoLogo.mp4",
-        "FA24_TH_T1_OCTOBER_DUO_6_A_ECOM_ NO LOGO_SOUND_3412_1892.mp4",
-        "ECOM_TOMMY_STRAY_KIDS_6sec_003_3412x1892_MP4_Audio_NoLogo.mp4",
-        "FA24_TH_T1_SEPTEMBER_PATRIC_6_B_ECOM_ NO LOGO_SOUND_3412_1892.mp4",
-    ];
 </script>
 
 <svelte:head>
@@ -569,8 +526,8 @@
     <meta name="Capella Document Search" content="Capella Document Search" />
 </svelte:head>
 <IdleVideoCarousel
-    {videos}
-    idleTime={60000}
+    videos={$videos}
+    idleTime={120000}
     on:carouselStart={handleCarouselStart}
     on:carouselEnd={handleCarouselEnd}
 />
