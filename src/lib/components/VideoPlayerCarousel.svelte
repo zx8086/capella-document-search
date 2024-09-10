@@ -3,6 +3,7 @@
 <script lang="ts">
     import { onMount, onDestroy, createEventDispatcher } from "svelte";
     import { browser } from "$app/environment";
+    import { base } from "$app/paths";
     import { fade } from "svelte/transition";
 
     export let videos: string[] = [];
@@ -13,52 +14,57 @@
     let videoElement: HTMLVideoElement;
     let currentVideoIndex = 0;
     let isExiting = false;
+    let isInitialized = false;
+    let isPlaying = false;
+
+    const videoBasePath = "/idle-videos/";
+
+    function getVideoPath(filename: string) {
+        return `${base}${videoBasePath}${filename}`;
+    }
 
     function initializeVideo(element: HTMLVideoElement) {
-        console.log("Initializing video");
-        videoElement = element;
-        videoElement.muted = true;
-        videoElement.addEventListener("ended", handleVideoEnded);
-        videoElement.addEventListener("canplay", handleCanPlay);
-        if (isVisible) loadAndPlayVideo();
+        if (!isInitialized) {
+            console.log("Initializing video");
+            videoElement = element;
+            videoElement.muted = true;
+            videoElement.addEventListener("ended", handleVideoEnded);
+            isInitialized = true;
+        }
     }
 
     function handleVideoEnded() {
         console.log("Video ended, moving to next");
         currentVideoIndex = (currentVideoIndex + 1) % videos.length;
         console.log("New index:", currentVideoIndex);
+        isPlaying = false;
         loadAndPlayVideo();
     }
 
-    function handleCanPlay() {
-        console.log("Video can play");
-        if (isVisible) {
-            playVideo();
-        }
-    }
-
     function loadAndPlayVideo() {
-        if (videoElement && videos[currentVideoIndex]) {
+        if (videoElement && videos[currentVideoIndex] && !isPlaying) {
             console.log("Loading video:", videos[currentVideoIndex]);
-            videoElement.src = videos[currentVideoIndex];
+            videoElement.src = getVideoPath(videos[currentVideoIndex]);
             videoElement.load();
             playVideo();
         }
     }
 
     function playVideo() {
-        if (videoElement) {
+        if (videoElement && !isPlaying) {
             console.log("Attempting to play video");
+            isPlaying = true;
             videoElement
                 .play()
                 .then(() => {
                     console.log("Video started playing");
+                    isPlaying = true;
                 })
                 .catch((error) => {
                     if (error.name !== "AbortError") {
                         console.error("Error playing video:", error);
                     }
-                    // Still retry even for AbortError
+                    isPlaying = false;
                     setTimeout(playVideo, 1000);
                 });
         }
@@ -95,16 +101,13 @@
         }
     });
 
-    $: {
-        console.log("isVisible changed:", isVisible);
-        if (isVisible && videos[currentVideoIndex]) {
-            console.log("Attempting to load and play video");
-            if (videoElement) {
-                loadAndPlayVideo();
-            } else {
-                setTimeout(loadAndPlayVideo, 0);
-            }
-        }
+    $: if (
+        isVisible &&
+        videos[currentVideoIndex] &&
+        isInitialized &&
+        !isPlaying
+    ) {
+        loadAndPlayVideo();
     }
 </script>
 
@@ -126,7 +129,10 @@
                 muted
                 use:initializeVideo
             >
-                <source src={videos[currentVideoIndex]} type="video/mp4" />
+                <source
+                    src={getVideoPath(videos[currentVideoIndex])}
+                    type="video/mp4"
+                />
                 Your browser does not support the video tag.
             </video>
         </div>
