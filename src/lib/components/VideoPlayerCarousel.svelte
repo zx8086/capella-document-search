@@ -3,7 +3,6 @@
 <script lang="ts">
     import { onMount, onDestroy, createEventDispatcher } from "svelte";
     import { browser } from "$app/environment";
-    import videojs from "video.js";
     import { fade } from "svelte/transition";
 
     export let videos: string[] = [];
@@ -11,50 +10,57 @@
 
     const dispatch = createEventDispatcher();
 
-    // @ts-ignore: Used in template
     let videoElement: HTMLVideoElement;
-    let player: any;
     let currentVideoIndex = 0;
     let isExiting = false;
 
-    function initializeVideoJS(element: HTMLVideoElement) {
-        if (typeof videojs !== "undefined") {
-            player = videojs(element, {
-                controls: false,
-                autoplay: false,
-                muted: true,
-                preload: "auto",
-                loop: false,
-                fluid: true,
-                responsive: true,
-                controlBar: false,
-            });
+    function initializeVideo(element: HTMLVideoElement) {
+        console.log("Initializing video");
+        videoElement = element;
+        videoElement.muted = true;
+        videoElement.addEventListener("ended", handleVideoEnded);
+        videoElement.addEventListener("canplay", handleCanPlay);
+        if (isVisible) loadAndPlayVideo();
+    }
 
-            player.on("ended", () => {
-                currentVideoIndex = (currentVideoIndex + 1) % videos.length;
-                changeVideoSource();
-            });
+    function handleVideoEnded() {
+        console.log("Video ended, moving to next");
+        currentVideoIndex = (currentVideoIndex + 1) % videos.length;
+        console.log("New index:", currentVideoIndex);
+        loadAndPlayVideo();
+    }
 
-            player.on("error", (error: any) => {
-                console.error("Video.js error:", error);
-            });
-
-            changeVideoSource();
+    function handleCanPlay() {
+        console.log("Video can play");
+        if (isVisible) {
+            playVideo();
         }
     }
 
-    async function changeVideoSource() {
-        if (player && videos[currentVideoIndex]) {
-            player.src({ type: "video/mp4", src: videos[currentVideoIndex] });
-            try {
-                await player.play();
-            } catch (error) {
-                console.info(
-                    "Autoplay was prevented. Muting and trying again.",
-                );
-                player.muted(true);
-                await player.play();
-            }
+    function loadAndPlayVideo() {
+        if (videoElement && videos[currentVideoIndex]) {
+            console.log("Loading video:", videos[currentVideoIndex]);
+            videoElement.src = videos[currentVideoIndex];
+            videoElement.load();
+            playVideo();
+        }
+    }
+
+    function playVideo() {
+        if (videoElement) {
+            console.log("Attempting to play video");
+            videoElement
+                .play()
+                .then(() => {
+                    console.log("Video started playing");
+                })
+                .catch((error) => {
+                    if (error.name !== "AbortError") {
+                        console.error("Error playing video:", error);
+                    }
+                    // Still retry even for AbortError
+                    setTimeout(playVideo, 1000);
+                });
         }
     }
 
@@ -67,10 +73,11 @@
         isExiting = true;
         setTimeout(() => {
             dispatch("exit");
-        }, 2000); // Wait for 2 seconds before dispatching exit
+        }, 2000);
     }
 
     onMount(() => {
+        console.log("Component mounted, isVisible:", isVisible);
         if (browser && isVisible) {
             window.addEventListener("mousemove", handleUserActivity);
             window.addEventListener("keydown", handleUserActivity);
@@ -82,22 +89,22 @@
             window.removeEventListener("mousemove", handleUserActivity);
             window.removeEventListener("keydown", handleUserActivity);
         }
-        if (player) {
-            player.dispose();
+        if (videoElement) {
+            videoElement.removeEventListener("ended", handleVideoEnded);
+            videoElement.removeEventListener("canplay", handleCanPlay);
         }
     });
 
-    $: if (isVisible && browser) {
-        window.addEventListener("mousemove", handleUserActivity);
-        window.addEventListener("keydown", handleUserActivity);
-        isExiting = false;
-    } else if (!isVisible && browser) {
-        window.removeEventListener("mousemove", handleUserActivity);
-        window.removeEventListener("keydown", handleUserActivity);
-    }
-
-    $: if (player && videos[currentVideoIndex]) {
-        changeVideoSource();
+    $: {
+        console.log("isVisible changed:", isVisible);
+        if (isVisible && videos[currentVideoIndex]) {
+            console.log("Attempting to load and play video");
+            if (videoElement) {
+                loadAndPlayVideo();
+            } else {
+                setTimeout(loadAndPlayVideo, 0);
+            }
+        }
     }
 </script>
 
@@ -108,19 +115,19 @@
     >
         <div
             class="w-full h-full relative"
-            data-transaction-name="Video Carouse"
+            data-transaction-name="Video Carousel"
             class:pointer-events-none={isExiting}
         >
             <video
                 bind:this={videoElement}
-                class="video-js vjs-default-skin vjs-big-play-centered w-full h-full object-cover"
+                class="w-full h-full object-cover"
                 preload="auto"
                 playsinline
-                autoplay
-                use:initializeVideoJS
+                muted
+                use:initializeVideo
             >
                 <source src={videos[currentVideoIndex]} type="video/mp4" />
-                <track kind="captions" src="" srclang="en" label="English" />
+                Your browser does not support the video tag.
             </video>
         </div>
     </div>
