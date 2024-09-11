@@ -55,6 +55,7 @@ jobs:
           VITE_ELASTIC_APM_SERVICE_VERSION=1.0.0
           VITE_ELASTIC_APM_ENVIRONMENT=production
           VITE_ELASTIC_APM_DISTRIBUTED_TRACING_ORIGINS="['*']"
+          VITE_PUBLIC_VIDEO_BASE_URL=""
           ORG_ID=${{ secrets.ORG_ID }}
           PROJECT_ID=${{ secrets.PROJECT_ID }}
           CLUSTER_ID=${{ secrets.CLUSTER_ID }}
