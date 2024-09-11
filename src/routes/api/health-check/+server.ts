@@ -9,6 +9,7 @@ import {
 import { getAllScopes } from "$lib/api";
 import type { CheckResult } from "../../../models";
 import fetch from "cross-fetch";
+import { frontendConfig } from "$frontendConfig";
 import backendConfig from "$backendConfig";
 import {
   ApolloClient,
@@ -20,6 +21,95 @@ import {
 const INDIVIDUAL_CHECK_TIMEOUT = 15000; // 15 seconds timeout for most checks
 const CAPELLA_API_TIMEOUT = 30000; // 30 seconds timeout for Capella API
 const GLOBAL_CHECK_TIMEOUT = 60000; // 60 seconds timeout for the entire health check
+
+async function checkOpenTelemetryEndpoint(
+  url: string,
+  name: string,
+): Promise<CheckResult> {
+  const startTime = Date.now();
+  try {
+    const response = await fetch(url, { method: "HEAD" });
+    const duration = Date.now() - startTime;
+
+    if (response.ok) {
+      return {
+        status: "OK",
+        message: `${name} endpoint is responsive`,
+        responseTime: duration,
+      };
+    } else {
+      throw new Error(`${name} responded with status: ${response.status}`);
+    }
+  } catch (error) {
+    const duration = Date.now() - startTime;
+    err(`${name} health check failed:`, error);
+    return {
+      status: "ERROR",
+      message: error instanceof Error ? error.message : String(error),
+      responseTime: duration,
+    };
+  }
+}
+
+async function checkTracesEndpoint(): Promise<CheckResult> {
+  return checkOpenTelemetryEndpoint(
+    backendConfig.openTelemetry.TRACES_ENDPOINT,
+    "Traces",
+  );
+}
+
+async function checkMetricsEndpoint(): Promise<CheckResult> {
+  return checkOpenTelemetryEndpoint(
+    backendConfig.openTelemetry.METRICS_ENDPOINT,
+    "Metrics",
+  );
+}
+
+async function checkLogsEndpoint(): Promise<CheckResult> {
+  return checkOpenTelemetryEndpoint(
+    backendConfig.openTelemetry.LOGS_ENDPOINT,
+    "Logs",
+  );
+}
+
+async function checkElasticAPMEndpoint(): Promise<CheckResult> {
+  const startTime = Date.now();
+  const apmServerUrl = frontendConfig.elasticApm.VITE_ELASTIC_APM_SERVER_URL;
+
+  if (!apmServerUrl) {
+    return {
+      status: "ERROR",
+      message: "APM Server URL is not configured",
+      responseTime: 0,
+    };
+  }
+
+  try {
+    const response = await fetch(`${apmServerUrl}/`, {
+      method: "HEAD",
+    });
+
+    const duration = Date.now() - startTime;
+
+    if (response.ok) {
+      return {
+        status: "OK",
+        message: "Elastic APM server endpoint is responsive",
+        responseTime: duration,
+      };
+    } else {
+      throw new Error(`APM server responded with status: ${response.status}`);
+    }
+  } catch (error) {
+    const duration = Date.now() - startTime;
+    err("Elastic APM server endpoint health check failed:", error);
+    return {
+      status: "ERROR",
+      message: error instanceof Error ? error.message : String(error),
+      responseTime: duration,
+    };
+  }
+}
 
 async function checkGraphQLEndpoint(): Promise<CheckResult> {
   const startTime = Date.now();
@@ -142,15 +232,19 @@ export async function GET({ url, fetch }: { url: URL; fetch: Function }) {
   const healthStatus: Record<string, CheckResult> = {};
 
   const simpleChecks = [
-    { name: "SQLite Database", check: checkDatabase },
     { name: "Internal Collections API", check: () => checkInternalAPI(fetch) },
-  ];
+    { name: "SQLite Database", check: checkDatabase },
+  ].sort((a, b) => a.name.localeCompare(b.name));
 
   const detailedChecks = [
     ...simpleChecks,
+    { name: "Elastic APM Server", check: checkElasticAPMEndpoint },
     { name: "External Capella Cloud API", check: checkCapellaAPI },
     { name: "GraphQL Endpoint", check: checkGraphQLEndpoint },
-  ];
+    // { name: "OpenTelemetry Logs Endpoint", check: checkLogsEndpoint },
+    // { name: "OpenTelemetry Metrics Endpoint", check: checkMetricsEndpoint },
+    // { name: "OpenTelemetry Traces Endpoint", check: checkTracesEndpoint },
+  ].sort((a, b) => a.name.localeCompare(b.name));
 
   const checksToRun = isSimpleCheck ? simpleChecks : detailedChecks;
 
@@ -161,7 +255,7 @@ export async function GET({ url, fetch }: { url: URL; fetch: Function }) {
         new Promise<{ status: string; message: string }>((_, reject) =>
           setTimeout(
             () => reject(new Error("Individual check timeout")),
-            name === "Capella API"
+            name === "External Capella Cloud API"
               ? CAPELLA_API_TIMEOUT
               : INDIVIDUAL_CHECK_TIMEOUT,
           ),
@@ -190,7 +284,12 @@ export async function GET({ url, fetch }: { url: URL; fetch: Function }) {
     err("Health check encountered an error:", error);
   }
 
-  const overallStatus = Object.values(healthStatus).every(
+  // Sort the healthStatus object
+  const sortedHealthStatus = Object.fromEntries(
+    Object.entries(healthStatus).sort(([a], [b]) => a.localeCompare(b)),
+  );
+
+  const overallStatus = Object.values(sortedHealthStatus).every(
     (s) => s.status === "OK",
   )
     ? "OK"
@@ -199,8 +298,8 @@ export async function GET({ url, fetch }: { url: URL; fetch: Function }) {
   return json(
     {
       status: overallStatus,
-      checks: healthStatus,
-      checkType: isSimpleCheck ? "simple" : "detailed",
+      checks: sortedHealthStatus,
+      checkType: isSimpleCheck ? "Simple" : "Detailed",
     },
     { status: 200 },
   );
