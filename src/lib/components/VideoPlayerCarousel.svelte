@@ -21,8 +21,8 @@
     const effectiveVideoBasePath =
         videoBasePath.trim() === "" ? "/idle-videos/" : videoBasePath;
 
-    function getVideoPath(filename: string, format?: string): string {
-        return `${effectiveVideoBasePath}${filename}${format ? `.${format}` : ""}`;
+    function getVideoPath(filename: string): string {
+        return `${effectiveVideoBasePath}${filename}`;
     }
 
     function initializeVideo(element: HTMLVideoElement) {
@@ -148,12 +148,8 @@
                 on:error={handleVideoError}
             >
                 <source
-                    src={getVideoPath(videos[currentVideoIndex], "mp4")}
+                    src={getVideoPath(videos[currentVideoIndex])}
                     type="video/mp4"
-                />
-                <source
-                    src={getVideoPath(videos[currentVideoIndex], "webm")}
-                    type="video/webm"
                 />
                 Your browser does not support the video tag.
             </video>
