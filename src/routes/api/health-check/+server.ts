@@ -8,16 +8,58 @@ import {
 } from "$lib/db/dbOperations";
 import { getAllScopes } from "$lib/api";
 import type { CheckResult } from "../../../models";
+import fetch from "cross-fetch";
+import backendConfig from "$backendConfig";
+import {
+  ApolloClient,
+  InMemoryCache,
+  createHttpLink,
+  gql,
+} from "@apollo/client/core";
 
 const INDIVIDUAL_CHECK_TIMEOUT = 15000; // 15 seconds timeout for most checks
 const CAPELLA_API_TIMEOUT = 30000; // 30 seconds timeout for Capella API
 const GLOBAL_CHECK_TIMEOUT = 60000; // 60 seconds timeout for the entire health check
 
-// type CheckResult = {
-//   status: string;
-//   message?: string;
-//   responseTime?: number;
-// };
+async function checkGraphQLEndpoint(): Promise<CheckResult> {
+  const startTime = Date.now();
+  try {
+    const client = new ApolloClient({
+      link: createHttpLink({
+        uri: backendConfig.application.GRAPHQL_ENDPOINT,
+        fetch,
+      }),
+      cache: new InMemoryCache(),
+    });
+
+    const query = gql`
+      query HealthCheck {
+        __typename
+      }
+    `;
+
+    const result = await client.query({ query });
+    const duration = Date.now() - startTime;
+
+    if (result.data.__typename) {
+      return {
+        status: "OK",
+        message: "GraphQL endpoint is responsive",
+        responseTime: duration,
+      };
+    } else {
+      throw new Error("Unexpected response from GraphQL endpoint");
+    }
+  } catch (error) {
+    const duration = Date.now() - startTime;
+    err("GraphQL endpoint health check failed:", error);
+    return {
+      status: "ERROR",
+      message: error instanceof Error ? error.message : String(error),
+      responseTime: duration,
+    };
+  }
+}
 
 async function checkCapellaAPI(): Promise<CheckResult> {
   const startTime = Date.now();
@@ -107,6 +149,7 @@ export async function GET({ url, fetch }: { url: URL; fetch: Function }) {
   const detailedChecks = [
     ...simpleChecks,
     { name: "External Capella Cloud API", check: checkCapellaAPI },
+    { name: "GraphQL Endpoint", check: checkGraphQLEndpoint },
   ];
 
   const checksToRun = isSimpleCheck ? simpleChecks : detailedChecks;
