@@ -87,9 +87,9 @@ if (INSTRUMENTATION_ENABLED) {
     const loggerProvider = new LoggerProvider({ resource });
     loggerProvider.addLogRecordProcessor(
       new BatchLogRecordProcessor(logExporter, {
-        maxExportBatchSize: 256,
-        scheduledDelayMillis: 1000,
-        exportTimeoutMillis: 30000,
+        maxExportBatchSize: 100,
+        scheduledDelayMillis: 10000, // 10 seconds
+        exportTimeoutMillis: 60000, // 1 minute
       }),
     );
     api.logs.setGlobalLoggerProvider(loggerProvider);

@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "vite dev",
-    "build": "vite build",
+    "build": "vite build && cp -R static/idle-videos build/idle-videos",
     "preview": "vite preview --host",
     "build:no-telemetry": "DISABLE_OPENTELEMETRY=true vite build",
     "start": "bun ./build/index.js",
@@ -60,12 +60,15 @@
     "clsx": "^2.1.1",
     "cross-fetch": "^4.0.0",
     "csv-parse": "^5.5.6",
+    "dns": "^0.2.2",
     "dotenv": "^16.4.5",
     "graphql": "^16.9.0",
     "graphql-request": "^7.1.0",
     "help": "^3.0.2",
     "mode-watcher": "^0.4.1",
+    "net": "^1.0.2",
     "node-cron": "^3.0.3",
+    "os": "^0.1.2",
     "papaparse": "^5.4.1",
     "svelte-sonner": "^0.3.27",
     "tailwind-merge": "^2.5.2",
@@ -82,6 +85,7 @@
     "@sveltejs/kit",
     "esbuild",
     "protobufjs",
-    "svelte-preprocess"
+    "svelte-preprocess",
+    "ws"
   ]
 }

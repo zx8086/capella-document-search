@@ -24,6 +24,9 @@ const frontendConfig: FrontendConfig = {
       "VITE_ELASTIC_APM_DISTRIBUTED_TRACING_ORIGINS",
     ),
   },
+  videoBaseUrl: {
+    VITE_PUBLIC_VIDEO_BASE_URL: getEnvOrThrow("VITE_PUBLIC_VIDEO_BASE_URL"),
+  },
 };
 
 export { frontendConfig };

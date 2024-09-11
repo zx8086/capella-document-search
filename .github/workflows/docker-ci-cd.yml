@@ -23,8 +23,11 @@ jobs:
             ${{ runner.os }}-bun-${{ github.repository }}-
             ${{ runner.os }}-bun-
 
-      - name: Install dependencies
-        run: bun install
+      - name: Install dependencies and run post-install scripts
+        run: |
+          bun install
+          bun pm untrusted
+          bun pm trust --all
 
       - name: Create .env file
         run: |

@@ -3,8 +3,8 @@
 <script lang="ts">
     import { onMount, onDestroy, createEventDispatcher } from "svelte";
     import { browser } from "$app/environment";
-    import { base } from "$app/paths";
     import { fade } from "svelte/transition";
+    import frontendConfig from "$frontendConfig";
 
     export let videos: string[] = [];
     export let isVisible = false;
@@ -18,9 +18,11 @@
     let isPlaying = false;
 
     const videoBasePath = "/idle-videos/";
+    const effectiveVideoBasePath =
+        videoBasePath.trim() === "" ? "/idle-videos/" : videoBasePath;
 
-    function getVideoPath(filename: string) {
-        return `${base}${videoBasePath}${filename}`;
+    function getVideoPath(filename: string, format?: string): string {
+        return `${effectiveVideoBasePath}${filename}${format ? `.${format}` : ""}`;
     }
 
     function initializeVideo(element: HTMLVideoElement) {
@@ -41,12 +43,21 @@
         loadAndPlayVideo();
     }
 
-    function loadAndPlayVideo() {
+    async function loadVideo(filename: string) {
+        const response = await fetch(`${videoBasePath}${filename}`);
+        if (!response.ok) throw new Error("Video load failed");
+        return URL.createObjectURL(await response.blob());
+    }
+
+    async function loadAndPlayVideo() {
         if (videoElement && videos[currentVideoIndex] && !isPlaying) {
-            console.debug("Loading video:", videos[currentVideoIndex]);
-            videoElement.src = getVideoPath(videos[currentVideoIndex]);
-            videoElement.load();
-            playVideo();
+            try {
+                const videoUrl = await loadVideo(videos[currentVideoIndex]);
+                videoElement.src = videoUrl;
+                await playVideo();
+            } catch (error) {
+                console.error("Error loading video:", error);
+            }
         }
     }
 
@@ -73,6 +84,13 @@
     function handleUserActivity(event: MouseEvent | KeyboardEvent) {
         event.stopPropagation();
         startFadeOut();
+    }
+
+    function handleVideoError(error: Event): void {
+        console.error("Video playback error:", error);
+        // Attempt to load the next video or show a fallback image
+        currentVideoIndex = (currentVideoIndex + 1) % videos.length;
+        loadAndPlayVideo();
     }
 
     function startFadeOut() {
@@ -127,10 +145,15 @@
                 playsinline
                 muted
                 use:initializeVideo
+                on:error={handleVideoError}
             >
                 <source
-                    src={getVideoPath(videos[currentVideoIndex])}
+                    src={getVideoPath(videos[currentVideoIndex], "mp4")}
                     type="video/mp4"
+                />
+                <source
+                    src={getVideoPath(videos[currentVideoIndex], "webm")}
+                    type="video/webm"
                 />
                 Your browser does not support the video tag.
             </video>

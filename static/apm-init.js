@@ -20,6 +20,7 @@
           distributedTracingOrigins:
             config.VITE_ELASTIC_APM_DISTRIBUTED_TRACING_ORIGINS,
           transactionSampleRate: 1.0,
+          disableInstrumentations: ["xmlhttprequest", "fetch"],
         });
         console.log("Elastic APM initialized successfully.");
       } catch (e) {
