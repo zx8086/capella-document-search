@@ -26,8 +26,8 @@ jobs:
       - name: Install dependencies and run post-install scripts
         run: |
           bun install
-          bun pm untrusted
-          bun pm trust --all
+          bun pm untrusted || true
+          bun pm trust --all || true
 
       - name: Create .env file
         run: |
