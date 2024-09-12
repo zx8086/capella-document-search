@@ -26,9 +26,11 @@ const config = {
         "connect-src": [
           "'self'",
           "https://eu-b2b.apm.eu-central-1.aws.cloud.es.io",
+          "https://apm.vpce.eu-central-1.aws.elastic-cloud.com",
+          "https://cloudapi.cloud.couchbase.com",
           "https://capellaql.prd.shared-services.eu.pvh.cloud",
           "https://openreplay.prd.shared-services.eu.pvh.cloud",
-          "http://collector.prd.shared-services.eu.pvh.cloud:4318",
+          "http://collector.prd.shared-services.eu.pvh.cloud",
           "https://apm.siobytes.com",
           "https://api.openreplay.com",
         ],
