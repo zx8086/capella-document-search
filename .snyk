@@ -115,3 +115,29 @@ patch:
         patched: '2024-09-11T13:38:25.661Z'
         id: 'npm:ws:20160920'
         path: dns > tomahawk > socket.io > socket.io-client > engine.io-client > ws
+  'npm:qs:20140806':
+    - dns > tomahawk > body-parser > qs:
+        patched: '2024-09-12T01:24:28.256Z'
+        id: 'npm:qs:20140806'
+        path: dns > tomahawk > body-parser > qs
+    - dns > tomahawk > express > qs:
+        patched: '2024-09-12T01:24:28.256Z'
+        id: 'npm:qs:20140806'
+        path: dns > tomahawk > express > qs
+    - dns > winston > request > qs:
+        patched: '2024-09-12T01:24:28.256Z'
+        id: 'npm:qs:20140806'
+        path: dns > winston > request > qs
+    - dns > tomahawk > winston > request > qs:
+        patched: '2024-09-12T01:24:28.256Z'
+        id: 'npm:qs:20140806'
+        path: dns > tomahawk > winston > request > qs
+  'npm:ws:20160104':
+    - dns > tomahawk > socket.io > engine.io > ws:
+        patched: '2024-09-12T01:24:28.256Z'
+        id: 'npm:ws:20160104'
+        path: dns > tomahawk > socket.io > engine.io > ws
+    - dns > tomahawk > socket.io > socket.io-client > engine.io-client > ws:
+        patched: '2024-09-12T01:24:28.256Z'
+        id: 'npm:ws:20160104'
+        path: dns > tomahawk > socket.io > socket.io-client > engine.io-client > ws
