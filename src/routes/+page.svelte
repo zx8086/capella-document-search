@@ -16,7 +16,8 @@
     import { videos } from "../stores/videoStore";
     import IdleVideoCarousel from "$lib/components/IdleVideoCarousel.svelte";
 
-    import { collections, type Collection } from "../stores/collectionsStore";
+    import { collections } from "../stores/collectionsStore";
+    import type { Collection } from "../models";
 
     interface SearchResult {
         collection: string;

@@ -11,8 +11,6 @@
     import type { Options } from "@openreplay/tracker";
     import { frontendConfig } from "$frontendConfig";
     import { writable } from "svelte/store";
-    // import videojs from "video.js";
-    // import VideoPlayerCarousel from "$lib/components/VideoPlayerCarousel.svelte";
     import { collections } from "../stores/collectionsStore";
 
     let pollInterval: number;
@@ -20,42 +18,7 @@
     let tracker: any | null = null;
     let isTrackerInitialized = false;
 
-    // let showVideoCarousel = false;
-    // let idleTimer: ReturnType<typeof setTimeout> | null = null;
-
-    // function resetIdleTimer() {
-    //     if (idleTimer) clearTimeout(idleTimer);
-    //     showVideoCarousel = false;
-    //     idleTimer = setTimeout(() => {
-    //         showVideoCarousel = true;
-    //     }, 120000); // 120 seconds for production
-    // }
-
-    // function handleUserActivity() {
-    //     if (showVideoCarousel) {
-    //         showVideoCarousel = false;
-    //     }
-    //     resetIdleTimer();
-    // }
-
-    // function handleExitFullScreen() {
-    //     setTimeout(() => {
-    //         showVideoCarousel = false;
-    //         resetIdleTimer();
-    //     }, 2000); // This should match the duration in VideoPlayerCarousel
-    // }
-
     const darkMode = writable(false);
-
-    // function toggleDarkMode() {
-    //     darkMode.update((value) => {
-    //         const newValue = !value;
-    //         if (browser) {
-    //             localStorage.setItem("theme", newValue ? "dark" : "light");
-    //         }
-    //         return newValue;
-    //     });
-    // }
 
     function applyDarkMode(isDark: boolean) {
         if (browser) {
@@ -176,25 +139,7 @@
     }
 
     onMount(async () => {
-        // resetIdleTimer();
-        // if (browser) {
-        //     window.addEventListener("mousemove", handleUserActivity);
-        //     window.addEventListener("keydown", handleUserActivity);
-        //     window.addEventListener("click", handleUserActivity);
-        //     window.addEventListener("scroll", handleUserActivity);
-        // }
         startAutoplay();
-        // if (browser) {
-        //     const savedTheme = localStorage.getItem("theme");
-        //     const prefersDark = window.matchMedia(
-        //         "(prefers-color-scheme: dark)",
-        //     ).matches;
-        //     const isDark =
-        //         savedTheme === "dark" || (!savedTheme && prefersDark);
-        //     darkMode.set(isDark);
-        //     applyDarkMode(isDark);
-        // }
-
         try {
             const trackerInstance = await initializeTracker();
             if (trackerInstance) {
@@ -213,7 +158,6 @@
             );
         }
 
-        // Add the following lines for collection polling
         collections.fetchCollections(); // Initial fetch
         pollInterval = setInterval(
             () => {
@@ -224,37 +168,11 @@
     });
 
     onDestroy(() => {
-        // if (idleTimer) clearTimeout(idleTimer);
-        // if (browser) {
-        //     window.removeEventListener("mousemove", handleUserActivity);
-        //     window.removeEventListener("keydown", handleUserActivity);
-        //     window.removeEventListener("click", handleUserActivity);
-        //     window.removeEventListener("scroll", handleUserActivity);
-        // }
         if (autoplayInterval) clearInterval(autoplayInterval);
 
-        // Add this line to clear the polling interval
         if (pollInterval) clearInterval(pollInterval);
     });
-
-    // const videos = [
-    //     "/idle-videos/X1_Single_Lewis_Hamilton-GENERIC_1280x730.mp4",
-    //     "/idle-videos/FA24_TH_T1_OCTOBER_DUO_10_B_ PAID_ LOGO_SOUND_1920_1080.mp4",
-    //     "/idle-videos/ECOM_TOMMY_STRAY_KIDS_6sec_001_3412x1892_MP4_Audio_NoLogo.mp4",
-    //     "/idle-videos/FA24_TH_T1_SEPTEMBER_ABBEY_6_C_ECOM_ NO LOGO_SOUND_3412_1892.mp4",
-    //     "/idle-videos/X1_DUO_GR_LH-GENERIC_1280x730.mp4",
-    //     "/idle-videos/ECOM_TOMMY_STRAY_KIDS_6sec_002_3412x1892_MP4_Audio_NoLogo.mp4",
-    //     "/idle-videos/FA24_TH_T1_OCTOBER_DUO_6_A_ECOM_ NO LOGO_SOUND_3412_1892.mp4",
-    //     "/idle-videos/ECOM_TOMMY_STRAY_KIDS_6sec_003_3412x1892_MP4_Audio_NoLogo.mp4",
-    //     "/idle-videos/FA24_TH_T1_SEPTEMBER_PATRIC_6_B_ECOM_ NO LOGO_SOUND_3412_1892.mp4",
-    // ];
 </script>
-
-<!-- <VideoPlayerCarousel
-    {videos}
-    isVisible={showVideoCarousel}
-    on:exit={handleExitFullScreen}
-/> -->
 
 <div class="flex flex-col min-h-screen">
     <!-- Header Section -->
