@@ -37,10 +37,6 @@ export interface CSVConfig {
   VITE_FILE_UPLOAD_LIMIT: number;
 }
 
-export interface VideoConfig {
-  VITE_PUBLIC_VIDEO_BASE_URL: string;
-}
-
 export interface BackendConfig {
   application: ApplicationConfig;
   capella: CapellaConfig;
@@ -59,5 +55,4 @@ export interface FrontendConfig {
   openreplay: OpenReplayConfig;
   csv: CSVConfig;
   elasticApm: ElasticApmConfig;
-  videoBaseUrl: VideoConfig;
 }

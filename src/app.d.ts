@@ -12,11 +12,6 @@ declare global {
     // interface Platform {}
   }
 
-  interface ImportMetaEnv {
-    PUBLIC_VIDEO_BASE_URL: string;
-    // Add other public env variables here
-  }
-
   interface Window {
     elasticApm: ElasticApm;
     active: false;

@@ -4,7 +4,7 @@
     import { onMount, onDestroy, createEventDispatcher } from "svelte";
     import { browser } from "$app/environment";
     import { fade } from "svelte/transition";
-    import frontendConfig from "$frontendConfig";
+    // import frontendConfig from "$frontendConfig";
 
     export let videos: string[] = [];
     export let isVisible = false;
