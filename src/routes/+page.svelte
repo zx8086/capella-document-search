@@ -241,9 +241,8 @@
         }
     }
 
-    function handleSubmit(
-        event: Event,
-    ): (result: { type: string; data?: any; error?: string }) => Promise<void> {
+    async function handleSubmit(event: SubmitEvent) {
+        event.preventDefault();
         trackClick("SearchButton", isSearchMode ? "Search" : "FileUpload");
         buttonState = "searching";
         processing = true;
@@ -253,91 +252,81 @@
         searchPerformed = true;
         isLoading = true;
 
-        return async ({ result }) => {
-            try {
-                console.log("Full result object:", result);
-                if (result.type === "success") {
-                    const data = result.data;
-                    console.log("Data object:", data);
-                    if (isSearchMode) {
-                        if (data && data.data && data.data.searchDocuments) {
-                            searchResults = data.data.searchDocuments;
-                            console.log("Search results:", searchResults);
+        try {
+            const form = event.target as HTMLFormElement;
+            const formData = new FormData(form);
+            const action = isSearchMode ? "?/searchDocuments" : "?/uploadFile";
 
-                            const foundCollectionsCount =
-                                data.foundCollectionsCount;
-                            console.log(
-                                "Found collections count:",
-                                foundCollectionsCount,
+            const response = await fetch(action, {
+                method: "POST",
+                body: formData,
+            });
+
+            const result = await response.json();
+
+            if (result.type === "success") {
+                const data = result.data;
+                if (isSearchMode) {
+                    if (data && data.searchDocuments) {
+                        searchResults = data.searchDocuments;
+                        const foundCollectionsCount =
+                            data.foundCollectionsCount;
+                        if (foundCollectionsCount === 0) {
+                            toast.error(
+                                "No results found for the given document key.",
+                                {
+                                    duration: Infinity,
+                                },
                             );
-
-                            if (foundCollectionsCount === 0) {
-                                toast.error(
-                                    "No results found for the given document key.",
-                                    {
-                                        duration: Infinity,
-                                    },
-                                );
-                            } else {
-                                toast.success(
-                                    `Search completed successfully. Document found in ${foundCollectionsCount} collection(s).`,
-                                    {
-                                        duration: 3000,
-                                    },
-                                );
-                            }
                         } else {
-                            console.error(
-                                "Unexpected result structure:",
-                                result,
-                            );
-                            throw new Error(
-                                "Unexpected search results structure",
-                            );
-                        }
-                    } else {
-                        // File upload handling
-                        if (Array.isArray(data.results)) {
-                            fileUploadResults = data.results;
                             toast.success(
-                                data.success || "File processed successfully.",
+                                `Search completed successfully. Document found in ${foundCollectionsCount} collection(s).`,
                                 {
                                     duration: 3000,
                                 },
                             );
-                        } else if (data && data.error) {
-                            toast.error(data.error, {
-                                duration: Infinity,
-                            });
-                        } else {
-                            console.error(
-                                "Unexpected file upload result structure:",
-                                data,
-                            );
-                            throw new Error(
-                                "Unexpected file upload result structure",
-                            );
                         }
+                    } else {
+                        throw new Error("Unexpected search results structure");
                     }
-                    buttonState = "results";
-                } else if (result.type === "error") {
-                    toast.error(result.error || "An unknown error occurred", {
-                        duration: Infinity,
-                    });
-                    buttonState = "ready";
+                } else {
+                    // File upload handling
+                    if (Array.isArray(data.results)) {
+                        fileUploadResults = data.results;
+                        toast.success(
+                            data.success || "File processed successfully.",
+                            {
+                                duration: 3000,
+                            },
+                        );
+                    } else if (data && data.error) {
+                        toast.error(data.error, {
+                            duration: Infinity,
+                        });
+                    } else {
+                        throw new Error(
+                            "Unexpected file upload result structure",
+                        );
+                    }
                 }
-            } catch (e) {
-                const errorMessage = e instanceof Error ? e.message : String(e);
-                toast.error(`Error: ${errorMessage}`, { duration: Infinity });
+                buttonState = "results";
+            } else if (result.type === "error") {
+                toast.error(result.error || "An unknown error occurred", {
+                    duration: Infinity,
+                });
                 buttonState = "ready";
-            } finally {
-                processing = false;
-                isLoading = false;
-                if (!isSearchMode) {
-                    resetFileInput();
-                }
             }
-        };
+        } catch (e) {
+            const errorMessage = e instanceof Error ? e.message : String(e);
+            toast.error(`Error: ${errorMessage}`, { duration: Infinity });
+            buttonState = "ready";
+        } finally {
+            processing = false;
+            isLoading = false;
+            if (!isSearchMode) {
+                resetFileInput();
+            }
+        }
     }
 
     let fileUploadTooltipContent: string =
@@ -542,7 +531,7 @@
     <div class="flex-grow flex flex-col items-center px-4 mt-4">
         <div class="w-full max-w-6xl">
             <form
-                use:enhance={handleSubmit}
+                on:submit|preventDefault={handleSubmit}
                 method="POST"
                 action={isSearchMode ? "?/searchDocuments" : "?/uploadFile"}
                 class="space-y-6"
