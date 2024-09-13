@@ -58,6 +58,12 @@ export default defineConfig({
     ),
     "import.meta.env.VITE_ELASTIC_APM_DISTRIBUTED_TRACING_ORIGINS":
       JSON.stringify(process.env.VITE_ELASTIC_APM_DISTRIBUTED_TRACING_ORIGINS),
+    "import.meta.env.VITE_OPENREPLAY_PROJECT_KEY": JSON.stringify(
+      process.env.VITE_OPENREPLAY_PROJECT_KEY,
+    ),
+    "import.meta.env.VITE_OPENREPLAY_INGEST_POINT": JSON.stringify(
+      process.env.VITE_OPENREPLAY_INGEST_POINT,
+    ),
   },
   esbuild: {
     target: "esnext",

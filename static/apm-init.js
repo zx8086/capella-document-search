@@ -16,7 +16,7 @@
           active: true,
           logLevel: "debug",
           breakdownMetrics: true,
-          centralConfig: true,
+          centralConfig: false,
           distributedTracingOrigins:
             config.VITE_ELASTIC_APM_DISTRIBUTED_TRACING_ORIGINS,
           transactionSampleRate: 1.0,
