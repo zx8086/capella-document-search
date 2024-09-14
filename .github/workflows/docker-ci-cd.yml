@@ -29,39 +29,39 @@ jobs:
           bun pm untrusted || true
           bun pm trust --all || true
 
-      - name: Create .env file
+      - name: Set up environment
         run: |
-          cat << EOF > .env
-          ENABLE_FILE_LOGGING=true
-          LOG_LEVEL=info
-          LOG_MAX_SIZE=20m
-          LOG_MAX_FILES=14d
-          GRAPHQL_ENDPOINT=http://localhost:4000/graphql
-          DB_DATA_DIR=src/data
-          VITE_FILE_UPLOAD_LIMIT=50
-          API_BASE_URL=https://cloudapi.cloud.couchbase.com/v4
-          ENABLE_OPENTELEMETRY=true
-          SERVICE_NAME="Capella Document Search"
-          SERVICE_VERSION=1.0.0
-          DEPLOYMENT_ENVIRONMENT=production
-          TRACES_ENDPOINT=https://otel-http-traces.siobytes.com
-          METRICS_ENDPOINT=https://otel-http-metrics.siobytes.com
-          LOGS_ENDPOINT=https://otel-http-logs.siobytes.com
-          METRIC_READER_INTERVAL=1800000
-          CONSOLE_METRIC_READER_INTERVAL=1800000
-          VITE_OPENREPLAY_INGEST_POINT=https://api.openreplay.com/ingest
-          VITE_ELASTIC_APM_SERVICE_NAME="Capella Document Search"
-          VITE_ELASTIC_APM_SERVER_URL=https://apm.siobytes.com
-          VITE_ELASTIC_APM_SERVICE_VERSION=1.0.0
-          VITE_ELASTIC_APM_ENVIRONMENT=production
-          VITE_ELASTIC_APM_DISTRIBUTED_TRACING_ORIGINS="['*']"
-          ORG_ID=${{ secrets.ORG_ID }}
-          PROJECT_ID=${{ secrets.PROJECT_ID }}
-          CLUSTER_ID=${{ secrets.CLUSTER_ID }}
-          BUCKET_ID=${{ secrets.BUCKET_ID }}
-          AUTH_TOKEN=${{ secrets.AUTH_TOKEN }}
-          VITE_OPENREPLAY_PROJECT_KEY=${{ secrets.VITE_OPENREPLAY_PROJECT_KEY }}
-          EOF
+          chmod +x ./setup_env.sh
+          ./setup_env.sh
+        env:
+          ENABLE_FILE_LOGGING: ${{ vars.ENABLE_FILE_LOGGING }}
+          LOG_LEVEL: ${{ vars.LOG_LEVEL }}
+          LOG_MAX_SIZE: ${{ vars.LOG_MAX_SIZE }}
+          LOG_MAX_FILES: ${{ vars.LOG_MAX_FILES }}
+          GRAPHQL_ENDPOINT: ${{ vars.GRAPHQL_ENDPOINT }}
+          DB_DATA_DIR: ${{ vars.DB_DATA_DIR }}
+          PUBLIC_CSV_FILE_UPLOAD_LIMIT: ${{ vars.PUBLIC_CSV_FILE_UPLOAD_LIMIT }}
+          API_BASE_URL: ${{ vars.API_BASE_URL }}
+          ENABLE_OPENTELEMETRY: ${{ vars.ENABLE_OPENTELEMETRY }}
+          SERVICE_NAME: ${{ vars.SERVICE_NAME }}
+          SERVICE_VERSION: ${{ vars.SERVICE_VERSION }}
+          DEPLOYMENT_ENVIRONMENT: ${{ vars.DEPLOYMENT_ENVIRONMENT }}
+          TRACES_ENDPOINT: ${{ vars.TRACES_ENDPOINT }}
+          METRICS_ENDPOINT: ${{ vars.METRICS_ENDPOINT }}
+          LOGS_ENDPOINT: ${{ vars.LOGS_ENDPOINT }}
+          METRIC_READER_INTERVAL: ${{ vars.METRIC_READER_INTERVAL }}
+          CONSOLE_METRIC_READER_INTERVAL: ${{ vars.CONSOLE_METRIC_READER_INTERVAL }}
+          PUBLIC_OPENREPLAY_INGEST_POINT: ${{ vars.PUBLIC_OPENREPLAY_INGEST_POINT }}
+          PUBLIC_ELASTIC_APM_SERVICE_NAME: ${{ vars.PUBLIC_ELASTIC_APM_SERVICE_NAME }}
+          PUBLIC_ELASTIC_APM_SERVER_URL: ${{ vars.PUBLIC_ELASTIC_APM_SERVER_URL }}
+          PUBLIC_ELASTIC_APM_SERVICE_VERSION: ${{ vars.PUBLIC_ELASTIC_APM_SERVICE_VERSION }}
+          PUBLIC_ELASTIC_APM_ENVIRONMENT: ${{ vars.PUBLIC_ELASTIC_APM_ENVIRONMENT }}
+          ORG_ID: ${{ secrets.ORG_ID }}
+          PROJECT_ID: ${{ secrets.PROJECT_ID }}
+          CLUSTER_ID: ${{ secrets.CLUSTER_ID }}
+          BUCKET_ID: ${{ secrets.BUCKET_ID }}
+          AUTH_TOKEN: ${{ secrets.AUTH_TOKEN }}
+          PUBLIC_OPENREPLAY_PROJECT_KEY: ${{ secrets.PUBLIC_OPENREPLAY_PROJECT_KEY }}
 
       - name: Run Snyk checks
         continue-on-error: true
@@ -89,37 +89,41 @@ jobs:
         uses: docker/setup-buildx-action@v3
 
       - name: Build and push Docker image
-        run: |
-          declare -a build_args=()
-          while IFS= read -r line || [[ -n "$line" ]]; do
-            if [[ ! "$line" =~ ^\s*# && -n "$line" ]]; then
-              key=$(echo "$line" | cut -d '=' -f1)
-              value=$(echo "$line" | cut -d '=' -f2-)
-              build_args+=("--build-arg" "${key}=${value}")
-            fi
-          done < .env
-
-          echo "Debug: build_args=${build_args[*]}"
-
-          docker buildx build \
-            --push \
-            -t zx8086/capella-document-search:latest \
-            "${build_args[@]}" \
-            --secret id=org_id,env=ORG_ID \
-            --secret id=project_id,env=PROJECT_ID \
-            --secret id=cluster_id,env=CLUSTER_ID \
-            --secret id=bucket_id,env=BUCKET_ID \
-            --secret id=auth_token,env=AUTH_TOKEN \
-            --secret id=openreplay_key,env=VITE_OPENREPLAY_PROJECT_KEY \
-            .
-
-        env:
-          ORG_ID: ${{ secrets.ORG_ID }}
-          PROJECT_ID: ${{ secrets.PROJECT_ID }}
-          CLUSTER_ID: ${{ secrets.CLUSTER_ID }}
-          BUCKET_ID: ${{ secrets.BUCKET_ID }}
-          AUTH_TOKEN: ${{ secrets.AUTH_TOKEN }}
-          VITE_OPENREPLAY_PROJECT_KEY: ${{ secrets.VITE_OPENREPLAY_PROJECT_KEY }}
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: zx8086/capella-document-search:latest
+          build-args: |
+            ENABLE_FILE_LOGGING=${{ env.ENABLE_FILE_LOGGING }}
+            LOG_LEVEL=${{ env.LOG_LEVEL }}
+            LOG_MAX_SIZE=${{ env.LOG_MAX_SIZE }}
+            LOG_MAX_FILES=${{ env.LOG_MAX_FILES }}
+            GRAPHQL_ENDPOINT=${{ env.GRAPHQL_ENDPOINT }}
+            DB_DATA_DIR=${{ env.DB_DATA_DIR }}
+            PUBLIC_CSV_FILE_UPLOAD_LIMIT=${{ env.PUBLIC_CSV_FILE_UPLOAD_LIMIT }}
+            API_BASE_URL=${{ env.API_BASE_URL }}
+            ENABLE_OPENTELEMETRY=${{ env.ENABLE_OPENTELEMETRY }}
+            SERVICE_NAME=${{ env.SERVICE_NAME }}
+            SERVICE_VERSION=${{ env.SERVICE_VERSION }}
+            DEPLOYMENT_ENVIRONMENT=${{ env.DEPLOYMENT_ENVIRONMENT }}
+            TRACES_ENDPOINT=${{ env.TRACES_ENDPOINT }}
+            METRICS_ENDPOINT=${{ env.METRICS_ENDPOINT }}
+            LOGS_ENDPOINT=${{ env.LOGS_ENDPOINT }}
+            METRIC_READER_INTERVAL=${{ env.METRIC_READER_INTERVAL }}
+            CONSOLE_METRIC_READER_INTERVAL=${{ env.CONSOLE_METRIC_READER_INTERVAL }}
+            PUBLIC_OPENREPLAY_INGEST_POINT=${{ env.PUBLIC_OPENREPLAY_INGEST_POINT }}
+            PUBLIC_ELASTIC_APM_SERVICE_NAME=${{ env.PUBLIC_ELASTIC_APM_SERVICE_NAME }}
+            PUBLIC_ELASTIC_APM_SERVER_URL=${{ env.PUBLIC_ELASTIC_APM_SERVER_URL }}
+            PUBLIC_ELASTIC_APM_SERVICE_VERSION=${{ env.PUBLIC_ELASTIC_APM_SERVICE_VERSION }}
+            PUBLIC_ELASTIC_APM_ENVIRONMENT=${{ env.PUBLIC_ELASTIC_APM_ENVIRONMENT }}
+          secrets: |
+            "org_id=${{ secrets.ORG_ID }}"
+            "project_id=${{ secrets.PROJECT_ID }}"
+            "cluster_id=${{ secrets.CLUSTER_ID }}"
+            "bucket_id=${{ secrets.BUCKET_ID }}"
+            "auth_token=${{ secrets.AUTH_TOKEN }}"
+            "openreplay_key=${{ secrets.PUBLIC_OPENREPLAY_PROJECT_KEY }}"
 
       - name: Run Snyk to check Docker image for vulnerabilities
         continue-on-error: true
@@ -155,22 +159,6 @@ jobs:
       - name: Cleanup
         if: always()
         run: |
-          # Remove the .env file
-          rm -f .env
-
-          # Remove SARIF files
-          rm -f snyk.sarif snyk-docker.sarif
-
-          # Remove any dangling Docker images
+          rm -f .env snyk.sarif snyk-docker.sarif
           docker image prune -f
-
-          # Optionally, remove the built image if you don't need it anymore
-          # docker rmi zx8086/capella-document-search:latest
-
-          # Remove any unused Docker volumes
           docker volume prune -f
-
-          # Optionally, you can also clean up unused Docker networks
-          # docker network prune -f
-
-          echo "Cleanup completed"

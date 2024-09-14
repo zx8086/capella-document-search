@@ -4,7 +4,7 @@ import winston from "winston";
 import { ecsFormat } from "@elastic/ecs-winston-format";
 import { OpenTelemetryTransportV3 } from "@opentelemetry/winston-transport";
 import DailyRotateFile from "winston-daily-rotate-file";
-import backendConfig from "$backendConfig";
+import { backendConfig } from "$backendConfig";
 
 // Define the transports array
 const transports: winston.transport[] = [

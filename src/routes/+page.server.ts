@@ -14,7 +14,7 @@ import {
   initializeDatabase,
 } from "$lib/db/dbOperations";
 import { log, err } from "../utils/serverLogger";
-import backendConfig from "$backendConfig";
+import { backendConfig } from "$backendConfig";
 
 import type { Collection, SearchResult } from "../models";
 

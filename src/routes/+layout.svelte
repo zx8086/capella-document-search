@@ -41,12 +41,8 @@
                 const TrackerClass = await initTracker();
                 if (TrackerClass) {
                     tracker = new TrackerClass({
-                        projectKey:
-                            frontendConfig.openreplay
-                                .VITE_OPENREPLAY_PROJECT_KEY,
-                        ingestPoint:
-                            frontendConfig.openreplay
-                                .VITE_OPENREPLAY_INGEST_POINT,
+                        projectKey: frontendConfig.openreplay.PROJECT_KEY,
+                        ingestPoint: frontendConfig.openreplay.INGEST_POINT,
                         obscureTextNumbers: false,
                         obscureTextEmails: true,
                         __DISABLE_SECURE_MODE: true,
@@ -144,7 +140,7 @@
             const trackerInstance = await initializeTracker();
             if (trackerInstance) {
                 await trackerInstance.start({
-                    userID: "simon.owusu@tommy.com",
+                    userID: "simonowusu@pvh.com",
                     metadata: {
                         balance: "10M",
                         plan: "free",

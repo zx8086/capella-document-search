@@ -29,12 +29,12 @@ export interface OpenTelemetryConfig {
 }
 
 export interface OpenReplayConfig {
-  VITE_OPENREPLAY_PROJECT_KEY: string;
-  VITE_OPENREPLAY_INGEST_POINT: string;
+  PROJECT_KEY: string;
+  INGEST_POINT: string;
 }
 
 export interface CSVConfig {
-  VITE_FILE_UPLOAD_LIMIT: number;
+  FILE_UPLOAD_LIMIT: number;
 }
 
 export interface BackendConfig {
@@ -44,11 +44,10 @@ export interface BackendConfig {
 }
 
 export interface ElasticApmConfig {
-  VITE_ELASTIC_APM_SERVICE_NAME: string;
-  VITE_ELASTIC_APM_SERVER_URL: string;
-  VITE_ELASTIC_APM_SERVICE_VERSION: string;
-  VITE_ELASTIC_APM_ENVIRONMENT: string;
-  VITE_ELASTIC_APM_DISTRIBUTED_TRACING_ORIGINS: string;
+  SERVICE_NAME: string;
+  SERVER_URL: string;
+  SERVICE_VERSION: string;
+  ENVIRONMENT: string;
 }
 
 export interface FrontendConfig {
