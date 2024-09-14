@@ -12,8 +12,11 @@ const config = {
     alias: {
       $lib: path.resolve("./src/lib"),
       $utils: path.resolve("./src/utils"),
+      $models: path.resolve("./src/models"),
       $frontendConfig: path.resolve("./src/frontend-config.ts"),
       $backendConfig: path.resolve("./src/backend-config.ts"),
+      "$env/static/private": path.resolve("./src/env/static/private.ts"),
+      "$env/static/public": path.resolve("./src/env/static/public.ts"),
     },
     env: {
       dir: process.cwd(),

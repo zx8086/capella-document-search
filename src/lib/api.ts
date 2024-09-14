@@ -1,7 +1,7 @@
 /* src/lib/api.ts */
 
 import { log } from "$utils/unifiedLogger";
-import backendConfig from "$backendConfig";
+import { backendConfig } from "$backendConfig";
 
 const API_BASE_URL = backendConfig.capella.API_BASE_URL;
 const ORG_ID = backendConfig.capella.ORG_ID;

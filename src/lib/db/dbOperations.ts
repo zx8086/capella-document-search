@@ -4,7 +4,7 @@ import { Database, Statement } from "bun:sqlite";
 import { log, err } from "$utils/unifiedLogger";
 import path from "path";
 import fs from "fs";
-import backendConfig from "$backendConfig";
+import { backendConfig } from "$backendConfig";
 
 let db: Database | null = null;
 let insertScopeStmt: Statement | null = null;

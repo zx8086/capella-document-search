@@ -10,7 +10,7 @@ import { getAllScopes } from "$lib/api";
 import type { CheckResult } from "../../../models";
 import fetch from "cross-fetch";
 import { frontendConfig } from "$frontendConfig";
-import backendConfig from "$backendConfig";
+import { backendConfig } from "$backendConfig";
 import {
   ApolloClient,
   InMemoryCache,

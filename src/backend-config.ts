@@ -1,39 +1,34 @@
 /* src/backend-config.ts */
 
-import {
-  getEnvOrThrow,
-  getEnvNumberOrThrow,
-  getEnvBooleanOrThrow,
-} from "./utils";
+import * as env from "./env/static/private";
 import type { BackendConfig } from "./models/types";
 
-const backendConfig: BackendConfig = {
+export const backendConfig: BackendConfig = {
   application: {
-    LOG_LEVEL: getEnvOrThrow("LOG_LEVEL"),
-    LOG_MAX_SIZE: getEnvOrThrow("LOG_MAX_SIZE"),
-    LOG_MAX_FILES: getEnvOrThrow("LOG_MAX_FILES"),
-    GRAPHQL_ENDPOINT: getEnvOrThrow("GRAPHQL_ENDPOINT"),
-    DB_DATA_DIR: getEnvOrThrow("DB_DATA_DIR"),
-    ENABLE_FILE_LOGGING: getEnvBooleanOrThrow("ENABLE_FILE_LOGGING"),
+    LOG_LEVEL: env.LOG_LEVEL,
+    LOG_MAX_SIZE: env.LOG_MAX_SIZE,
+    LOG_MAX_FILES: env.LOG_MAX_FILES,
+    GRAPHQL_ENDPOINT: env.GRAPHQL_ENDPOINT,
+    DB_DATA_DIR: env.DB_DATA_DIR,
+    ENABLE_FILE_LOGGING: env.ENABLE_FILE_LOGGING === "true",
   },
   capella: {
-    API_BASE_URL: getEnvOrThrow("API_BASE_URL"),
-    ORG_ID: getEnvOrThrow("ORG_ID"),
-    PROJECT_ID: getEnvOrThrow("PROJECT_ID"),
-    CLUSTER_ID: getEnvOrThrow("CLUSTER_ID"),
-    BUCKET_ID: getEnvOrThrow("BUCKET_ID"),
-    AUTH_TOKEN: getEnvOrThrow("AUTH_TOKEN"),
+    API_BASE_URL: env.API_BASE_URL,
+    ORG_ID: env.ORG_ID,
+    PROJECT_ID: env.PROJECT_ID,
+    CLUSTER_ID: env.CLUSTER_ID,
+    BUCKET_ID: env.BUCKET_ID,
+    AUTH_TOKEN: env.AUTH_TOKEN,
   },
   openTelemetry: {
-    SERVICE_NAME: getEnvOrThrow("SERVICE_NAME"),
-    SERVICE_VERSION: getEnvOrThrow("SERVICE_VERSION"),
-    DEPLOYMENT_ENVIRONMENT: getEnvOrThrow("DEPLOYMENT_ENVIRONMENT"),
-    TRACES_ENDPOINT: getEnvOrThrow("TRACES_ENDPOINT"),
-    METRICS_ENDPOINT: getEnvOrThrow("METRICS_ENDPOINT"),
-    LOGS_ENDPOINT: getEnvOrThrow("LOGS_ENDPOINT"),
-    METRIC_READER_INTERVAL: getEnvNumberOrThrow("METRIC_READER_INTERVAL"),
+    SERVICE_NAME: env.SERVICE_NAME,
+    SERVICE_VERSION: env.SERVICE_VERSION,
+    DEPLOYMENT_ENVIRONMENT: env.DEPLOYMENT_ENVIRONMENT,
+    TRACES_ENDPOINT: env.TRACES_ENDPOINT,
+    METRICS_ENDPOINT: env.METRICS_ENDPOINT,
+    LOGS_ENDPOINT: env.LOGS_ENDPOINT,
+    METRIC_READER_INTERVAL: Number(env.METRIC_READER_INTERVAL),
   },
-};
+} as const;
 
-export default backendConfig;
 export type { BackendConfig } from "./models/types";

@@ -33,7 +33,7 @@ import { WinstonInstrumentation } from "@opentelemetry/instrumentation-winston";
 import { GraphQLInstrumentation } from "@opentelemetry/instrumentation-graphql";
 import * as api from "@opentelemetry/api-logs";
 
-import backendConfig from "./backend-config";
+import { backendConfig } from "$backendConfig";
 
 const INSTRUMENTATION_ENABLED = process.env.ENABLE_OPENTELEMETRY === "true";
 console.log("INSTRUMENTATION_ENABLED:", INSTRUMENTATION_ENABLED);
