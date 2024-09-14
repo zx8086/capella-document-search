@@ -37,7 +37,5 @@
       );
     }
   }
-
-  // Initialize APM immediately
   initAPM();
 })();
