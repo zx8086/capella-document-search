@@ -29,46 +29,11 @@ jobs:
           bun pm untrusted || true
           bun pm trust --all || true
 
-      # - name: Set up environment
-      #   run: |
-      #     chmod +x ./setup_env.sh
-      #     ./setup_env.sh
-      #   env:
-      #     ENABLE_FILE_LOGGING: ${{ vars.ENABLE_FILE_LOGGING }}
-      #     LOG_LEVEL: ${{ vars.LOG_LEVEL }}
-      #     LOG_MAX_SIZE: ${{ vars.LOG_MAX_SIZE }}
-      #     LOG_MAX_FILES: ${{ vars.LOG_MAX_FILES }}
-      #     GRAPHQL_ENDPOINT: ${{ vars.GRAPHQL_ENDPOINT }}
-      #     DB_DATA_DIR: ${{ vars.DB_DATA_DIR }}
-      #     PUBLIC_CSV_FILE_UPLOAD_LIMIT: ${{ vars.PUBLIC_CSV_FILE_UPLOAD_LIMIT }}
-      #     API_BASE_URL: ${{ vars.API_BASE_URL }}
-      #     ENABLE_OPENTELEMETRY: ${{ vars.ENABLE_OPENTELEMETRY }}
-      #     SERVICE_NAME: ${{ vars.SERVICE_NAME }}
-      #     SERVICE_VERSION: ${{ vars.SERVICE_VERSION }}
-      #     DEPLOYMENT_ENVIRONMENT: ${{ vars.DEPLOYMENT_ENVIRONMENT }}
-      #     TRACES_ENDPOINT: ${{ vars.TRACES_ENDPOINT }}
-      #     METRICS_ENDPOINT: ${{ vars.METRICS_ENDPOINT }}
-      #     LOGS_ENDPOINT: ${{ vars.LOGS_ENDPOINT }}
-      #     METRIC_READER_INTERVAL: ${{ vars.METRIC_READER_INTERVAL }}
-      #     CONSOLE_METRIC_READER_INTERVAL: ${{ vars.CONSOLE_METRIC_READER_INTERVAL }}
-      #     PUBLIC_OPENREPLAY_INGEST_POINT: ${{ vars.PUBLIC_OPENREPLAY_INGEST_POINT }}
-      #     PUBLIC_ELASTIC_APM_SERVICE_NAME: ${{ vars.PUBLIC_ELASTIC_APM_SERVICE_NAME }}
-      #     PUBLIC_ELASTIC_APM_SERVER_URL: ${{ vars.PUBLIC_ELASTIC_APM_SERVER_URL }}
-      #     PUBLIC_ELASTIC_APM_SERVICE_VERSION: ${{ vars.PUBLIC_ELASTIC_APM_SERVICE_VERSION }}
-      #     PUBLIC_ELASTIC_APM_ENVIRONMENT: ${{ vars.PUBLIC_ELASTIC_APM_ENVIRONMENT }}
-      #     ORG_ID: ${{ secrets.ORG_ID }}
-      #     PROJECT_ID: ${{ secrets.PROJECT_ID }}
-      #     CLUSTER_ID: ${{ secrets.CLUSTER_ID }}
-      #     BUCKET_ID: ${{ secrets.BUCKET_ID }}
-      #     AUTH_TOKEN: ${{ secrets.AUTH_TOKEN }}
-      #     PUBLIC_OPENREPLAY_PROJECT_KEY: ${{ secrets.PUBLIC_OPENREPLAY_PROJECT_KEY }}
-
       - name: Run Snyk checks
         continue-on-error: true
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
         run: |
-          export $(grep -v '^#' .env | xargs)
           bun run snyk test --file=package.json --sarif-file-output=snyk.sarif
           bun run snyk monitor --file=package.json
 
@@ -95,28 +60,28 @@ jobs:
           push: true
           tags: zx8086/capella-document-search:latest
           build-args: |
-            ENABLE_FILE_LOGGING=${{ env.ENABLE_FILE_LOGGING }}
-            LOG_LEVEL=${{ env.LOG_LEVEL }}
-            LOG_MAX_SIZE=${{ env.LOG_MAX_SIZE }}
-            LOG_MAX_FILES=${{ env.LOG_MAX_FILES }}
-            GRAPHQL_ENDPOINT=${{ env.GRAPHQL_ENDPOINT }}
-            DB_DATA_DIR=${{ env.DB_DATA_DIR }}
-            PUBLIC_CSV_FILE_UPLOAD_LIMIT=${{ env.PUBLIC_CSV_FILE_UPLOAD_LIMIT }}
-            API_BASE_URL=${{ env.API_BASE_URL }}
-            ENABLE_OPENTELEMETRY=${{ env.ENABLE_OPENTELEMETRY }}
-            SERVICE_NAME=${{ env.SERVICE_NAME }}
-            SERVICE_VERSION=${{ env.SERVICE_VERSION }}
-            DEPLOYMENT_ENVIRONMENT=${{ env.DEPLOYMENT_ENVIRONMENT }}
-            TRACES_ENDPOINT=${{ env.TRACES_ENDPOINT }}
-            METRICS_ENDPOINT=${{ env.METRICS_ENDPOINT }}
-            LOGS_ENDPOINT=${{ env.LOGS_ENDPOINT }}
-            METRIC_READER_INTERVAL=${{ env.METRIC_READER_INTERVAL }}
-            CONSOLE_METRIC_READER_INTERVAL=${{ env.CONSOLE_METRIC_READER_INTERVAL }}
-            PUBLIC_OPENREPLAY_INGEST_POINT=${{ env.PUBLIC_OPENREPLAY_INGEST_POINT }}
-            PUBLIC_ELASTIC_APM_SERVICE_NAME=${{ env.PUBLIC_ELASTIC_APM_SERVICE_NAME }}
-            PUBLIC_ELASTIC_APM_SERVER_URL=${{ env.PUBLIC_ELASTIC_APM_SERVER_URL }}
-            PUBLIC_ELASTIC_APM_SERVICE_VERSION=${{ env.PUBLIC_ELASTIC_APM_SERVICE_VERSION }}
-            PUBLIC_ELASTIC_APM_ENVIRONMENT=${{ env.PUBLIC_ELASTIC_APM_ENVIRONMENT }}
+            ENABLE_FILE_LOGGING=${{ vars.ENABLE_FILE_LOGGING }}
+            LOG_LEVEL=${{ vars.LOG_LEVEL }}
+            LOG_MAX_SIZE=${{ vars.LOG_MAX_SIZE }}
+            LOG_MAX_FILES=${{ vars.LOG_MAX_FILES }}
+            GRAPHQL_ENDPOINT=${{ vars.GRAPHQL_ENDPOINT }}
+            DB_DATA_DIR=${{ vars.DB_DATA_DIR }}
+            PUBLIC_CSV_FILE_UPLOAD_LIMIT=${{ vars.PUBLIC_CSV_FILE_UPLOAD_LIMIT }}
+            API_BASE_URL=${{ vars.API_BASE_URL }}
+            ENABLE_OPENTELEMETRY=${{ vars.ENABLE_OPENTELEMETRY }}
+            SERVICE_NAME=${{ vars.SERVICE_NAME }}
+            SERVICE_VERSION=${{ vars.SERVICE_VERSION }}
+            DEPLOYMENT_ENVIRONMENT=${{ vars.DEPLOYMENT_ENVIRONMENT }}
+            TRACES_ENDPOINT=${{ vars.TRACES_ENDPOINT }}
+            METRICS_ENDPOINT=${{ vars.METRICS_ENDPOINT }}
+            LOGS_ENDPOINT=${{ vars.LOGS_ENDPOINT }}
+            METRIC_READER_INTERVAL=${{ vars.METRIC_READER_INTERVAL }}
+            CONSOLE_METRIC_READER_INTERVAL=${{ vars.CONSOLE_METRIC_READER_INTERVAL }}
+            PUBLIC_OPENREPLAY_INGEST_POINT=${{ vars.PUBLIC_OPENREPLAY_INGEST_POINT }}
+            PUBLIC_ELASTIC_APM_SERVICE_NAME=${{ vars.PUBLIC_ELASTIC_APM_SERVICE_NAME }}
+            PUBLIC_ELASTIC_APM_SERVER_URL=${{ vars.PUBLIC_ELASTIC_APM_SERVER_URL }}
+            PUBLIC_ELASTIC_APM_SERVICE_VERSION=${{ vars.PUBLIC_ELASTIC_APM_SERVICE_VERSION }}
+            PUBLIC_ELASTIC_APM_ENVIRONMENT=${{ vars.PUBLIC_ELASTIC_APM_ENVIRONMENT }}
           secrets: |
             "org_id=${{ secrets.ORG_ID }}"
             "project_id=${{ secrets.PROJECT_ID }}"
@@ -152,13 +117,13 @@ jobs:
           docker rm capella-document-search || true
           docker run -d --name capella-document-search \
             -p 3000:3000 \
-            --env-file .env \
+            --env-file <(env | grep '^PUBLIC_\|^ENABLE_\|^LOG_\|^GRAPHQL_\|^DB_\|^API_\|^SERVICE_\|^DEPLOYMENT_\|^TRACES_\|^METRICS_\|^LOGS_') \
             -e HEALTH_CHECK_PORT=3000 \
             zx8086/capella-document-search:latest
 
       - name: Cleanup
         if: always()
         run: |
-          rm -f .env snyk.sarif snyk-docker.sarif
+          rm -f snyk.sarif snyk-docker.sarif
           docker image prune -f
           docker volume prune -f

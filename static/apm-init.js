@@ -24,6 +24,9 @@
           logLevel: "debug",
           breakdownMetrics: true,
           centralConfig: false,
+          disableInstrumentations: [
+            "https://openreplay.prd.shared-services.eu.pvh.cloud",
+          ],
           transactionSampleRate: 1.0,
         });
         console.log("Elastic APM initialized successfully.");
