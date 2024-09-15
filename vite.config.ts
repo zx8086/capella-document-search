@@ -17,15 +17,6 @@ export default defineConfig(({ mode }) => {
         strict: false,
       },
     },
-    // resolve: {
-    //   alias: {
-    //     $lib: path.resolve("./src/lib"),
-    //     $utils: path.resolve("./src/utils"),
-    //     models: path.resolve("./src/models"),
-    //     $frontendConfig: path.resolve("./src/frontend-config.ts"),
-    //     $backendConfig: path.resolve("./src/backend-config.ts"),
-    //   },
-    // },
     ssr: {
       noExternal: ["@apollo/client", "@openreplay/tracker"],
     },
@@ -46,11 +37,24 @@ export default defineConfig(({ mode }) => {
       exclude: enableOpenTelemetry ? ["src/utils/serverLogger"] : [],
     },
     define: {
-      // Expose public env variables to the client
-      ...Object.keys(env).reduce((acc, key) => {
-        acc[`import.meta.env.${key}`] = JSON.stringify(env[key]);
-        return acc;
-      }, {}),
+      "process.env.PUBLIC_ELASTIC_APM_SERVICE_NAME": JSON.stringify(
+        process.env.PUBLIC_ELASTIC_APM_SERVICE_NAME,
+      ),
+      "process.env.PUBLIC_ELASTIC_APM_SERVER_URL": JSON.stringify(
+        process.env.PUBLIC_ELASTIC_APM_SERVER_URL,
+      ),
+      "process.env.PUBLIC_ELASTIC_APM_SERVICE_VERSION": JSON.stringify(
+        process.env.PUBLIC_ELASTIC_APM_SERVICE_VERSION,
+      ),
+      "process.env.PUBLIC_ELASTIC_APM_ENVIRONMENT": JSON.stringify(
+        process.env.PUBLIC_ELASTIC_APM_ENVIRONMENT,
+      ),
+      "import.meta.env.PUBLIC_OPENREPLAY_PROJECT_KEY": JSON.stringify(
+        process.env.PUBLIC_OPENREPLAY_PROJECT_KEY,
+      ),
+      "import.meta.env.PUBLIC_OPENREPLAY_INGEST_POINT": JSON.stringify(
+        process.env.PUBLIC_OPENREPLAY_INGEST_POINT,
+      ),
     },
     esbuild: {
       target: "esnext",

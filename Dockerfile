@@ -92,26 +92,6 @@ RUN --mount=type=secret,id=org_id \
 # Run build after secrets are set in .env file
 RUN bun run build
 
-# Copy Elastic APM RUM script and debug wrapper
-COPY static/elastic-apm-rum.umd.js /app/build/client/elastic-apm-rum.umd.js
-COPY static/elastic-apm-rum-debug-wrapper.js /app/elastic-apm-rum-debug-wrapper.js
-
-# Combine debug wrapper with original script using a shell script
-RUN echo '#!/bin/sh\n\
-    cat /app/elastic-apm-rum-debug-wrapper.js > /app/build/client/elastic-apm-rum-debug.js\n\
-    cat /app/build/client/elastic-apm-rum.umd.js >> /app/build/client/elastic-apm-rum-debug.js\n\
-    echo "console.log(\"Debug: Elastic APM RUM script execution completed\");" >> /app/build/client/elastic-apm-rum-debug.js\n\
-    echo "console.log(\"Debug: window.elasticApm is:\", window.elasticApm);" >> /app/build/client/elastic-apm-rum-debug.js\n\
-    mv /app/build/client/elastic-apm-rum-debug.js /app/build/client/elastic-apm-rum.umd.js' > /app/combine_scripts.sh && \
-    chmod +x /app/combine_scripts.sh && \
-    /app/combine_scripts.sh
-
-COPY static/apm-init.js /app/build/client/apm-init.js
-
-# Copy the runtime configuration script
-COPY /static/generate-runtime-config.sh /app/generate-runtime-config.sh
-RUN chmod +x /app/generate-runtime-config.sh
-
 # Ensure the src/data directory exists
 RUN mkdir -p /app/src/data && chown -R bun:bun /app/src/data
 
@@ -125,8 +105,6 @@ RUN echo '#!/bin/sh\n\
     fi\n\
     echo "Contents of set-global.js:"\n\
     cat /app/set-global.js\n\
-    echo "Generating runtime config..."\n\
-    /app/generate-runtime-config.sh\n\
     echo "Starting application..."\n\
     exec bun --preload /app/set-global.js ./build/index.js' > /app/start.sh && chmod +x /app/start.sh
 

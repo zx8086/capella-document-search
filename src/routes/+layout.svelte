@@ -2,18 +2,18 @@
 
 <script lang="ts">
     import "../app.css";
+    import "../apm-config";
     import * as Drawer from "$lib/components/ui/drawer";
     import { Button } from "$lib/components/ui/button";
     import { Toaster } from "$lib/components/ui/sonner";
     import { onMount, setContext, onDestroy } from "svelte";
     import { browser } from "$app/environment";
     import { key, initTracker } from "$lib/context/tracker";
-    import type { Options } from "@openreplay/tracker";
     import { frontendConfig } from "$frontendConfig";
     import { writable } from "svelte/store";
     import { collections } from "../stores/collectionsStore";
 
-    let pollInterval: number;
+    let pollInterval: ReturnType<typeof setInterval>;
 
     let tracker: any | null = null;
     let isTrackerInitialized = false;
@@ -39,7 +39,7 @@
         if (browser) {
             try {
                 const TrackerClass = await initTracker();
-                if (TrackerClass) {
+                if (TrackerClass && frontendConfig.openreplay.PROJECT_KEY) {
                     tracker = new TrackerClass({
                         projectKey: frontendConfig.openreplay.PROJECT_KEY,
                         ingestPoint: frontendConfig.openreplay.INGEST_POINT,
@@ -59,12 +59,15 @@
                         },
                         capturePerformance: true,
                         respectDoNotTrack: false,
-                        verbose: true,
-                        console: {
-                            enabled: true,
-                            level: ["log", "info", "warn", "error"],
+                    });
+                } else {
+                    console.warn(
+                        "OpenReplay configuration is missing or incomplete.",
+                        {
+                            TrackerClass,
+                            projectKey: frontendConfig.openreplay.PROJECT_KEY,
                         },
-                    } as Options);
+                    );
                 }
             } catch (error) {
                 console.warn(
