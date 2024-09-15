@@ -129,7 +129,6 @@ jobs:
             -e BUCKET_ID=${{ secrets.BUCKET_ID }} \
             -e AUTH_TOKEN=${{ secrets.AUTH_TOKEN }} \
             -e PUBLIC_OPENREPLAY_PROJECT_KEY=${{ secrets.PUBLIC_OPENREPLAY_PROJECT_KEY }} \
-            -e HEALTH_CHECK_PORT=3000 \
             zx8086/capella-document-search:latest
 
       - name: Cleanup

@@ -28,6 +28,13 @@ export interface OpenTelemetryConfig {
   METRIC_READER_INTERVAL: number;
 }
 
+export interface ElasticApmConfig {
+  SERVICE_NAME: string;
+  SERVER_URL: string;
+  SERVICE_VERSION: string;
+  ENVIRONMENT: string;
+}
+
 export interface OpenReplayConfig {
   PROJECT_KEY: string;
   INGEST_POINT: string;
@@ -41,13 +48,6 @@ export interface BackendConfig {
   application: ApplicationConfig;
   capella: CapellaConfig;
   openTelemetry: OpenTelemetryConfig;
-}
-
-export interface ElasticApmConfig {
-  SERVICE_NAME: string;
-  SERVER_URL: string;
-  SERVICE_VERSION: string;
-  ENVIRONMENT: string;
 }
 
 export interface FrontendConfig {
