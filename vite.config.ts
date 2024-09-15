@@ -55,6 +55,9 @@ export default defineConfig(({ mode }) => {
       "import.meta.env.PUBLIC_OPENREPLAY_INGEST_POINT": JSON.stringify(
         process.env.PUBLIC_OPENREPLAY_INGEST_POINT,
       ),
+      "import.meta.env.PUBLIC_CSV_FILE_UPLOAD_LIMIT": JSON.stringify(
+        process.env.PUBLIC_CSV_FILE_UPLOAD_LIMIT,
+      ),
     },
     esbuild: {
       target: "esnext",
