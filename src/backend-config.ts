@@ -32,6 +32,7 @@ export const backendConfig: BackendConfig = {
     METRICS_ENDPOINT: getEnvOrThrow("METRICS_ENDPOINT"),
     LOGS_ENDPOINT: getEnvOrThrow("LOGS_ENDPOINT"),
     METRIC_READER_INTERVAL: getEnvNumberOrThrow("METRIC_READER_INTERVAL"),
+    SUMMARY_LOG_INTERVAL: getEnvNumberOrThrow("SUMMARY_LOG_INTERVAL"),
   },
 } as const;
 

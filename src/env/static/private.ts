@@ -19,3 +19,4 @@ export const TRACES_ENDPOINT = process.env.TRACES_ENDPOINT;
 export const METRICS_ENDPOINT = process.env.METRICS_ENDPOINT;
 export const LOGS_ENDPOINT = process.env.LOGS_ENDPOINT;
 export const METRIC_READER_INTERVAL = process.env.METRIC_READER_INTERVAL;
+export const SUMMARY_LOG_INTERVAL = process.env.SUMMARY_LOG_INTERVAL;

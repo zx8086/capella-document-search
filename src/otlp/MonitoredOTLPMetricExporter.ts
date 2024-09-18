@@ -1,4 +1,4 @@
-/* src/MonitoredOTLPMetricExporter.ts */
+/* src/otlp/MonitoredOTLPMetricExporter.ts */
 
 import { OTLPMetricExporter } from "@opentelemetry/exporter-metrics-otlp-http";
 import type { ResourceMetrics } from "@opentelemetry/sdk-metrics";
@@ -7,17 +7,33 @@ import dns from "dns";
 import { isIP } from "net";
 import os from "os";
 import type { OTLPExporterNodeConfigBase } from "@opentelemetry/otlp-exporter-base";
+import { backendConfig } from "$backendConfig";
+import { otlpConfig } from "./otlpConfig";
 
 export class MonitoredOTLPMetricExporter extends OTLPMetricExporter {
   private totalExports: number = 0;
   private successfulExports: number = 0;
   private lastLogTime: number = Date.now();
-  private readonly logIntervalMs: number = 60000; // Log every minute
-  private readonly url: string;
+  private readonly logIntervalMs: number;
+  public readonly url: string;
 
-  constructor(config: OTLPExporterNodeConfigBase) {
-    super(config);
-    this.url = config.url || "http://localhost:4318/v1/metrics";
+  constructor(exporterConfig: OTLPExporterNodeConfigBase) {
+    super(exporterConfig);
+    this.url =
+      exporterConfig.url || backendConfig.openTelemetry.METRICS_ENDPOINT;
+    console.log(`${this.constructor.name} initialized with URL: ${this.url}`);
+
+    this.logIntervalMs = otlpConfig.logIntervalMs;
+    if (typeof this.logIntervalMs !== "number" || isNaN(this.logIntervalMs)) {
+      console.warn(
+        `Invalid logIntervalMs: ${this.logIntervalMs}. Using default of 300000ms.`,
+      );
+      this.logIntervalMs = backendConfig.openTelemetry.SUMMARY_LOG_INTERVAL;
+    } else {
+      console.log(
+        `${this.constructor.name} log interval: ${this.logIntervalMs}ms`,
+      );
+    }
   }
 
   private async checkNetworkConnectivity(): Promise<void> {
@@ -57,6 +73,7 @@ export class MonitoredOTLPMetricExporter extends OTLPMetricExporter {
     metrics: ResourceMetrics,
     resultCallback: (result: ExportResult) => void,
   ): Promise<void> {
+    console.debug("Starting metric export");
     this.totalExports++;
     const exportStartTime = Date.now();
 
@@ -115,22 +132,23 @@ export class MonitoredOTLPMetricExporter extends OTLPMetricExporter {
     } else {
       console.error(`Unexpected error type:`, error);
     }
-    console.error(
-      `Current memory usage: ${(process.memoryUsage().heapUsed / 1024 / 1024).toFixed(2)} MB`,
-    );
-    console.error(`Current time: ${new Date().toISOString()}`);
   }
 
   private periodicLogging(): void {
     const currentTime = Date.now();
-    if (currentTime - this.lastLogTime >= this.logIntervalMs) {
+    const timeSinceLastLog = currentTime - this.lastLogTime;
+    console.log(
+      `Time since last log: ${timeSinceLastLog}ms, Interval: ${this.logIntervalMs}ms`,
+    );
+
+    if (timeSinceLastLog >= this.logIntervalMs) {
       const successRate = (this.successfulExports / this.totalExports) * 100;
       console.debug(`
-=== OpenTelemetry Metric Export Statistics ===
+=== OpenTelemetry Metrics Export Statistics ===
 Total Exports: ${this.totalExports}
 Successful Exports: ${this.successfulExports}
 Success Rate: ${successRate.toFixed(2)}%
-============================================
+========================================
       `);
       this.lastLogTime = currentTime;
     }

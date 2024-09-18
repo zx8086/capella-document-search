@@ -29,5 +29,5 @@ export function getAllEnv(): Record<string, string> {
   return { ...privateEnv, ...publicEnv };
 }
 
-console.log("Private env:", privateEnv);
-console.log("Public env:", publicEnv);
+// console.log("Private env:", privateEnv);
+// console.log("Public env:", publicEnv);
