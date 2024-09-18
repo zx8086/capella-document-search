@@ -26,6 +26,7 @@ export interface OpenTelemetryConfig {
   METRICS_ENDPOINT: string;
   LOGS_ENDPOINT: string;
   METRIC_READER_INTERVAL: number;
+  SUMMARY_LOG_INTERVAL: number;
 }
 
 export interface ElasticApmConfig {

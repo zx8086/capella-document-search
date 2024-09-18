@@ -89,12 +89,18 @@ export const actions: Actions = {
         (result) => result.data !== null,
       ).length;
 
-      log("Found Collections", { meta: { foundCollectionsCount } });
-      return {
+      const returnData = {
         type: "success",
         data: response.data,
         foundCollectionsCount: foundCollectionsCount,
       };
+
+      console.log(
+        "Data being returned from searchDocuments action:",
+        JSON.stringify(returnData, null, 2),
+      );
+
+      return returnData;
     } catch (error: unknown) {
       err("Error in searchDocuments action:", error);
       if (error instanceof Error) {
