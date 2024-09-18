@@ -44,6 +44,7 @@
     let allCollections: Collection[] = [];
     let selectedCollections: Collection[] = [];
     let errorMessage: string = "";
+    let errorDetails: string = "";
 
     onMount(() => {
         const unsubscribe = collections.subscribe((fetchedCollections) => {
@@ -287,7 +288,7 @@
                                 );
                             }
                         } else {
-                            console.error(
+                            console.debug(
                                 "Unexpected result structure:",
                                 result,
                             );
@@ -321,14 +322,35 @@
                     }
                     buttonState = "results";
                 } else if (result.type === "error") {
-                    toast.error(result.error || "An unknown error occurred", {
-                        duration: Infinity,
-                    });
+                    console.error("Error from server:", result.error);
+
+                    let userMessage =
+                        "An unexpected error occurred. Please try again later.";
+
+                    if (
+                        result.error &&
+                        typeof result.error === "object" &&
+                        "message" in result.error
+                    ) {
+                        const errorMessage = result.error.message as string;
+                        if (
+                            errorMessage.includes(
+                                "socket connection was closed unexpectedly",
+                            )
+                        ) {
+                            userMessage =
+                                "The connection to the server was interrupted. Please try again.";
+                        }
+                    }
+
+                    toast.error(userMessage, { duration: Infinity });
                     buttonState = "ready";
                 }
             } catch (e) {
-                const errorMessage = e instanceof Error ? e.message : String(e);
-                toast.error(`Error: ${errorMessage}`, { duration: Infinity });
+                console.error("Error in form submission:", e);
+                toast.error("An unexpected error occurred. Please try again.", {
+                    duration: Infinity,
+                });
                 buttonState = "ready";
             } finally {
                 processing = false;

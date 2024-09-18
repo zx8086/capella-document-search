@@ -13,7 +13,7 @@ import {
   getFormattedCollections,
   initializeDatabase,
 } from "$lib/db/dbOperations";
-import { log, err } from "../utils/serverLogger";
+import { log, err, debug } from "../utils/serverLogger";
 import { backendConfig } from "$backendConfig";
 
 import type { Collection, SearchResult } from "../models";
@@ -42,81 +42,132 @@ export const load: PageServerLoad = async () => {
 
 export const actions: Actions = {
   searchDocuments: async ({ request }) => {
-    try {
-      const data = await request.formData();
-      const selectedCollections = JSON.parse(
-        data.get("collections") as string,
-      ) as Collection[];
-      const documentKey = data.get("documentKey") as string;
-      const keys = [documentKey];
+    const MAX_RETRIES = 3;
+    let retries = 0;
 
-      log("Keys:", { meta: { keys } });
+    while (retries < MAX_RETRIES) {
+      try {
+        const data = await request.formData();
+        const selectedCollections = JSON.parse(
+          data.get("collections") as string,
+        ) as Collection[];
+        const documentKey = data.get("documentKey") as string;
+        const keys = [documentKey];
 
-      const formattedCollections = selectedCollections.map(
-        ({ bucket, scope_name, collection_name }) => ({
-          bucket,
-          scope: scope_name,
-          collection: collection_name,
-        }),
-      );
+        log("Keys:", { meta: { keys } });
 
-      const query = gql`
-        query searchDocuments(
-          $collections: [BucketScopeCollection!]!
-          $keys: [String!]!
-        ) {
-          searchDocuments(collections: $collections, keys: $keys) {
-            bucket
-            scope
-            collection
-            data
-            timeTaken
+        const formattedCollections = selectedCollections.map(
+          ({ bucket, scope_name, collection_name }) => ({
+            bucket,
+            scope: scope_name,
+            collection: collection_name,
+          }),
+        );
+
+        const query = gql`
+          query searchDocuments(
+            $collections: [BucketScopeCollection!]!
+            $keys: [String!]!
+          ) {
+            searchDocuments(collections: $collections, keys: $keys) {
+              bucket
+              scope
+              collection
+              data
+              timeTaken
+            }
+          }
+        `;
+
+        const response = await client.query({
+          query,
+          variables: {
+            collections: formattedCollections,
+            keys,
+          },
+          fetchPolicy: "no-cache",
+        });
+
+        const searchResults: SearchResult[] = response.data.searchDocuments;
+        const foundCollectionsCount = searchResults.filter(
+          (result) => result.data !== null,
+        ).length;
+
+        const returnData = {
+          type: "success",
+          data: response.data,
+          foundCollectionsCount: foundCollectionsCount,
+        };
+
+        debug(
+          "Data being returned from searchDocuments action:",
+          JSON.stringify(returnData, null, 2),
+        );
+
+        return returnData;
+      } catch (error: unknown) {
+        retries++;
+        err(`Error in searchDocuments action (attempt ${retries}):`, error);
+
+        if (error instanceof Error) {
+          if (
+            (error as any).networkError?.message.includes(
+              "socket connection was closed unexpectedly",
+            )
+          ) {
+            if (retries < MAX_RETRIES) {
+              log(`Retrying search (attempt ${retries + 1})...`);
+              await new Promise((resolve) =>
+                setTimeout(resolve, 1000 * retries),
+              ); // Exponential backoff
+              continue;
+            } else {
+              return {
+                type: "error",
+                error: "Network connection issue. Please try again later.",
+                details:
+                  "The connection to the server was interrupted. This might be due to network instability or server issues.",
+              };
+            }
+          }
+
+          if ("graphQLErrors" in error) {
+            err("GraphQL Errors:", (error as any).graphQLErrors);
+            return {
+              type: "error",
+              error: "An error occurred while processing your request.",
+              details: (error as any).graphQLErrors
+                .map((e: any) => e.message)
+                .join(", "),
+            };
+          }
+
+          if ("networkError" in error && (error as any).networkError) {
+            err("Network Error:", (error as any).networkError);
+            return {
+              type: "error",
+              error: "A network error occurred.",
+              details:
+                (error as any).networkError.message ||
+                "Unable to connect to the server.",
+            };
           }
         }
-      `;
 
-      const response = await client.query({
-        query,
-        variables: {
-          collections: formattedCollections,
-          keys,
-        },
-        fetchPolicy: "no-cache",
-      });
-
-      const searchResults: SearchResult[] = response.data.searchDocuments;
-      const foundCollectionsCount = searchResults.filter(
-        (result) => result.data !== null,
-      ).length;
-
-      const returnData = {
-        type: "success",
-        data: response.data,
-        foundCollectionsCount: foundCollectionsCount,
-      };
-
-      console.log(
-        "Data being returned from searchDocuments action:",
-        JSON.stringify(returnData, null, 2),
-      );
-
-      return returnData;
-    } catch (error: unknown) {
-      err("Error in searchDocuments action:", error);
-      if (error instanceof Error) {
-        if ("graphQLErrors" in error) {
-          err("GraphQL Errors:", (error as any).graphQLErrors);
-        }
-        if ("networkError" in error) {
-          err("Network Error:", (error as any).networkError);
-        }
+        return {
+          type: "error",
+          error: "An unexpected error occurred",
+          details: error instanceof Error ? error.message : "Unknown error",
+        };
       }
-      return {
-        type: "error",
-        error:
-          error instanceof Error ? error.message : "An unknown error occurred",
-      };
     }
+
+    return {
+      type: "error",
+      error: "Failed to complete the search after multiple attempts",
+      details:
+        "Please try again later or contact support if the issue persists.",
+    };
   },
   uploadFile: async ({ request }) => {
     try {
