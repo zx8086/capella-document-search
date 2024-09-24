@@ -29,6 +29,34 @@ jobs:
           bun pm untrusted || true
           bun pm trust --all || true
 
+      - name: Create .env file
+        run: |
+          cat << EOF > .env
+          ENABLE_FILE_LOGGING=${{ vars.ENABLE_FILE_LOGGING }}
+          LOG_LEVEL=${{ vars.LOG_LEVEL }}
+          LOG_MAX_SIZE=${{ vars.LOG_MAX_SIZE }}
+          LOG_MAX_FILES=${{ vars.LOG_MAX_FILES }}
+          GRAPHQL_ENDPOINT=${{ vars.GRAPHQL_ENDPOINT }}
+          DB_DATA_DIR=${{ vars.DB_DATA_DIR }}
+          PUBLIC_CSV_FILE_UPLOAD_LIMIT=${{ vars.PUBLIC_CSV_FILE_UPLOAD_LIMIT }}
+          API_BASE_URL=${{ vars.API_BASE_URL }}
+          ENABLE_OPENTELEMETRY=${{ vars.ENABLE_OPENTELEMETRY }}
+          SERVICE_NAME=${{ vars.SERVICE_NAME }}
+          SERVICE_VERSION=${{ vars.SERVICE_VERSION }}
+          DEPLOYMENT_ENVIRONMENT=${{ vars.DEPLOYMENT_ENVIRONMENT }}
+          TRACES_ENDPOINT=${{ vars.TRACES_ENDPOINT }}
+          METRICS_ENDPOINT=${{ vars.METRICS_ENDPOINT }}
+          LOGS_ENDPOINT=${{ vars.LOGS_ENDPOINT }}
+          METRIC_READER_INTERVAL=${{ vars.METRIC_READER_INTERVAL }}
+          CONSOLE_METRIC_READER_INTERVAL=${{ vars.CONSOLE_METRIC_READER_INTERVAL }}
+          SUMMARY_LOG_INTERVAL=${{ vars.SUMMARY_LOG_INTERVAL }}
+          PUBLIC_OPENREPLAY_INGEST_POINT=${{ vars.PUBLIC_OPENREPLAY_INGEST_POINT }}
+          PUBLIC_ELASTIC_APM_SERVICE_NAME=${{ vars.PUBLIC_ELASTIC_APM_SERVICE_NAME }}
+          PUBLIC_ELASTIC_APM_SERVER_URL=${{ vars.PUBLIC_ELASTIC_APM_SERVER_URL }}
+          PUBLIC_ELASTIC_APM_SERVICE_VERSION=${{ vars.PUBLIC_ELASTIC_APM_SERVICE_VERSION }}
+          PUBLIC_ELASTIC_APM_ENVIRONMENT=${{ vars.PUBLIC_ELASTIC_APM_ENVIRONMENT }}
+          EOF
+
       - name: Run Snyk checks
         continue-on-error: true
         env:
@@ -60,29 +88,29 @@ jobs:
           push: true
           tags: zx8086/capella-document-search:latest
           build-args: |
-            ENABLE_FILE_LOGGING=${{ vars.ENABLE_FILE_LOGGING }}
-            LOG_LEVEL=${{ vars.LOG_LEVEL }}
-            LOG_MAX_SIZE=${{ vars.LOG_MAX_SIZE }}
-            LOG_MAX_FILES=${{ vars.LOG_MAX_FILES }}
-            GRAPHQL_ENDPOINT=${{ vars.GRAPHQL_ENDPOINT }}
-            DB_DATA_DIR=${{ vars.DB_DATA_DIR }}
-            PUBLIC_CSV_FILE_UPLOAD_LIMIT=${{ vars.PUBLIC_CSV_FILE_UPLOAD_LIMIT }}
-            API_BASE_URL=${{ vars.API_BASE_URL }}
-            ENABLE_OPENTELEMETRY=${{ vars.ENABLE_OPENTELEMETRY }}
-            SERVICE_NAME=${{ vars.SERVICE_NAME }}
-            SERVICE_VERSION=${{ vars.SERVICE_VERSION }}
-            DEPLOYMENT_ENVIRONMENT=${{ vars.DEPLOYMENT_ENVIRONMENT }}
-            TRACES_ENDPOINT=${{ vars.TRACES_ENDPOINT }}
-            METRICS_ENDPOINT=${{ vars.METRICS_ENDPOINT }}
-            LOGS_ENDPOINT=${{ vars.LOGS_ENDPOINT }}
-            METRIC_READER_INTERVAL=${{ vars.METRIC_READER_INTERVAL }}
-            CONSOLE_METRIC_READER_INTERVAL=${{ vars.CONSOLE_METRIC_READER_INTERVAL }}
-            SUMMARY_LOG_INTERVAL=${{ vars.SUMMARY_LOG_INTERVAL }}
-            PUBLIC_OPENREPLAY_INGEST_POINT=${{ vars.PUBLIC_OPENREPLAY_INGEST_POINT }}
-            PUBLIC_ELASTIC_APM_SERVICE_NAME=${{ vars.PUBLIC_ELASTIC_APM_SERVICE_NAME }}
-            PUBLIC_ELASTIC_APM_SERVER_URL=${{ vars.PUBLIC_ELASTIC_APM_SERVER_URL }}
-            PUBLIC_ELASTIC_APM_SERVICE_VERSION=${{ vars.PUBLIC_ELASTIC_APM_SERVICE_VERSION }}
-            PUBLIC_ELASTIC_APM_ENVIRONMENT=${{ vars.PUBLIC_ELASTIC_APM_ENVIRONMENT }}
+            ENABLE_FILE_LOGGING
+            LOG_LEVEL
+            LOG_MAX_SIZE
+            LOG_MAX_FILES
+            GRAPHQL_ENDPOINT
+            DB_DATA_DIR
+            PUBLIC_CSV_FILE_UPLOAD_LIMIT
+            API_BASE_URL
+            ENABLE_OPENTELEMETRY
+            SERVICE_NAME
+            SERVICE_VERSION
+            DEPLOYMENT_ENVIRONMENT
+            TRACES_ENDPOINT
+            METRICS_ENDPOINT
+            LOGS_ENDPOINT
+            METRIC_READER_INTERVAL
+            CONSOLE_METRIC_READER_INTERVAL
+            SUMMARY_LOG_INTERVAL
+            PUBLIC_OPENREPLAY_INGEST_POINT
+            PUBLIC_ELASTIC_APM_SERVICE_NAME
+            PUBLIC_ELASTIC_APM_SERVER_URL
+            PUBLIC_ELASTIC_APM_SERVICE_VERSION
+            PUBLIC_ELASTIC_APM_ENVIRONMENT
           secrets: |
             "org_id=${{ secrets.ORG_ID }}"
             "project_id=${{ secrets.PROJECT_ID }}"
@@ -135,6 +163,7 @@ jobs:
       - name: Cleanup
         if: always()
         run: |
+          rm -f .env
           rm -f snyk.sarif snyk-docker.sarif
           docker image prune -f
           docker volume prune -f
