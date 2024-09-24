@@ -1,5 +1,10 @@
 /* src/instrumentation.ts */
 
+import { debug, log, warn, err } from "$utils/browserLogger";
+import { trace, context } from "@opentelemetry/api";
+
+log("Starting Application - Couchbase Capella GraphQL API Service");
+
 import {
   diag,
   DiagConsoleLogger,
@@ -20,6 +25,9 @@ import { BatchSpanProcessor } from "@opentelemetry/sdk-trace-base";
 import { MonitoredOTLPTraceExporter } from "./otlp/MonitoredOTLPTraceExporter";
 import { MonitoredOTLPMetricExporter } from "./otlp/MonitoredOTLPMetricExporter";
 import { MonitoredOTLPLogExporter } from "./otlp/MonitoredOTLPLogExporter";
+import type { SpanExporter } from "@opentelemetry/sdk-trace-base";
+import type { PushMetricExporter } from "@opentelemetry/sdk-metrics";
+import type { LogRecordExporter } from "@opentelemetry/sdk-logs";
 import {
   MeterProvider,
   PeriodicExportingMetricReader,
@@ -34,14 +42,24 @@ import { GraphQLInstrumentation } from "@opentelemetry/instrumentation-graphql";
 import * as api from "@opentelemetry/api-logs";
 import { backendConfig } from "$backendConfig";
 
+log("Staring Instrumentation............");
+
 const INSTRUMENTATION_ENABLED =
-  (process.env["ENABLE_OPENTELEMETRY"] as string) === "true";
-console.log("INSTRUMENTATION_ENABLED:", INSTRUMENTATION_ENABLED);
+  (Bun.env["ENABLE_OPENTELEMETRY"] as string) === "true";
+log("OpenTelemetry Instrumentation Status", { INSTRUMENTATION_ENABLED });
+
+log("OpenTelemetry Environment Variables", {
+  ENABLE_OPENTELEMETRY: Bun.env["ENABLE_OPENTELEMETRY"],
+  PARSED_INSTRUMENTATION_ENABLED: INSTRUMENTATION_ENABLED,
+});
+
+log("Parsed INSTRUMENTATION_ENABLED:", { INSTRUMENTATION_ENABLED });
 
 let sdk: NodeSDK | undefined;
 let meter: Meter | undefined;
 let httpRequestCounter: Counter | undefined;
 let httpResponseTimeHistogram: Histogram | undefined;
+let isInitialized = false;
 
 const createResource = async () => {
   return Resource.default().merge(
@@ -54,19 +72,22 @@ const createResource = async () => {
   );
 };
 
+const exporterTimeout = 300000; // 5 minutes
+
 const commonConfig = {
-  timeoutMillis: 120000,
+  timeoutMillis: exporterTimeout,
   concurrencyLimit: 100,
+  keepAlive: true,
 };
 
 export function initializeHttpMetrics() {
   if (INSTRUMENTATION_ENABLED && meter) {
-    console.debug("Initializing HTTP metrics");
+    log("Initializing HTTP metrics");
     try {
       httpRequestCounter = meter.createCounter("http_requests_total", {
         description: "Count of HTTP requests",
       });
-      console.debug("HTTP request counter created");
+      log("HTTP request counter created");
 
       httpResponseTimeHistogram = meter.createHistogram(
         "http_response_time_seconds",
@@ -74,14 +95,14 @@ export function initializeHttpMetrics() {
           description: "HTTP response time in seconds",
         },
       );
-      console.debug("HTTP response time histogram created");
+      log("HTTP response time histogram created");
 
-      console.debug("HTTP metrics initialized successfully");
+      log("HTTP metrics initialized successfully");
     } catch (error) {
-      console.error("Error initializing HTTP metrics:", error);
+      err("Error initializing HTTP metrics:", error);
     }
   } else {
-    console.debug(
+    log(
       "HTTP metrics initialization skipped (instrumentation disabled or meter not available)",
     );
   }
@@ -90,39 +111,53 @@ export function initializeHttpMetrics() {
 async function initializeOpenTelemetry() {
   if (INSTRUMENTATION_ENABLED) {
     try {
-      console.log("Initializing OpenTelemetry SDK...");
+      log("Initializing OpenTelemetry SDK...");
       diag.setLogger(new DiagConsoleLogger(), DiagLogLevel.INFO);
 
       const resource = await createResource();
 
-      const traceExporter = new MonitoredOTLPTraceExporter({
-        url: backendConfig.openTelemetry.TRACES_ENDPOINT,
-        headers: { "Content-Type": "application/json" },
-        ...commonConfig,
-      });
-      console.log("Metric exporter created with config:", {
+      const traceExporter = new MonitoredOTLPTraceExporter(
+        {
+          url: backendConfig.openTelemetry.TRACES_ENDPOINT,
+          headers: { "Content-Type": "application/json" },
+          ...commonConfig,
+        },
+        exporterTimeout,
+      ) as unknown as SpanExporter;
+
+      const otlpMetricExporter = new MonitoredOTLPMetricExporter(
+        {
+          url: backendConfig.openTelemetry.METRICS_ENDPOINT,
+          headers: { "Content-Type": "application/json" },
+          ...commonConfig,
+        },
+        exporterTimeout,
+      ) as unknown as PushMetricExporter;
+
+      log("Metric exporter created with timeout:", exporterTimeout);
+
+      const logExporter = new MonitoredOTLPLogExporter(
+        {
+          url: backendConfig.openTelemetry.LOGS_ENDPOINT,
+          headers: { "Content-Type": "application/json" },
+          ...commonConfig,
+        },
+        exporterTimeout,
+      ) as unknown as LogRecordExporter;
+
+      log("Traces exporter created with config:", {
         url: backendConfig.openTelemetry.TRACES_ENDPOINT,
         interval: backendConfig.openTelemetry.METRIC_READER_INTERVAL,
         summaryInterval: backendConfig.openTelemetry.SUMMARY_LOG_INTERVAL,
       });
 
-      const otlpMetricExporter = new MonitoredOTLPMetricExporter({
-        url: backendConfig.openTelemetry.METRICS_ENDPOINT,
-        headers: { "Content-Type": "application/json" },
-        ...commonConfig,
-      });
-      console.log("Metric exporter created with config:", {
+      log("Metrics exporter created with config:", {
         url: backendConfig.openTelemetry.METRICS_ENDPOINT,
         interval: backendConfig.openTelemetry.METRIC_READER_INTERVAL,
         summaryInterval: backendConfig.openTelemetry.SUMMARY_LOG_INTERVAL,
       });
 
-      const logExporter = new MonitoredOTLPLogExporter({
-        url: backendConfig.openTelemetry.LOGS_ENDPOINT,
-        headers: { "Content-Type": "application/json" },
-        ...commonConfig,
-      });
-      console.log("Metric exporter created with config:", {
+      log("Logs exporter created with config:", {
         url: backendConfig.openTelemetry.LOGS_ENDPOINT,
         interval: backendConfig.openTelemetry.METRIC_READER_INTERVAL,
         summaryInterval: backendConfig.openTelemetry.SUMMARY_LOG_INTERVAL,
@@ -133,9 +168,10 @@ async function initializeOpenTelemetry() {
         new BatchLogRecordProcessor(logExporter, {
           maxExportBatchSize: 100,
           scheduledDelayMillis: 10000,
-          exportTimeoutMillis: 60000,
+          exportTimeoutMillis: exporterTimeout,
         }),
       );
+
       api.logs.setGlobalLoggerProvider(loggerProvider);
 
       const otlpMetricReader = new PeriodicExportingMetricReader({
@@ -159,18 +195,18 @@ async function initializeOpenTelemetry() {
           backendConfig.openTelemetry.SERVICE_VERSION,
         );
         if (!meter) {
-          console.warn("Failed to get meter from global MeterProvider");
+          warn("Failed to get meter from global MeterProvider");
         } else {
-          console.debug("Meter created successfully");
+          log("Metrics Meter created successfully");
         }
       } catch (error) {
-        console.error("Error getting meter:", error);
+        err("Error getting meter:", error);
       }
 
       const batchSpanProcessor = new BatchSpanProcessor(traceExporter, {
         maxExportBatchSize: 512,
         scheduledDelayMillis: 5000,
-        exportTimeoutMillis: 30000,
+        exportTimeoutMillis: exporterTimeout,
       });
 
       sdk = new NodeSDK({
@@ -196,13 +232,13 @@ async function initializeOpenTelemetry() {
       });
 
       sdk.start();
-      console.log("OpenTelemetry SDK started with auto-instrumentation");
+      log("OpenTelemetry SDK started with auto-instrumentation");
 
       initializeHttpMetrics();
 
       process.on("SIGTERM", () => {
         const shutdownTimeout = setTimeout(() => {
-          console.error("SDK shutdown timed out, forcing exit");
+          err("SDK shutdown timed out, forcing exit");
           process.exit(1);
         }, 5000);
 
@@ -210,21 +246,31 @@ async function initializeOpenTelemetry() {
           ?.shutdown()
           .then(() => {
             clearTimeout(shutdownTimeout);
-            console.log("SDK shut down successfully");
-            process.exit(0);
+            log("SDK shut down successfully");
+            setTimeout(() => process.exit(0), 1000);
           })
           .catch((error) => {
             clearTimeout(shutdownTimeout);
-            console.error("Error shutting down SDK", error);
+            err("Error shutting down SDK", error);
             process.exit(1);
           });
       });
     } catch (error) {
-      console.error("Error initializing OpenTelemetry SDK:", error);
+      err("Error initializing OpenTelemetry SDK:", error);
     }
   } else {
-    console.log("OpenTelemetry instrumentation is disabled");
+    log("OpenTelemetry instrumentation is disabled");
   }
+
+  if (INSTRUMENTATION_ENABLED) {
+    if (!httpRequestCounter || !httpResponseTimeHistogram) {
+      err("HTTP metrics not properly initialized");
+    } else {
+      log("HTTP metrics initialized successfully");
+    }
+  }
+
+  isInitialized = true;
 }
 
 initializeOpenTelemetry().catch(console.error);
@@ -236,27 +282,25 @@ export function getMeter(): Meter | undefined {
 }
 
 export function recordHttpRequest(method: string, route: string) {
-  if (INSTRUMENTATION_ENABLED && httpRequestCounter) {
-    httpRequestCounter.add(1, { method, route });
-    console.debug(`Recorded HTTP request: method=${method}, route=${route}`);
-  } else if (!INSTRUMENTATION_ENABLED) {
-    console.debug(`Skipped recording HTTP request: instrumentation disabled`);
+  if (INSTRUMENTATION_ENABLED) {
+    if (httpRequestCounter) {
+      httpRequestCounter.add(1, { method, route });
+      debug(`Recorded HTTP request: method=${method}, route=${route}`);
+    } else {
+      err("HTTP request counter not initialized");
+    }
   } else {
-    console.debug(`Skipped recording HTTP request: counter not initialized`);
+    warn(`Skipped recording HTTP request: instrumentation disabled`);
+    warn("ENABLE_OPENTELEMETRY env var:", Bun.env["ENABLE_OPENTELEMETRY"]);
+    warn("INSTRUMENTATION_ENABLED:", INSTRUMENTATION_ENABLED);
   }
 }
 
 export function recordHttpResponseTime(duration: number) {
-  if (INSTRUMENTATION_ENABLED && httpResponseTimeHistogram) {
-    httpResponseTimeHistogram.record(duration / 1000); // Convert ms to seconds
-    console.debug(`Recorded HTTP response time: ${duration}ms`);
-  } else if (!INSTRUMENTATION_ENABLED) {
-    console.debug(
-      `Skipped recording HTTP response time: instrumentation disabled`,
-    );
-  } else {
-    console.debug(
-      `Skipped recording HTTP response time: histogram not initialized`,
-    );
+  if (INSTRUMENTATION_ENABLED && isInitialized && httpResponseTimeHistogram) {
+    const activeContext = context.active();
+    const span = trace.getSpan(activeContext);
+    const traceId = span?.spanContext().traceId;
+    httpResponseTimeHistogram.record(duration / 1000, { traceId });
   }
 }
