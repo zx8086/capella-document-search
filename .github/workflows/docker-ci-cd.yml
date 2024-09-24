@@ -1,5 +1,4 @@
 name: Docker CI/CD with Bun and Snyk
-
 on:
   push:
     branches: ["master"]
