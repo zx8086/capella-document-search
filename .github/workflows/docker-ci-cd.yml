@@ -35,11 +35,6 @@ jobs:
           bun pm untrusted || true
           bun pm trust --all || true
 
-      - name: Debug .env file
-        run: |
-          echo "Contents of .env file:"
-          cat .env
-
       - name: Create .env file
         run: |
           cat << EOF > .env
@@ -67,6 +62,11 @@ jobs:
           PUBLIC_ELASTIC_APM_SERVICE_VERSION=${{ vars.PUBLIC_ELASTIC_APM_SERVICE_VERSION }}
           PUBLIC_ELASTIC_APM_ENVIRONMENT=${{ vars.PUBLIC_ELASTIC_APM_ENVIRONMENT }}
           EOF
+
+      - name: Debug .env file
+        run: |
+          echo "Contents of .env file:"
+          cat .env
 
       - name: Run Snyk checks
         continue-on-error: true
