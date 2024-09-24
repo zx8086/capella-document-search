@@ -5,6 +5,9 @@ FROM oven/bun:latest AS base
 WORKDIR /app
 COPY .env .
 
+# Load environment variables from .env file
+RUN set -a && . ./.env && set +a
+
 # Define build arguments and set environment variables
 ARG ENABLE_FILE_LOGGING
 ARG LOG_LEVEL
@@ -69,9 +72,6 @@ FROM base AS release
 COPY --from=deps /app/node_modules ./node_modules
 COPY --from=builder /app ./
 COPY package.json bunfig.toml svelte.config.js vite.config.ts ./
-
-# Load environment variables from .env file
-RUN set -a && . ./.env && set +a
 
 # Run build after environment variables are set
 RUN bun run build
