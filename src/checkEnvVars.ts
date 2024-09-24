@@ -44,11 +44,15 @@ export function getEnvNumberOrDefault(
 }
 
 export function getEnvBooleanOrThrow(key: string): boolean {
-  const value = getEnvOrThrow(key).toLowerCase();
-  if (value !== "true" && value !== "false") {
-    throw new Error(`Environment variable ${key} is not a valid boolean`);
+  const value = getEnvOrThrow(key);
+  console.log(`Checking boolean env var ${key}, raw value: "${value}"`);
+  const lowercaseValue = value.toLowerCase();
+  if (lowercaseValue !== "true" && lowercaseValue !== "false") {
+    throw new Error(
+      `Environment variable ${key} is not a valid boolean. Got: "${value}"`,
+    );
   }
-  return value === "true";
+  return lowercaseValue === "true";
 }
 
 export function getEnvBooleanOrDefault(
