@@ -63,11 +63,6 @@ jobs:
           PUBLIC_ELASTIC_APM_ENVIRONMENT=${{ vars.PUBLIC_ELASTIC_APM_ENVIRONMENT }}
           EOF
 
-      - name: Debug .env file
-        run: |
-          echo "Contents of .env file:"
-          cat .env
-
       - name: Run Snyk checks
         continue-on-error: true
         env:
@@ -131,23 +126,17 @@ jobs:
             PUBLIC_ELASTIC_APM_SERVER_URL=${{ vars.PUBLIC_ELASTIC_APM_SERVER_URL }}
             PUBLIC_ELASTIC_APM_SERVICE_VERSION=${{ vars.PUBLIC_ELASTIC_APM_SERVICE_VERSION }}
             PUBLIC_ELASTIC_APM_ENVIRONMENT=${{ vars.PUBLIC_ELASTIC_APM_ENVIRONMENT }}
-          secrets: |
-            "org_id=${{ secrets.ORG_ID }}"
-            "project_id=${{ secrets.PROJECT_ID }}"
-            "cluster_id=${{ secrets.CLUSTER_ID }}"
-            "bucket_id=${{ secrets.BUCKET_ID }}"
-            "auth_token=${{ secrets.AUTH_TOKEN }}"
-            "openreplay_key=${{ secrets.PUBLIC_OPENREPLAY_PROJECT_KEY }}"
 
       - name: Run Snyk to check Docker image for vulnerabilities
         continue-on-error: true
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
         run: |
-          docker run --rm -e SNYK_TOKEN -v /var/run/docker.sock:/var/run/docker.sock -v $(pwd):/app snyk/snyk:docker snyk container test zx8086/capella-document-search:latest --file=/app/Dockerfile --severity-threshold=high --sarif-file-output=/app/snyk-docker.sarif
+          snyk container test zx8086/capella-document-search:latest --severity-threshold=high --sarif-file-output=snyk-docker.sarif --debug || true
+          snyk container monitor zx8086/capella-document-search:latest || true
 
       - name: Upload Docker Snyk scan results to GitHub Code Scanning
-        if: hashFiles('snyk-docker.sarif') != ''
+        if: always() && hashFiles('snyk-docker.sarif') != ''
         uses: github/codeql-action/upload-sarif@v3
         with:
           sarif_file: snyk-docker.sarif
@@ -160,6 +149,12 @@ jobs:
           rm -f snyk.sarif snyk-docker.sarif
           docker image prune -f
           docker volume prune -f
+          echo "Cleanup completed"
+
+      - name: Install latest Snyk
+        run: |
+          npm install -g snyk@latest
+          snyk --version
 
       - name: Inspect Docker image
         run: |
