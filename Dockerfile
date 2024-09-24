@@ -3,12 +3,8 @@
 FROM oven/bun:latest AS base
 
 WORKDIR /app
-COPY .env .
 
-# Load environment variables from .env file
-RUN set -a && . ./.env && set +a
-
-# Define build arguments and set environment variables
+# Define build arguments
 ARG ENABLE_FILE_LOGGING
 ARG LOG_LEVEL
 ARG LOG_MAX_SIZE
@@ -33,6 +29,7 @@ ARG PUBLIC_ELASTIC_APM_SERVER_URL
 ARG PUBLIC_ELASTIC_APM_SERVICE_VERSION
 ARG PUBLIC_ELASTIC_APM_ENVIRONMENT
 
+# Set environment variables
 ENV ENABLE_FILE_LOGGING=${ENABLE_FILE_LOGGING}
 ENV LOG_LEVEL=${LOG_LEVEL}
 ENV LOG_MAX_SIZE=${LOG_MAX_SIZE}
@@ -57,6 +54,9 @@ ENV PUBLIC_ELASTIC_APM_SERVER_URL=${PUBLIC_ELASTIC_APM_SERVER_URL}
 ENV PUBLIC_ELASTIC_APM_SERVICE_VERSION=${PUBLIC_ELASTIC_APM_SERVICE_VERSION}
 ENV PUBLIC_ELASTIC_APM_ENVIRONMENT=${PUBLIC_ELASTIC_APM_ENVIRONMENT}
 
+# Print environment variables for debugging
+RUN env
+
 # Dependencies
 FROM base AS deps
 COPY package.json bun.lockb ./
@@ -73,7 +73,10 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY --from=builder /app ./
 COPY package.json bunfig.toml svelte.config.js vite.config.ts ./
 
-# Run build after environment variables are set
+# Before running the build command, print environment variables again
+RUN env
+
+# Run build
 RUN bun run build
 
 # Ensure the src/data directory exists
