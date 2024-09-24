@@ -123,4 +123,3 @@ WORKDIR /app
 
 # Run the application
 CMD ["/app/start.sh"]
-/d
