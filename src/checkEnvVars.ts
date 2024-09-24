@@ -45,7 +45,12 @@ export function getEnvNumberOrDefault(
 
 export function getEnvBooleanOrThrow(key: string): boolean {
   const value = getEnvOrThrow(key);
-  console.log(`Checking boolean env var ${key}, raw value: "${value}"`);
+  console.log(
+    `Checking boolean env var ${key}, raw value: "${value}", type: ${typeof value}`,
+  );
+  if (value === undefined || value === "") {
+    throw new Error(`Environment variable ${key} is not set`);
+  }
   const lowercaseValue = value.toLowerCase();
   if (lowercaseValue !== "true" && lowercaseValue !== "false") {
     throw new Error(

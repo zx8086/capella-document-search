@@ -1,19 +1,11 @@
-#Dockerfile
+# Dockerfile
 
-# Use the official Bun image
-# Note: As of the last check, this image contains a known vulnerability:
-# Critical severity vulnerability found in zlib/zlib1g
-# Description: Integer Overflow or Wraparound
-# Info: https://security.snyk.io/vuln/SNYK-DEBIAN11-ZLIB-6008961
-# This vulnerability is present in the base image and cannot be immediately resolved.
 FROM oven/bun:latest AS base
 
-# Set working directory
 WORKDIR /app
 COPY .env .
 
-
-# Define build arguments
+# Define build arguments and set environment variables
 ARG ENABLE_FILE_LOGGING
 ARG LOG_LEVEL
 ARG LOG_MAX_SIZE
@@ -38,7 +30,6 @@ ARG PUBLIC_ELASTIC_APM_SERVER_URL
 ARG PUBLIC_ELASTIC_APM_SERVICE_VERSION
 ARG PUBLIC_ELASTIC_APM_ENVIRONMENT
 
-# Set environment variables
 ENV ENABLE_FILE_LOGGING=${ENABLE_FILE_LOGGING}
 ENV LOG_LEVEL=${LOG_LEVEL}
 ENV LOG_MAX_SIZE=${LOG_MAX_SIZE}
@@ -62,6 +53,8 @@ ENV PUBLIC_ELASTIC_APM_SERVICE_NAME=${PUBLIC_ELASTIC_APM_SERVICE_NAME}
 ENV PUBLIC_ELASTIC_APM_SERVER_URL=${PUBLIC_ELASTIC_APM_SERVER_URL}
 ENV PUBLIC_ELASTIC_APM_SERVICE_VERSION=${PUBLIC_ELASTIC_APM_SERVICE_VERSION}
 ENV PUBLIC_ELASTIC_APM_ENVIRONMENT=${PUBLIC_ELASTIC_APM_ENVIRONMENT}
+
+RUN env | sort
 
 # Dependencies
 FROM base AS deps
@@ -115,11 +108,8 @@ RUN echo '#!/bin/sh\n\
     echo "Starting application..."\n\
     exec bun --preload /app/set-global.js ./build/index.js' > /app/start.sh && chmod +x /app/start.sh
 
-# Expose the port the app runs on
 EXPOSE 3000
 
-# Set the working directory
 WORKDIR /app
 
-# Run the application
 CMD ["/app/start.sh"]
