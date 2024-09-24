@@ -10,6 +10,8 @@ FROM oven/bun:latest AS base
 
 # Set working directory
 WORKDIR /app
+COPY .env .
+
 
 # Define build arguments
 ARG ENABLE_FILE_LOGGING
@@ -91,6 +93,9 @@ RUN --mount=type=secret,id=org_id \
     echo "AUTH_TOKEN=$(cat /run/secrets/auth_token)" >> /app/.env && \
     echo "PUBLIC_OPENREPLAY_PROJECT_KEY=$(cat /run/secrets/openreplay_key)" >> /app/.env
 
+# Load environment variables from .env file
+RUN set -a && . ./.env && set +a
+
 # Run build after secrets are set in .env file
 RUN bun run build
 
@@ -118,3 +123,4 @@ WORKDIR /app
 
 # Run the application
 CMD ["/app/start.sh"]
+/d
