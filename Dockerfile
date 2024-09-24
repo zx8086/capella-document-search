@@ -4,25 +4,25 @@ FROM oven/bun:latest AS base
 
 WORKDIR /app
 
-# Define build arguments and set environment variables with default empty values
-ARG ENABLE_FILE_LOGGING=""
-ARG LOG_LEVEL=""
-ARG LOG_MAX_SIZE=""
-ARG LOG_MAX_FILES=""
-ARG GRAPHQL_ENDPOINT=""
-ARG DB_DATA_DIR=""
-ARG PUBLIC_CSV_FILE_UPLOAD_LIMIT=""
-ARG API_BASE_URL=""
-ARG ENABLE_OPENTELEMETRY=""
-ARG SERVICE_NAME=""
-ARG SERVICE_VERSION=""
-ARG DEPLOYMENT_ENVIRONMENT=""
-ARG TRACES_ENDPOINT=""
-ARG METRICS_ENDPOINT=""
-ARG LOGS_ENDPOINT=""
-ARG METRIC_READER_INTERVAL=""
-ARG CONSOLE_METRIC_READER_INTERVAL=""
-ARG SUMMARY_LOG_INTERVAL=""
+# Define build arguments and set environment variables with default values
+ARG ENABLE_FILE_LOGGING="false"
+ARG LOG_LEVEL="info"
+ARG LOG_MAX_SIZE="10m"
+ARG LOG_MAX_FILES="7d"
+ARG GRAPHQL_ENDPOINT="http://localhost:4000/graphql"
+ARG DB_DATA_DIR="/app/data"
+ARG PUBLIC_CSV_FILE_UPLOAD_LIMIT="5000000"
+ARG API_BASE_URL="http://localhost:3000"
+ARG ENABLE_OPENTELEMETRY="false"
+ARG SERVICE_NAME="capella-document-search"
+ARG SERVICE_VERSION="1.0.0"
+ARG DEPLOYMENT_ENVIRONMENT="development"
+ARG TRACES_ENDPOINT="http://localhost:4318/v1/traces"
+ARG METRICS_ENDPOINT="http://localhost:4318/v1/metrics"
+ARG LOGS_ENDPOINT="http://localhost:4318/v1/logs"
+ARG METRIC_READER_INTERVAL="60000"
+ARG CONSOLE_METRIC_READER_INTERVAL="60000"
+ARG SUMMARY_LOG_INTERVAL="300000"
 ARG PUBLIC_OPENREPLAY_INGEST_POINT=""
 ARG PUBLIC_ELASTIC_APM_SERVICE_NAME=""
 ARG PUBLIC_ELASTIC_APM_SERVER_URL=""
@@ -60,7 +60,7 @@ RUN env
 FROM base AS deps
 COPY package.json bun.lockb ./
 RUN --mount=type=cache,target=/root/.bun \
-    bun install --frozen-lockfile
+    bun install
 
 # Builder
 FROM base AS builder
