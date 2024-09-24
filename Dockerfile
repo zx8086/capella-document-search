@@ -54,8 +54,6 @@ ENV PUBLIC_ELASTIC_APM_SERVER_URL=${PUBLIC_ELASTIC_APM_SERVER_URL}
 ENV PUBLIC_ELASTIC_APM_SERVICE_VERSION=${PUBLIC_ELASTIC_APM_SERVICE_VERSION}
 ENV PUBLIC_ELASTIC_APM_ENVIRONMENT=${PUBLIC_ELASTIC_APM_ENVIRONMENT}
 
-RUN env | sort
-
 # Dependencies
 FROM base AS deps
 COPY package.json bun.lockb ./
@@ -72,24 +70,10 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY --from=builder /app ./
 COPY package.json bunfig.toml svelte.config.js vite.config.ts ./
 
-# Add the secret mounting here
-RUN --mount=type=secret,id=org_id \
-    --mount=type=secret,id=project_id \
-    --mount=type=secret,id=cluster_id \
-    --mount=type=secret,id=bucket_id \
-    --mount=type=secret,id=auth_token \
-    --mount=type=secret,id=openreplay_key \
-    echo "ORG_ID=$(cat /run/secrets/org_id)" >> /app/.env && \
-    echo "PROJECT_ID=$(cat /run/secrets/project_id)" >> /app/.env && \
-    echo "CLUSTER_ID=$(cat /run/secrets/cluster_id)" >> /app/.env && \
-    echo "BUCKET_ID=$(cat /run/secrets/bucket_id)" >> /app/.env && \
-    echo "AUTH_TOKEN=$(cat /run/secrets/auth_token)" >> /app/.env && \
-    echo "PUBLIC_OPENREPLAY_PROJECT_KEY=$(cat /run/secrets/openreplay_key)" >> /app/.env
-
 # Load environment variables from .env file
 RUN set -a && . ./.env && set +a
 
-# Run build after secrets are set in .env file
+# Run build after environment variables are set
 RUN bun run build
 
 # Ensure the src/data directory exists

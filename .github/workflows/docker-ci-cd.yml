@@ -3,6 +3,8 @@ name: Docker CI/CD with Bun and Snyk
 on:
   push:
     branches: ["master"]
+  pull_request:
+    branches: ["master"]
 
 permissions:
   contents: read
@@ -14,13 +16,17 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v1
+        with:
+          bun-version: latest
+
       - name: Cache Bun dependencies
         uses: actions/cache@v3
         with:
           path: ~/.bun/install/cache
-          key: ${{ runner.os }}-bun-${{ github.repository }}-${{ hashFiles('**/bun.lockb') }}
+          key: ${{ runner.os }}-bun-${{ hashFiles('**/bun.lockb') }}
           restore-keys: |
-            ${{ runner.os }}-bun-${{ github.repository }}-
             ${{ runner.os }}-bun-
 
       - name: Install dependencies and run post-install scripts
@@ -57,17 +63,12 @@ jobs:
           PUBLIC_ELASTIC_APM_ENVIRONMENT=${{ vars.PUBLIC_ELASTIC_APM_ENVIRONMENT }}
           EOF
 
-      - name: Debug Environment Variables
-        run: |
-          echo "ENABLE_FILE_LOGGING: ${{ vars.ENABLE_FILE_LOGGING }}"
-          echo "All vars:"
-          env | sort
-
       - name: Run Snyk checks
         continue-on-error: true
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
         run: |
+          export $(grep -v '^#' .env | xargs)
           bun run snyk test --file=package.json --sarif-file-output=snyk.sarif
           bun run snyk monitor --file=package.json
 
@@ -86,13 +87,21 @@ jobs:
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
+        with:
+          version: "lab:latest"
+          driver: cloud
+          endpoint: "zx8086/cldbuild"
+          install: true
 
       - name: Build and push Docker image
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         with:
           context: .
-          push: true
+          push: ${{ github.event_name != 'pull_request' }}
           tags: zx8086/capella-document-search:latest
+          platforms: linux/arm64,linux/amd64
+          target: release
+          outputs: ${{ github.event_name == 'pull_request' && 'type=cacheonly' || 'type=registry' }}
           build-args: |
             ENABLE_FILE_LOGGING=${{ vars.ENABLE_FILE_LOGGING }}
             LOG_LEVEL=${{ vars.LOG_LEVEL }}
@@ -117,13 +126,6 @@ jobs:
             PUBLIC_ELASTIC_APM_SERVER_URL=${{ vars.PUBLIC_ELASTIC_APM_SERVER_URL }}
             PUBLIC_ELASTIC_APM_SERVICE_VERSION=${{ vars.PUBLIC_ELASTIC_APM_SERVICE_VERSION }}
             PUBLIC_ELASTIC_APM_ENVIRONMENT=${{ vars.PUBLIC_ELASTIC_APM_ENVIRONMENT }}
-          secrets: |
-            "org_id=${{ secrets.ORG_ID }}"
-            "project_id=${{ secrets.PROJECT_ID }}"
-            "cluster_id=${{ secrets.CLUSTER_ID }}"
-            "bucket_id=${{ secrets.BUCKET_ID }}"
-            "auth_token=${{ secrets.AUTH_TOKEN }}"
-            "openreplay_key=${{ secrets.PUBLIC_OPENREPLAY_PROJECT_KEY }}"
 
       - name: Run Snyk to check Docker image for vulnerabilities
         continue-on-error: true
@@ -132,39 +134,12 @@ jobs:
         run: |
           docker run --rm -e SNYK_TOKEN -v /var/run/docker.sock:/var/run/docker.sock -v $(pwd):/app snyk/snyk:docker snyk container test zx8086/capella-document-search:latest --file=/app/Dockerfile --severity-threshold=high --sarif-file-output=/app/snyk-docker.sarif
 
-      - name: Run Snyk monitor for Docker image
-        continue-on-error: true
-        env:
-          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
-        run: |
-          docker run --rm -e SNYK_TOKEN -v /var/run/docker.sock:/var/run/docker.sock -v $(pwd):/app snyk/snyk:docker snyk container monitor zx8086/capella-document-search:latest --file=/app/Dockerfile || true
-
       - name: Upload Docker Snyk scan results to GitHub Code Scanning
         if: hashFiles('snyk-docker.sarif') != ''
         uses: github/codeql-action/upload-sarif@v3
         with:
           sarif_file: snyk-docker.sarif
           category: snyk-docker
-
-      - name: Deploy container
-        run: |
-          docker stop capella-document-search || true
-          docker rm capella-document-search || true
-
-          # Generate environment variable arguments for runtime variables
-          ENV_ARGS=$(env | grep -E '^(PUBLIC_|ENABLE_|LOG_|GRAPHQL_|DB_|API_|SERVICE_|DEPLOYMENT_|TRACES_|METRICS_|LOGS_)' | sed 's/^/-e /')
-
-          # Run the container with generated environment variables and secrets
-          docker run -d --name capella-document-search \
-            -p 3000:3000 \
-            $ENV_ARGS \
-            -e ORG_ID=${{ secrets.ORG_ID }} \
-            -e PROJECT_ID=${{ secrets.PROJECT_ID }} \
-            -e CLUSTER_ID=${{ secrets.CLUSTER_ID }} \
-            -e BUCKET_ID=${{ secrets.BUCKET_ID }} \
-            -e AUTH_TOKEN=${{ secrets.AUTH_TOKEN }} \
-            -e PUBLIC_OPENREPLAY_PROJECT_KEY=${{ secrets.PUBLIC_OPENREPLAY_PROJECT_KEY }} \
-            zx8086/capella-document-search:latest
 
       - name: Cleanup
         if: always()
@@ -173,3 +148,8 @@ jobs:
           rm -f snyk.sarif snyk-docker.sarif
           docker image prune -f
           docker volume prune -f
+
+      - name: Inspect Docker image
+        run: |
+          docker image inspect zx8086/capella-document-search:latest
+          docker history zx8086/capella-document-search:latest
