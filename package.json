@@ -59,7 +59,7 @@
     "@opentelemetry/sdk-trace-node": "^1.25.1",
     "@opentelemetry/semantic-conventions": "^1.26.0",
     "@opentelemetry/tracing": "^0.24.0",
-    "@opentelemetry/winston-transport": "^0.5.0",
+    "@opentelemetry/winston-transport": "^0.6.0",
     "@slack/webhook": "^7.0.3",
     "@snyk/protect": "latest",
     "@types/papaparse": "^5.3.14",
