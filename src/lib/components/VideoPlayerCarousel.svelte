@@ -17,7 +17,7 @@
     let isInitialized = false;
     let isPlaying = false;
 
-    const videoBasePath = "/idle-videos/";
+    const videoBasePath = "https://d2bgp0ri487o97.cloudfront.net/idle-videos/";
     const effectiveVideoBasePath =
         videoBasePath.trim() === "" ? "/idle-videos/" : videoBasePath;
 
@@ -43,18 +43,43 @@
         loadAndPlayVideo();
     }
 
-    async function loadVideo(filename: string) {
-        const response = await fetch(`${videoBasePath}${filename}`);
-        if (!response.ok) throw new Error("Video load failed");
-        return URL.createObjectURL(await response.blob());
+    function loadVideo(filename: string): string {
+        return `${videoBasePath}${filename}`;
     }
 
+    let preloadedVideos: { [key: string]: string } = {};
+    let preloadIndex = 0;
+
+    async function preloadNextVideo() {
+        if (videos.length > 0 && preloadIndex < videos.length) {
+            const videoToPreload = videos[preloadIndex];
+            if (!preloadedVideos[videoToPreload]) {
+                try {
+                    const videoUrl = loadVideo(videoToPreload);
+                    preloadedVideos[videoToPreload] = videoUrl;
+                    console.debug(`Preloaded video: ${videoToPreload}`);
+                } catch (error) {
+                    console.error(
+                        `Error preloading video ${videoToPreload}:`,
+                        error,
+                    );
+                }
+            }
+            preloadIndex = (preloadIndex + 1) % videos.length;
+        }
+    }
+
+    // Modify loadAndPlayVideo to use preloaded videos
     async function loadAndPlayVideo() {
         if (videoElement && videos[currentVideoIndex] && !isPlaying) {
             try {
-                const videoUrl = await loadVideo(videos[currentVideoIndex]);
+                let videoUrl =
+                    preloadedVideos[videos[currentVideoIndex]] ||
+                    loadVideo(videos[currentVideoIndex]);
                 videoElement.src = videoUrl;
                 await playVideo();
+                // Preload the next video after starting playback
+                preloadNextVideo();
             } catch (error) {
                 console.error("Error loading video:", error);
             }
@@ -105,6 +130,7 @@
         if (browser && isVisible) {
             window.addEventListener("mousemove", handleUserActivity);
             window.addEventListener("keydown", handleUserActivity);
+            preloadNextVideo();
         }
     });
 
@@ -148,7 +174,7 @@
                 on:error={handleVideoError}
             >
                 <source
-                    src={getVideoPath(videos[currentVideoIndex])}
+                    src={loadVideo(videos[currentVideoIndex])}
                     type="video/mp4"
                 />
                 Your browser does not support the video tag.

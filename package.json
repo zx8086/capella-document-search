@@ -5,10 +5,11 @@
   "type": "module",
   "scripts": {
     "dev": "bun --bun vite dev",
-    "build": "bun --bun vite build && cp -R static/idle-videos build/idle-videos",
+    "build": "bun --bun vite build",
+    "build:docker": "DISABLE_OPENTELEMETRY=true NODE_ENV=production bun --bun vite build",
     "preview": "bun --bun vite preview --host",
     "build:no-telemetry": "DISABLE_OPENTELEMETRY=true bun --bun vite build",
-    "start": "bun ./build/index.js",
+    "start": "bun --preload ./src/instrumentation.ts ./build/index.js",
     "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
     "check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
     "prepublish": "bun run snyk-protect",

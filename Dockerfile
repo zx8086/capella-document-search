@@ -1,101 +1,109 @@
 # Dockerfile
 
+# Use the official Bun image
+# Note: As of the last check, this image contains a known vulnerability:
+# Critical severity vulnerability found in zlib/zlib1g
+# Description: Integer Overflow or Wraparound
+# Info: https://security.snyk.io/vuln/SNYK-DEBIAN11-ZLIB-6008961
+# This vulnerability is present in the base image and cannot be immediately resolved.
+# Use the official Bun image
 FROM oven/bun:latest AS base
 
-WORKDIR /app
+# Set common environment variables
+ENV APP_ROOT=/usr/src/app
+WORKDIR ${APP_ROOT}
 
-# Define build arguments and set environment variables with default values
-ARG ENABLE_FILE_LOGGING="false"
-ARG LOG_LEVEL="info"
-ARG LOG_MAX_SIZE="10m"
-ARG LOG_MAX_FILES="7d"
-ARG GRAPHQL_ENDPOINT="http://localhost:4000/graphql"
-ARG DB_DATA_DIR="/app/data"
-ARG PUBLIC_CSV_FILE_UPLOAD_LIMIT="5000000"
-ARG API_BASE_URL="http://localhost:3000"
-ARG ENABLE_OPENTELEMETRY="false"
-ARG SERVICE_NAME="capella-document-search"
-ARG SERVICE_VERSION="1.0.0"
-ARG DEPLOYMENT_ENVIRONMENT="development"
-ARG TRACES_ENDPOINT="http://localhost:4318/v1/traces"
-ARG METRICS_ENDPOINT="http://localhost:4318/v1/metrics"
-ARG LOGS_ENDPOINT="http://localhost:4318/v1/logs"
-ARG METRIC_READER_INTERVAL="60000"
-ARG CONSOLE_METRIC_READER_INTERVAL="60000"
-ARG SUMMARY_LOG_INTERVAL="300000"
-ARG PUBLIC_OPENREPLAY_INGEST_POINT=""
-ARG PUBLIC_ELASTIC_APM_SERVICE_NAME=""
-ARG PUBLIC_ELASTIC_APM_SERVER_URL=""
-ARG PUBLIC_ELASTIC_APM_SERVICE_VERSION=""
-ARG PUBLIC_ELASTIC_APM_ENVIRONMENT=""
+# Create necessary directories
+RUN mkdir -p ${APP_ROOT}/logs
 
-ENV ENABLE_FILE_LOGGING=${ENABLE_FILE_LOGGING}
-ENV LOG_LEVEL=${LOG_LEVEL}
-ENV LOG_MAX_SIZE=${LOG_MAX_SIZE}
-ENV LOG_MAX_FILES=${LOG_MAX_FILES}
-ENV GRAPHQL_ENDPOINT=${GRAPHQL_ENDPOINT}
-ENV DB_DATA_DIR=${DB_DATA_DIR}
-ENV PUBLIC_CSV_FILE_UPLOAD_LIMIT=${PUBLIC_CSV_FILE_UPLOAD_LIMIT}
-ENV API_BASE_URL=${API_BASE_URL}
-ENV ENABLE_OPENTELEMETRY=${ENABLE_OPENTELEMETRY}
-ENV SERVICE_NAME=${SERVICE_NAME}
-ENV SERVICE_VERSION=${SERVICE_VERSION}
-ENV DEPLOYMENT_ENVIRONMENT=${DEPLOYMENT_ENVIRONMENT}
-ENV TRACES_ENDPOINT=${TRACES_ENDPOINT}
-ENV METRICS_ENDPOINT=${METRICS_ENDPOINT}
-ENV LOGS_ENDPOINT=${LOGS_ENDPOINT}
-ENV METRIC_READER_INTERVAL=${METRIC_READER_INTERVAL}
-ENV CONSOLE_METRIC_READER_INTERVAL=${CONSOLE_METRIC_READER_INTERVAL}
-ENV SUMMARY_LOG_INTERVAL=${SUMMARY_LOG_INTERVAL}
-ENV PUBLIC_OPENREPLAY_INGEST_POINT=${PUBLIC_OPENREPLAY_INGEST_POINT}
-ENV PUBLIC_ELASTIC_APM_SERVICE_NAME=${PUBLIC_ELASTIC_APM_SERVICE_NAME}
-ENV PUBLIC_ELASTIC_APM_SERVER_URL=${PUBLIC_ELASTIC_APM_SERVER_URL}
-ENV PUBLIC_ELASTIC_APM_SERVICE_VERSION=${PUBLIC_ELASTIC_APM_SERVICE_VERSION}
-ENV PUBLIC_ELASTIC_APM_ENVIRONMENT=${PUBLIC_ELASTIC_APM_ENVIRONMENT}
-
-# Print environment variables for debugging
-RUN env
-
-# Dependencies
+# Install dependencies stage
 FROM base AS deps
-COPY package.json bun.lockb ./
-RUN --mount=type=cache,target=/root/.bun \
-    bun install
 
-# Builder
-FROM base AS builder
-COPY --from=deps /app/node_modules ./node_modules
+# Copy only package.json and lockfile
+COPY package.json bun.lockb ./
+
+# Install dependencies
+RUN --mount=type=cache,target=/root/.bun \
+    bun install --frozen-lockfile
+
+# Build stage
+FROM deps AS builder
+
+# Set environment variables for build
+ENV NODE_ENV=production
+ENV DISABLE_OPENTELEMETRY=true
+
+# Copy all source files
 COPY . .
 
-# Release
-FROM base AS release
-COPY --from=deps /app/node_modules ./node_modules
-COPY --from=builder /app ./
-COPY package.json bunfig.toml svelte.config.js vite.config.ts ./
+# Build the application
+RUN echo "Starting build process..." && \
+    bun run build:docker
 
-# Before running the build command, print environment variables again
-RUN env
+# Development stage
+FROM deps AS development
+ENV NODE_ENV=development
+COPY . .
+CMD ["bun", "run", "dev"]
 
-# Run build
-RUN bun run build
+# Final release stage
+FROM deps AS release
 
-# Ensure the src/data directory exists
-RUN mkdir -p /app/src/data && chown -R bun:bun /app/src/data
+# Set Node environment
+ENV NODE_ENV=production
 
-# Create a script to set global variables and start the application
+# Copy built files from builder stage
+COPY --from=builder ${APP_ROOT}/build ${APP_ROOT}/build
+COPY --from=builder ${APP_ROOT}/static ${APP_ROOT}/static
+
+# Set default values for environment variables
+ENV ENABLE_FILE_LOGGING=true \
+    LOG_LEVEL=log \
+    LOG_MAX_SIZE=20m \
+    LOG_MAX_FILES=14d \
+    GRAPHQL_ENDPOINT=http://localhost:4000/graphql \
+    DB_DATA_DIR=src/data \
+    PUBLIC_CSV_FILE_UPLOAD_LIMIT=50 \
+    PUBLIC_VIDEO_BASE_URL="" \
+    API_BASE_URL=https://cloudapi.cloud.couchbase.com/v4 \
+    ORG_ID=9d75c6a4-2ec3-4a6c-8574-b3842eeaa4b5 \
+    PROJECT_ID=1c249d82-f799-4b08-a8c0-18f7088e5049 \
+    CLUSTER_ID=2091944c-177f-450e-9266-9761679ebc73 \
+    BUCKET_ID=ZGVmYXVsdA== \
+    ENABLE_OPENTELEMETRY=true \
+    SERVICE_NAME="Capella Document Search" \
+    SERVICE_VERSION=2.0.0 \
+    DEPLOYMENT_ENVIRONMENT=production \
+    TRACES_ENDPOINT=https://otel-http-traces.siobytes.com \
+    METRICS_ENDPOINT=https://otel-http-metrics.siobytes.com \
+    LOGS_ENDPOINT=https://otel-http-logs.siobytes.com \
+    METRIC_READER_INTERVAL=60000 \
+    CONSOLE_METRIC_READER_INTERVAL=60000 \
+    SUMMARY_LOG_INTERVAL=300000 \
+    PUBLIC_OPENREPLAY_INGEST_POINT=https://openreplay.prd.shared-services.eu.pvh.cloud/ingest \
+    PUBLIC_ELASTIC_APM_SERVICE_NAME="Capella Document Search" \
+    PUBLIC_ELASTIC_APM_SERVER_URL=https://apm.siobytes.com \
+    PUBLIC_ELASTIC_APM_SERVICE_VERSION=2.0.0 \
+    PUBLIC_ELASTIC_APM_ENVIRONMENT=production
+
+# Create a script to set ENABLE_OPENTELEMETRY global variable and start the application
 RUN echo '#!/bin/sh\n\
-    echo "ENABLE_OPENTELEMETRY is set to: $ENABLE_OPENTELEMETRY"\n\
     if [ "$ENABLE_OPENTELEMETRY" = "true" ]; then\n\
-    echo "globalThis.INSTRUMENTATION_ENABLED = true;" > /app/set-global.js\n\
+    echo "globalThis.INSTRUMENTATION_ENABLED = true;" > ${APP_ROOT}/set-global.js\n\
     else\n\
-    echo "globalThis.INSTRUMENTATION_ENABLED = false;" > /app/set-global.js\n\
+    echo "globalThis.INSTRUMENTATION_ENABLED = false;" > ${APP_ROOT}/set-global.js\n\
     fi\n\
-    echo "Contents of set-global.js:"\n\
-    cat /app/set-global.js\n\
-    echo "Starting application..."\n\
-    exec bun --preload /app/set-global.js ./build/index.js' > /app/start.sh && chmod +x /app/start.sh
+    exec bun --preload ${APP_ROOT}/set-global.js ${APP_ROOT}/build/index.js\n\
+    ' > ${APP_ROOT}/start.sh && chmod +x ${APP_ROOT}/start.sh
 
+# Set ownership of app directory to bun user
+RUN chown -R bun:bun ${APP_ROOT}
+
+# Switch to non-root user
 USER bun
+
+# Expose the port the app runs on
 EXPOSE 3000
 
-CMD ["/app/start.sh"]
+# Run the application
+CMD ["bun", "run", "start"]
