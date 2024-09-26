@@ -38,7 +38,7 @@ COPY . .
 
 # Build the application
 RUN echo "Starting build process..." && \
-    bun run build:docker
+    bun run build
 
 # Development stage
 FROM deps AS development
@@ -87,14 +87,14 @@ ENV ENABLE_FILE_LOGGING=true \
     PUBLIC_ELASTIC_APM_ENVIRONMENT=production
 
 # Create a script to set ENABLE_OPENTELEMETRY global variable and start the application
-RUN echo '#!/bin/sh\n\
-    if [ "$ENABLE_OPENTELEMETRY" = "true" ]; then\n\
-    echo "globalThis.INSTRUMENTATION_ENABLED = true;" > ${APP_ROOT}/set-global.js\n\
-    else\n\
-    echo "globalThis.INSTRUMENTATION_ENABLED = false;" > ${APP_ROOT}/set-global.js\n\
-    fi\n\
-    exec bun --preload ${APP_ROOT}/set-global.js ${APP_ROOT}/build/index.js\n\
-    ' > ${APP_ROOT}/start.sh && chmod +x ${APP_ROOT}/start.sh
+# RUN echo '#!/bin/sh\n\
+#     if [ "$ENABLE_OPENTELEMETRY" = "true" ]; then\n\
+#     echo "globalThis.INSTRUMENTATION_ENABLED = true;" > ${APP_ROOT}/set-global.js\n\
+#     else\n\
+#     echo "globalThis.INSTRUMENTATION_ENABLED = false;" > ${APP_ROOT}/set-global.js\n\
+#     fi\n\
+#     exec bun --preload ${APP_ROOT}/set-global.js ${APP_ROOT}/build/index.js\n\
+#     ' > ${APP_ROOT}/start.sh && chmod +x ${APP_ROOT}/start.sh
 
 # Set ownership of app directory to bun user
 RUN chown -R bun:bun ${APP_ROOT}
