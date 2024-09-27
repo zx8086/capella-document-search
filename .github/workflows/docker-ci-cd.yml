@@ -21,13 +21,13 @@ jobs:
         with:
           bun-version: latest
 
-      # - name: Cache Bun dependencies
-      #   uses: actions/cache@v3
-      #   with:
-      #     path: ~/.bun/install/cache
-      #     key: ${{ runner.os }}-bun-${{ hashFiles('**/bun.lockb') }}
-      #     restore-keys: |
-      #       ${{ runner.os }}-bun-
+      - name: Cache Bun dependencies
+        uses: actions/cache@v3
+        with:
+          path: ~/.bun/install/cache
+          key: ${{ runner.os }}-bun-${{ hashFiles('**/bun.lockb') }}
+          restore-keys: |
+            ${{ runner.os }}-bun-
 
       - name: Install dependencies and run post-install scripts
         run: |
@@ -145,9 +145,17 @@ jobs:
           image: zx8086/capella-document-search:latest
           args: --file=Dockerfile --severity-threshold=high --sarif-file-output=snyk-docker.sarif
 
+      - name: Check for SARIF file
+        run: |
+          if [ -f "snyk-docker.sarif" ]; then
+            echo "SARIF file exists"
+          else
+            echo "SARIF file does not exist"
+          fi
+
       - name: Upload Docker Snyk scan results to GitHub Code Scanning
         uses: github/codeql-action/upload-sarif@v3
-        if: always()
+        if: always() && hashFiles('snyk-docker.sarif') != ''
         continue-on-error: true
         with:
           sarif_file: snyk-docker.sarif
