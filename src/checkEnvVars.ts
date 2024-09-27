@@ -2,13 +2,17 @@
 
 import { getPrivateEnv, getPublicEnv } from "$lib/env";
 
+function isString(value: unknown): value is string {
+  return typeof value === "string";
+}
+
 export function getEnvOrThrow(key: string): string {
   const privateValue = getPrivateEnv(key);
   const publicValue = getPublicEnv(key);
 
   const value = privateValue !== undefined ? privateValue : publicValue;
 
-  if (value === undefined || typeof value !== "string") {
+  if (!isString(value)) {
     throw new Error(
       `Environment variable ${key} is not set or is not a string`,
     );
@@ -22,7 +26,7 @@ export function getEnvOrDefault(key: string, defaultValue: string): string {
 
   const value = privateValue !== undefined ? privateValue : publicValue;
 
-  return value !== undefined ? value : defaultValue;
+  return isString(value) ? value : defaultValue;
 }
 
 export function getEnvNumberOrThrow(key: string): number {
@@ -48,9 +52,6 @@ export function getEnvBooleanOrThrow(key: string): boolean {
   console.log(
     `Checking boolean env var ${key}, raw value: "${value}", type: ${typeof value}`,
   );
-  if (value === undefined || value === "") {
-    throw new Error(`Environment variable ${key} is not set`);
-  }
   const lowercaseValue = value.toLowerCase();
   if (lowercaseValue !== "true" && lowercaseValue !== "false") {
     throw new Error(

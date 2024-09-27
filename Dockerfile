@@ -32,6 +32,25 @@ FROM deps AS builder
 # Set environment variables for build
 ENV NODE_ENV=production
 ENV DISABLE_OPENTELEMETRY=true
+ENV ENABLE_FILE_LOGGING=false
+ENV LOG_LEVEL=info
+ENV LOG_MAX_SIZE=20m
+ENV LOG_MAX_FILES=14d
+ENV GRAPHQL_ENDPOINT=http://localhost:4000/graphql
+ENV DB_DATA_DIR=src/data
+ENV API_BASE_URL=https://cloudapi.cloud.couchbase.com/v4
+ENV ORG_ID=your-org-id
+ENV PROJECT_ID=your-project-id
+ENV CLUSTER_ID=your-cluster-id
+ENV BUCKET_ID=your-bucket-id
+ENV SERVICE_NAME="Capella Document Search"
+ENV SERVICE_VERSION=2.0.0
+ENV DEPLOYMENT_ENVIRONMENT=production
+ENV TRACES_ENDPOINT=https://your-traces-endpoint
+ENV METRICS_ENDPOINT=https://your-metrics-endpoint
+ENV LOGS_ENDPOINT=https://your-logs-endpoint
+ENV METRIC_READER_INTERVAL=60000
+ENV SUMMARY_LOG_INTERVAL=300000
 
 # Copy all source files
 COPY . .

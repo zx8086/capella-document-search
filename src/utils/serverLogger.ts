@@ -1,10 +1,10 @@
 /* src/utils/serverLogger.ts */
 
 import winston from "winston";
-import { backendConfig } from "$backendConfig";
-import { ecsFormat } from "@elastic/ecs-winston-format";
 import { OpenTelemetryTransportV3 } from "@opentelemetry/winston-transport";
 import DailyRotateFile from "winston-daily-rotate-file";
+import { ecsFormat } from "@elastic/ecs-winston-format";
+import { backendConfig } from "../backend-config";
 
 // Define the transports array
 const transports: winston.transport[] = [
@@ -15,7 +15,7 @@ const transports: winston.transport[] = [
 ];
 
 // Add file logging if ENABLE_FILE_LOGGING is set to 'true'
-if (process.env.ENABLE_FILE_LOGGING === "true") {
+if (backendConfig.application.ENABLE_FILE_LOGGING) {
   transports.push(
     new DailyRotateFile({
       filename: "logs/application-%DATE%.log",
