@@ -1,5 +1,10 @@
 /* src/routes/+page.server.ts */
 
+import { initializeBackendConfig } from "$backendConfig";
+
+// Initialize the backend configuration
+const backendConfig = initializeBackendConfig();
+
 import {
   ApolloClient,
   InMemoryCache,
@@ -14,7 +19,7 @@ import {
   initializeDatabase,
 } from "$lib/db/dbOperations";
 import { log, err, debug } from "../utils/serverLogger";
-import { backendConfig } from "$backendConfig";
+// import { backendConfig } from "$backendConfig";
 
 import type { Collection, SearchResult } from "../models";
 
