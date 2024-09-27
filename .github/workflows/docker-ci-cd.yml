@@ -161,7 +161,7 @@ jobs:
 
       - name: Install latest Snyk
         run: |
-          npm install -g snyk@latest
+          bun install -g snyk@latest
           snyk --version
 
       - name: Inspect Docker image
