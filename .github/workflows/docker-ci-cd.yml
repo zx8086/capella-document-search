@@ -143,12 +143,76 @@ jobs:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
         with:
           image: zx8086/capella-document-search:latest
-          args: --file=Dockerfile --severity-threshold=high --sarif-file-output=snyk-docker.sarif
+          args: --file=Dockerfile --severity-threshold=high
+
+      - name: Generate SARIF file from Snyk output
+        if: always()
+        run: |
+          # Install jq if not available
+          if ! command -v jq &> /dev/null; then
+            sudo apt-get update && sudo apt-get install -y jq
+          fi
+
+          # Run Snyk test and capture output
+          snyk test --docker zx8086/capella-document-search:latest --json | \
+          jq '{
+            "$schema": "https://raw.githubusercontent.com/oasis-tcs/sarif-spec/master/Schemata/sarif-schema-2.1.0.json",
+            "version": "2.1.0",
+            "runs": [
+              {
+                "tool": {
+                  "driver": {
+                    "name": "Snyk Docker",
+                    "rules": [.vulnerabilities[] | {
+                      "id": .id,
+                      "shortDescription": {
+                        "text": .title
+                      },
+                      "fullDescription": {
+                        "text": .description
+                      },
+                      "help": {
+                        "text": .description
+                      },
+                      "properties": {
+                        "tags": [
+                          "security",
+                          .severity
+                        ]
+                      }
+                    }]
+                  }
+                },
+                "results": [.vulnerabilities[] | {
+                  "ruleId": .id,
+                  "message": {
+                    "text": .title
+                  },
+                  "locations": [
+                    {
+                      "physicalLocation": {
+                        "artifactLocation": {
+                          "uri": "Dockerfile"
+                        },
+                        "region": {
+                          "startLine": 1,
+                          "startColumn": 1,
+                          "endLine": 1,
+                          "endColumn": 1
+                        }
+                      }
+                    }
+                  ]
+                }]
+              }
+            ]
+          }' > snyk-docker.sarif
 
       - name: Check for SARIF file
         run: |
           if [ -f "snyk-docker.sarif" ]; then
             echo "SARIF file exists"
+            cat snyk-docker.sarif
           else
             echo "SARIF file does not exist"
           fi
