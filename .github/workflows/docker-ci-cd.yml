@@ -69,18 +69,19 @@ jobs:
           PUBLIC_ELASTIC_APM_ENVIRONMENT=${{ vars.PUBLIC_ELASTIC_APM_ENVIRONMENT }}
           EOF
 
-      - name: Run Snyk checks
+      - name: Run Snyk to check for vulnerabilities in code
+        uses: snyk/actions/node@master
         continue-on-error: true
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
-        run: |
-          export $(grep -v '^#' .env | xargs)
-          bun run snyk test --file=package.json --sarif-file-output=snyk.sarif
-          bun run snyk monitor --file=package.json
+        with:
+          command: test
+          args: --sarif-file-output=snyk.sarif
 
-      - name: Upload Snyk scan results to GitHub Code Scanning
-        if: hashFiles('snyk.sarif') != ''
+      - name: Upload Snyk code scan results to GitHub Code Scanning
         uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        continue-on-error: true
         with:
           sarif_file: snyk.sarif
           category: snyk-code
@@ -136,16 +137,18 @@ jobs:
             PUBLIC_ELASTIC_APM_ENVIRONMENT=production
 
       - name: Run Snyk to check Docker image for vulnerabilities
+        uses: snyk/actions/docker@master
         continue-on-error: true
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
-        run: |
-          snyk container test zx8086/capella-document-search:latest --severity-threshold=high --sarif-file-output=snyk-docker.sarif --debug || true
-          snyk container monitor zx8086/capella-document-search:latest || true
+        with:
+          image: zx8086/capella-document-search:latest
+          args: --file=Dockerfile --severity-threshold=high --sarif-file-output=snyk-docker.sarif
 
       - name: Upload Docker Snyk scan results to GitHub Code Scanning
-        if: always() && hashFiles('snyk-docker.sarif') != ''
         uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        continue-on-error: true
         with:
           sarif_file: snyk-docker.sarif
           category: snyk-docker
@@ -154,15 +157,10 @@ jobs:
         if: always()
         run: |
           rm -f .env
-          rm -f snyk.sarif snyk-docker.sarif
+          rm -f snyk.sarif snyk-docker.sarif || true
           docker image prune -f
           docker volume prune -f
           echo "Cleanup completed"
-
-      - name: Install latest Snyk
-        run: |
-          bun install -g snyk@latest
-          snyk --version
 
       - name: Inspect Docker image
         run: |
