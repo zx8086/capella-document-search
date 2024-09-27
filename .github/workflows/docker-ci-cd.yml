@@ -145,16 +145,17 @@ jobs:
           image: zx8086/capella-document-search:latest
           args: --file=Dockerfile --severity-threshold=high
 
-      - name: Generate SARIF file from Snyk output
-        if: always()
+      - name: Run Snyk and generate SARIF
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
         run: |
           # Install jq if not available
           if ! command -v jq &> /dev/null; then
             sudo apt-get update && sudo apt-get install -y jq
           fi
 
-          # Run Snyk test and capture output
-          snyk test --docker zx8086/capella-document-search:latest --json | \
+          # Run Snyk test using Bun and capture output
+          bun run snyk test --docker zx8086/capella-document-search:latest --json | \
           jq '{
             "$schema": "https://raw.githubusercontent.com/oasis-tcs/sarif-spec/master/Schemata/sarif-schema-2.1.0.json",
             "version": "2.1.0",
@@ -208,7 +209,26 @@ jobs:
             ]
           }' > snyk-docker.sarif
 
-      - name: Check for SARIF file
+          # Check if the SARIF file is empty and create a valid empty SARIF if so
+          if [ ! -s snyk-docker.sarif ]; then
+            echo '{
+              "$schema": "https://raw.githubusercontent.com/oasis-tcs/sarif-spec/master/Schemata/sarif-schema-2.1.0.json",
+              "version": "2.1.0",
+              "runs": [
+                {
+                  "tool": {
+                    "driver": {
+                      "name": "Snyk Docker",
+                      "rules": []
+                    }
+                  },
+                  "results": []
+                }
+              ]
+            }' > snyk-docker.sarif
+          fi
+
+      - name: Check SARIF file
         run: |
           if [ -f "snyk-docker.sarif" ]; then
             echo "SARIF file exists"
@@ -219,7 +239,7 @@ jobs:
 
       - name: Upload Docker Snyk scan results to GitHub Code Scanning
         uses: github/codeql-action/upload-sarif@v3
-        if: always() && hashFiles('snyk-docker.sarif') != ''
+        if: always()
         continue-on-error: true
         with:
           sarif_file: snyk-docker.sarif
