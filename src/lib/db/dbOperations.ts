@@ -1,7 +1,7 @@
 /* src/lib/db/dbOperations.ts */
 
 import { backendConfig } from "$backendConfig";
-import { Database, Statement } from "bun:sqlite";
+import { Database, type Statement } from "bun:sqlite";
 import { log, err } from "$utils/unifiedLogger";
 import path from "path";
 import fs from "fs";

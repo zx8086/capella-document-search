@@ -7,7 +7,7 @@
 # Info: https://security.snyk.io/vuln/SNYK-DEBIAN11-ZLIB-6008961
 # This vulnerability is present in the base image and cannot be immediately resolved.
 # Use the official Bun image
-FROM oven/bun:latest AS base
+FROM oven/bun:slim AS base
 
 # Set common environment variables
 ENV APP_ROOT=/usr/src/app
@@ -24,7 +24,7 @@ COPY package.json bun.lockb ./
 
 # Install dependencies
 RUN --mount=type=cache,target=/root/.bun \
-    bun install --frozen-lockfile
+    bun install
 
 # Build stage
 FROM deps AS builder
@@ -43,6 +43,7 @@ ENV ORG_ID=your-org-id
 ENV PROJECT_ID=your-project-id
 ENV CLUSTER_ID=your-cluster-id
 ENV BUCKET_ID=your-bucket-id
+ENV AUTH_TOKEN=your-auth-token
 ENV SERVICE_NAME="Capella Document Search"
 ENV SERVICE_VERSION=2.0.0
 ENV DEPLOYMENT_ENVIRONMENT=production
@@ -51,6 +52,11 @@ ENV METRICS_ENDPOINT=https://your-metrics-endpoint
 ENV LOGS_ENDPOINT=https://your-logs-endpoint
 ENV METRIC_READER_INTERVAL=60000
 ENV SUMMARY_LOG_INTERVAL=300000
+ENV PUBLIC_OPENREPLAY_INGEST_POINT=https://your-openreplay-ingest-point
+ENV PUBLIC_ELASTIC_APM_SERVICE_NAME="Capella Document Search"
+ENV PUBLIC_ELASTIC_APM_SERVER_URL=2.0.0
+ENV PUBLIC_ELASTIC_APM_SERVICE_VERSION=https://your-apm-server-url
+ENV PUBLIC_ELASTIC_APM_ENVIRONMENT=production
 
 # Copy all source files
 COPY . .
@@ -89,6 +95,7 @@ ENV ENABLE_FILE_LOGGING=false \
     PROJECT_ID=ffffffff-gggg-hhhh-iiii-jjjjjjjjjjjj \
     CLUSTER_ID=kkkkkkkk-llll-mmmm-nnnn-oooooooooooo \
     BUCKET_ID=XXXXXXXXXXXX== \
+    AUTH_TOKEN=your-auth-token \
     ENABLE_OPENTELEMETRY=false \
     SERVICE_NAME="Capella Document Search" \
     SERVICE_VERSION=2.0.0 \

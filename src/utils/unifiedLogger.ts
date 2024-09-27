@@ -1,20 +1,13 @@
 /* src/utils/unifiedLogger.ts */
 
 import { browser } from "$app/environment";
-
-let serverLogger: any;
-
-if (!browser) {
-  import("./serverLogger").then((module) => {
-    serverLogger = module;
-  });
-}
+import * as serverLogger from "./serverLogger";
 
 export function log(message: string, meta?: any): void {
   if (browser) {
     console.log(message, meta);
   } else {
-    serverLogger?.log(message, meta);
+    serverLogger.log(message, meta);
   }
 }
 

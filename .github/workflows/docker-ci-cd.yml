@@ -21,13 +21,13 @@ jobs:
         with:
           bun-version: latest
 
-      - name: Cache Bun dependencies
-        uses: actions/cache@v3
-        with:
-          path: ~/.bun/install/cache
-          key: ${{ runner.os }}-bun-${{ hashFiles('**/bun.lockb') }}
-          restore-keys: |
-            ${{ runner.os }}-bun-
+      # - name: Cache Bun dependencies
+      #   uses: actions/cache@v3
+      #   with:
+      #     path: ~/.bun/install/cache
+      #     key: ${{ runner.os }}-bun-${{ hashFiles('**/bun.lockb') }}
+      #     restore-keys: |
+      #       ${{ runner.os }}-bun-
 
       - name: Install dependencies and run post-install scripts
         run: |
@@ -51,6 +51,7 @@ jobs:
           PROJECT_ID=${{ vars.PROJECT_ID }}
           CLUSTER_ID=${{ vars.CLUSTER_ID }}
           BUCKET_ID=${{ vars.BUCKET_ID }}
+          AUTH_TOKEN=${{ vars.AUTH_TOKEN }}
           ENABLE_OPENTELEMETRY=${{ vars.ENABLE_OPENTELEMETRY }}
           SERVICE_NAME=${{ vars.SERVICE_NAME }}
           SERVICE_VERSION=${{ vars.SERVICE_VERSION }}
