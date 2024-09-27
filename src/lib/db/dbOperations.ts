@@ -31,7 +31,7 @@ export function initializeDatabase() {
     if (!fs.existsSync(dataDir)) {
       try {
         fs.mkdirSync(dataDir, { recursive: true });
-      } catch (error) {
+      } catch (error: any) {
         err(`Failed to create database directory: ${error.message}`);
         throw error;
       }

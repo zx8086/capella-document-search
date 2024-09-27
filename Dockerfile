@@ -57,7 +57,7 @@ COPY --from=builder ${APP_ROOT}/build ${APP_ROOT}/build
 COPY --from=builder ${APP_ROOT}/static ${APP_ROOT}/static
 
 # Set default values for environment variables
-ENV ENABLE_FILE_LOGGING=true \
+ENV ENABLE_FILE_LOGGING=false \
     LOG_LEVEL=log \
     LOG_MAX_SIZE=20m \
     LOG_MAX_FILES=14d \
@@ -65,24 +65,24 @@ ENV ENABLE_FILE_LOGGING=true \
     DB_DATA_DIR=src/data \
     PUBLIC_CSV_FILE_UPLOAD_LIMIT=50 \
     PUBLIC_VIDEO_BASE_URL="" \
-    API_BASE_URL=https://cloudapi.cloud.couchbase.com/v4 \
-    ORG_ID=9d75c6a4-2ec3-4a6c-8574-b3842eeaa4b5 \
-    PROJECT_ID=1c249d82-f799-4b08-a8c0-18f7088e5049 \
-    CLUSTER_ID=2091944c-177f-450e-9266-9761679ebc73 \
-    BUCKET_ID=ZGVmYXVsdA== \
-    ENABLE_OPENTELEMETRY=true \
+    API_BASE_URL=https://example-api-url.com/v4 \
+    ORG_ID=aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee \
+    PROJECT_ID=ffffffff-gggg-hhhh-iiii-jjjjjjjjjjjj \
+    CLUSTER_ID=kkkkkkkk-llll-mmmm-nnnn-oooooooooooo \
+    BUCKET_ID=XXXXXXXXXXXX== \
+    ENABLE_OPENTELEMETRY=false \
     SERVICE_NAME="Capella Document Search" \
     SERVICE_VERSION=2.0.0 \
     DEPLOYMENT_ENVIRONMENT=production \
-    TRACES_ENDPOINT=https://otel-http-traces.siobytes.com \
-    METRICS_ENDPOINT=https://otel-http-metrics.siobytes.com \
-    LOGS_ENDPOINT=https://otel-http-logs.siobytes.com \
+    TRACES_ENDPOINT=https://your-traces-endpoint \
+    METRICS_ENDPOINT=https://your-metrics-endpoint \
+    LOGS_ENDPOINT=https://your-logs-endpoint \
     METRIC_READER_INTERVAL=60000 \
     CONSOLE_METRIC_READER_INTERVAL=60000 \
     SUMMARY_LOG_INTERVAL=300000 \
-    PUBLIC_OPENREPLAY_INGEST_POINT=https://openreplay.prd.shared-services.eu.pvh.cloud/ingest \
+    PUBLIC_OPENREPLAY_INGEST_POINT=https://your-openreplay-ingest-point \
     PUBLIC_ELASTIC_APM_SERVICE_NAME="Capella Document Search" \
-    PUBLIC_ELASTIC_APM_SERVER_URL=https://apm.siobytes.com \
+    PUBLIC_ELASTIC_APM_SERVER_URL=https://your-apm-server-url \
     PUBLIC_ELASTIC_APM_SERVICE_VERSION=2.0.0 \
     PUBLIC_ELASTIC_APM_ENVIRONMENT=production
 
