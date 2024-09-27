@@ -108,7 +108,7 @@ jobs:
           target: release
           outputs: ${{ github.event_name == 'pull_request' && 'type=cacheonly' || 'type=registry' }}
           build-args: |
-            ENABLE_FILE_LOGGING=true
+            ENABLE_FILE_LOGGING=false
             LOG_LEVEL=info
             LOG_MAX_SIZE=20m
             LOG_MAX_FILES=14d
@@ -121,7 +121,7 @@ jobs:
             PROJECT_ID=your-project-id
             CLUSTER_ID=your-cluster-id
             BUCKET_ID=your-bucket-id
-            ENABLE_OPENTELEMETRY=true
+            ENABLE_OPENTELEMETRY=false
             SERVICE_NAME="Capella Document Search"
             SERVICE_VERSION=2.0.0
             DEPLOYMENT_ENVIRONMENT=production
