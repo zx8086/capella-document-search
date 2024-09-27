@@ -108,34 +108,34 @@ jobs:
           target: release
           outputs: ${{ github.event_name == 'pull_request' && 'type=cacheonly' || 'type=registry' }}
           build-args: |
-            ENABLE_FILE_LOGGING=${{ vars.ENABLE_FILE_LOGGING }}
-            LOG_LEVEL=${{ vars.LOG_LEVEL }}
-            LOG_MAX_SIZE=${{ vars.LOG_MAX_SIZE }}
-            LOG_MAX_FILES=${{ vars.LOG_MAX_FILES }}
-            GRAPHQL_ENDPOINT=${{ vars.GRAPHQL_ENDPOINT }}
-            DB_DATA_DIR=${{ vars.DB_DATA_DIR }}
-            PUBLIC_CSV_FILE_UPLOAD_LIMIT=${{ vars.PUBLIC_CSV_FILE_UPLOAD_LIMIT }}
-            PUBLIC_VIDEO_BASE_URL=${{ vars.PUBLIC_VIDEO_BASE_URL }}
-            API_BASE_URL=${{ vars.API_BASE_URL }}
-            ORG_ID=${{ vars.ORG_ID }}
-            PROJECT_ID=${{ vars.PROJECT_ID }}
-            CLUSTER_ID=${{ vars.CLUSTER_ID }}
-            BUCKET_ID=${{ vars.BUCKET_ID }}
-            ENABLE_OPENTELEMETRY=${{ vars.ENABLE_OPENTELEMETRY }}
-            SERVICE_NAME=${{ vars.SERVICE_NAME }}
-            SERVICE_VERSION=${{ vars.SERVICE_VERSION }}
-            DEPLOYMENT_ENVIRONMENT=${{ vars.DEPLOYMENT_ENVIRONMENT }}
-            TRACES_ENDPOINT=${{ vars.TRACES_ENDPOINT }}
-            METRICS_ENDPOINT=${{ vars.METRICS_ENDPOINT }}
-            LOGS_ENDPOINT=${{ vars.LOGS_ENDPOINT }}
-            METRIC_READER_INTERVAL=${{ vars.METRIC_READER_INTERVAL }}
-            CONSOLE_METRIC_READER_INTERVAL=${{ vars.CONSOLE_METRIC_READER_INTERVAL }}
-            SUMMARY_LOG_INTERVAL=${{ vars.SUMMARY_LOG_INTERVAL }}
-            PUBLIC_OPENREPLAY_INGEST_POINT=${{ vars.PUBLIC_OPENREPLAY_INGEST_POINT }}
-            PUBLIC_ELASTIC_APM_SERVICE_NAME=${{ vars.PUBLIC_ELASTIC_APM_SERVICE_NAME }}
-            PUBLIC_ELASTIC_APM_SERVER_URL=${{ vars.PUBLIC_ELASTIC_APM_SERVER_URL }}
-            PUBLIC_ELASTIC_APM_SERVICE_VERSION=${{ vars.PUBLIC_ELASTIC_APM_SERVICE_VERSION }}
-            PUBLIC_ELASTIC_APM_ENVIRONMENT=${{ vars.PUBLIC_ELASTIC_APM_ENVIRONMENT }}
+            ENABLE_FILE_LOGGING=true
+            LOG_LEVEL=info
+            LOG_MAX_SIZE=20m
+            LOG_MAX_FILES=14d
+            GRAPHQL_ENDPOINT=http://localhost:4000/graphql
+            DB_DATA_DIR=src/data
+            PUBLIC_CSV_FILE_UPLOAD_LIMIT=50
+            PUBLIC_VIDEO_BASE_URL=
+            API_BASE_URL=https://cloudapi.cloud.couchbase.com/v4
+            ORG_ID=your-org-id
+            PROJECT_ID=your-project-id
+            CLUSTER_ID=your-cluster-id
+            BUCKET_ID=your-bucket-id
+            ENABLE_OPENTELEMETRY=true
+            SERVICE_NAME="Capella Document Search"
+            SERVICE_VERSION=2.0.0
+            DEPLOYMENT_ENVIRONMENT=production
+            TRACES_ENDPOINT=https://your-traces-endpoint
+            METRICS_ENDPOINT=https://your-metrics-endpoint
+            LOGS_ENDPOINT=https://your-logs-endpoint
+            METRIC_READER_INTERVAL=60000
+            CONSOLE_METRIC_READER_INTERVAL=60000
+            SUMMARY_LOG_INTERVAL=300000
+            PUBLIC_OPENREPLAY_INGEST_POINT=https://your-openreplay-ingest-point
+            PUBLIC_ELASTIC_APM_SERVICE_NAME="Capella Document Search"
+            PUBLIC_ELASTIC_APM_SERVER_URL=https://your-apm-server-url
+            PUBLIC_ELASTIC_APM_SERVICE_VERSION=2.0.0
+            PUBLIC_ELASTIC_APM_ENVIRONMENT=production
 
       - name: Run Snyk to check Docker image for vulnerabilities
         continue-on-error: true

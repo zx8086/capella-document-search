@@ -1,10 +1,10 @@
 /* src/utils/serverLogger.ts */
 
 import winston from "winston";
+import { backendConfig } from "$backendConfig";
 import { ecsFormat } from "@elastic/ecs-winston-format";
 import { OpenTelemetryTransportV3 } from "@opentelemetry/winston-transport";
 import DailyRotateFile from "winston-daily-rotate-file";
-import { backendConfig } from "$backendConfig";
 
 // Define the transports array
 const transports: winston.transport[] = [
