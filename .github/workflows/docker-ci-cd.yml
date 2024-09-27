@@ -45,7 +45,12 @@ jobs:
           GRAPHQL_ENDPOINT=${{ vars.GRAPHQL_ENDPOINT }}
           DB_DATA_DIR=${{ vars.DB_DATA_DIR }}
           PUBLIC_CSV_FILE_UPLOAD_LIMIT=${{ vars.PUBLIC_CSV_FILE_UPLOAD_LIMIT }}
+          PUBLIC_VIDEO_BASE_URL=${{ vars.PUBLIC_VIDEO_BASE_URL }}
           API_BASE_URL=${{ vars.API_BASE_URL }}
+          ORG_ID=${{ vars.ORG_ID }}
+          PROJECT_ID=${{ vars.PROJECT_ID }}
+          CLUSTER_ID=${{ vars.CLUSTER_ID }}
+          BUCKET_ID=${{ vars.BUCKET_ID }}
           ENABLE_OPENTELEMETRY=${{ vars.ENABLE_OPENTELEMETRY }}
           SERVICE_NAME=${{ vars.SERVICE_NAME }}
           SERVICE_VERSION=${{ vars.SERVICE_VERSION }}
@@ -110,7 +115,12 @@ jobs:
             GRAPHQL_ENDPOINT=${{ vars.GRAPHQL_ENDPOINT }}
             DB_DATA_DIR=${{ vars.DB_DATA_DIR }}
             PUBLIC_CSV_FILE_UPLOAD_LIMIT=${{ vars.PUBLIC_CSV_FILE_UPLOAD_LIMIT }}
+            PUBLIC_VIDEO_BASE_URL=${{ vars.PUBLIC_VIDEO_BASE_URL }}
             API_BASE_URL=${{ vars.API_BASE_URL }}
+            ORG_ID=${{ vars.ORG_ID }}
+            PROJECT_ID=${{ vars.PROJECT_ID }}
+            CLUSTER_ID=${{ vars.CLUSTER_ID }}
+            BUCKET_ID=${{ vars.BUCKET_ID }}
             ENABLE_OPENTELEMETRY=${{ vars.ENABLE_OPENTELEMETRY }}
             SERVICE_NAME=${{ vars.SERVICE_NAME }}
             SERVICE_VERSION=${{ vars.SERVICE_VERSION }}
