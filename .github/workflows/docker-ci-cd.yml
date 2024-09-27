@@ -119,6 +119,7 @@ jobs:
             PROJECT_ID=${{ secrets.PROJECT_ID }}
             CLUSTER_ID=${{ secrets.CLUSTER_ID }}
             BUCKET_ID=${{ secrets.BUCKET_ID }}
+            AUTH_TOKEN=${{ secrets.AUTH_TOKEN }}
             SERVICE_NAME="Capella Document Search"
             SERVICE_VERSION=2.0.0
             DEPLOYMENT_ENVIRONMENT=production
