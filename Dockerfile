@@ -93,6 +93,8 @@ COPY svelte.config.js vite.config.ts tsconfig.json ./
 RUN mkdir -p ${APP_ROOT}/data && \
     chown -R bun:bun ${APP_ROOT}
 
+RUN mkdir -p /app/data && chown -R bun:bun /app/data && chmod 755 /app/data
+
 # Set default values for environment variables
 ENV ENABLE_FILE_LOGGING=false \
     LOG_LEVEL=log \
