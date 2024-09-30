@@ -7,7 +7,6 @@
 # Info: https://security.snyk.io/vuln/SNYK-DEBIAN11-ZLIB-6008961
 # This vulnerability is present in the base image and cannot be immediately resolved.
 # Use the official Bun image
-# Use the official Bun image
 FROM oven/bun:slim AS base
 
 # Set common environment variables
@@ -64,18 +63,9 @@ ENV PUBLIC_ELASTIC_APM_ENVIRONMENT=production
 COPY src ${APP_ROOT}/src
 COPY svelte.config.js vite.config.ts tsconfig.json ./
 
-# Ensure static directory exists (remove if not needed)
-RUN mkdir -p ${APP_ROOT}/static
-
 # Build the application
 RUN echo "Starting build process..." && \
     bun run build
-
-# Development stage
-FROM deps AS development
-ENV NODE_ENV=development
-COPY . .
-CMD ["bun", "run", "dev"]
 
 # Final release stage
 FROM deps AS release
@@ -85,8 +75,10 @@ ENV NODE_ENV=production
 
 # Copy built files from builder stage
 COPY --from=builder ${APP_ROOT}/build ${APP_ROOT}/build
-# Copy static files if they exist, otherwise this will be skipped
-COPY --from=builder ${APP_ROOT}/static ${APP_ROOT}/static 2>/dev/null || :
+
+# Conditionally copy static directory if it exists
+RUN mkdir -p ${APP_ROOT}/static
+COPY --from=builder ${APP_ROOT}/static ${APP_ROOT}/static 2>/dev/null || true
 
 # Copy source files and configuration for runtime
 COPY src ${APP_ROOT}/src
