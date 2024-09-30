@@ -13,15 +13,11 @@ FROM oven/bun:slim AS base
 ENV APP_ROOT=/usr/src/app
 WORKDIR ${APP_ROOT}
 
-# Create necessary directories
-RUN mkdir -p ${APP_ROOT}/logs
-
 # Install dependencies stage
 FROM base AS deps
 
-# Copy configuration files
-COPY package.json bun.lockb ./
-COPY svelte.config.js vite.config.ts tsconfig.json ./
+# Copy the entire project
+COPY . .
 
 # Install dependencies
 RUN --mount=type=cache,target=/root/.bun \
@@ -59,10 +55,6 @@ ENV PUBLIC_ELASTIC_APM_SERVER_URL=2.0.0
 ENV PUBLIC_ELASTIC_APM_SERVICE_VERSION=https://your-apm-server-url
 ENV PUBLIC_ELASTIC_APM_ENVIRONMENT=production
 
-# Copy source files and configuration
-COPY src ${APP_ROOT}/src
-COPY svelte.config.js vite.config.ts tsconfig.json ./
-
 # Build the application
 RUN echo "Starting build process..." && \
     bun run build
@@ -76,24 +68,10 @@ ENV NODE_ENV=production
 # Copy built files from builder stage
 COPY --from=builder ${APP_ROOT}/build ${APP_ROOT}/build
 
-# Copy static directory if it exists, otherwise create an empty one
-RUN if [ -d "${APP_ROOT}/static" ]; then \
-    cp -R ${APP_ROOT}/static ${APP_ROOT}/static_temp && \
-    rm -rf ${APP_ROOT}/static && \
-    mv ${APP_ROOT}/static_temp ${APP_ROOT}/static; \
-    else \
-    mkdir -p ${APP_ROOT}/static; \
-    fi
-
-# Copy source files and configuration for runtime
-COPY src ${APP_ROOT}/src
-COPY svelte.config.js vite.config.ts tsconfig.json ./
-
 # Create necessary directories and set permissions
 RUN mkdir -p ${APP_ROOT}/data && \
-    chown -R bun:bun ${APP_ROOT}
-
-RUN mkdir -p /app/data && chown -R bun:bun /app/data && chmod 755 /app/data
+    chown -R bun:bun ${APP_ROOT} && \
+    chmod 755 ${APP_ROOT}/data
 
 # Set default values for environment variables
 ENV ENABLE_FILE_LOGGING=false \
@@ -101,7 +79,7 @@ ENV ENABLE_FILE_LOGGING=false \
     LOG_MAX_SIZE=20m \
     LOG_MAX_FILES=14d \
     GRAPHQL_ENDPOINT=http://localhost:4000/graphql \
-    DB_DATA_DIR=src/data \
+    DB_DATA_DIR=${APP_ROOT}/data \
     PUBLIC_CSV_FILE_UPLOAD_LIMIT=50 \
     PUBLIC_VIDEO_BASE_URL="" \
     API_BASE_URL=https://example-api-url.com/v4 \
@@ -125,9 +103,6 @@ ENV ENABLE_FILE_LOGGING=false \
     PUBLIC_ELASTIC_APM_SERVER_URL=https://your-apm-server-url \
     PUBLIC_ELASTIC_APM_SERVICE_VERSION=2.0.0 \
     PUBLIC_ELASTIC_APM_ENVIRONMENT=production
-
-# Set ownership of app directory to bun user
-RUN chown -R bun:bun ${APP_ROOT}
 
 # Switch to non-root user
 USER bun
