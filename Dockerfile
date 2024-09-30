@@ -112,16 +112,6 @@ ENV ENABLE_FILE_LOGGING=false \
     PUBLIC_ELASTIC_APM_SERVICE_VERSION=2.0.0 \
     PUBLIC_ELASTIC_APM_ENVIRONMENT=production
 
-# Create a script to set ENABLE_OPENTELEMETRY global variable and start the application
-# RUN echo '#!/bin/sh\n\
-#     if [ "$ENABLE_OPENTELEMETRY" = "true" ]; then\n\
-#     echo "globalThis.INSTRUMENTATION_ENABLED = true;" > ${APP_ROOT}/set-global.js\n\
-#     else\n\
-#     echo "globalThis.INSTRUMENTATION_ENABLED = false;" > ${APP_ROOT}/set-global.js\n\
-#     fi\n\
-#     exec bun --preload ${APP_ROOT}/set-global.js ${APP_ROOT}/build/index.js\n\
-#     ' > ${APP_ROOT}/start.sh && chmod +x ${APP_ROOT}/start.sh
-
 # Set ownership of app directory to bun user
 RUN chown -R bun:bun ${APP_ROOT}
 
