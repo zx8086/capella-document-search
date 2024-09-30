@@ -76,13 +76,19 @@ ENV NODE_ENV=production
 # Copy built files from builder stage
 COPY --from=builder ${APP_ROOT}/build ${APP_ROOT}/build
 
-# Conditionally copy static directory if it exists
-RUN mkdir -p ${APP_ROOT}/static
-COPY --from=builder ${APP_ROOT}/static ${APP_ROOT}/static 2>/dev/null || true
+# Copy static directory if it exists, otherwise create an empty one
+RUN if [ -d "${APP_ROOT}/static" ]; then \
+    cp -R ${APP_ROOT}/static ${APP_ROOT}/static_temp && \
+    rm -rf ${APP_ROOT}/static && \
+    mv ${APP_ROOT}/static_temp ${APP_ROOT}/static; \
+    else \
+    mkdir -p ${APP_ROOT}/static; \
+    fi
 
 # Copy source files and configuration for runtime
 COPY src ${APP_ROOT}/src
 COPY svelte.config.js vite.config.ts tsconfig.json ./
+
 
 # Set default values for environment variables
 ENV ENABLE_FILE_LOGGING=false \
