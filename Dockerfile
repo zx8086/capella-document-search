@@ -19,8 +19,9 @@ RUN mkdir -p ${APP_ROOT}/logs
 # Install dependencies stage
 FROM base AS deps
 
-# Copy only package.json and lockfile
+# Copy configuration files
 COPY package.json bun.lockb ./
+COPY svelte.config.js vite.config.ts tsconfig.json ./
 
 # Install dependencies
 RUN --mount=type=cache,target=/root/.bun \
@@ -58,8 +59,9 @@ ENV PUBLIC_ELASTIC_APM_SERVER_URL=2.0.0
 ENV PUBLIC_ELASTIC_APM_SERVICE_VERSION=https://your-apm-server-url
 ENV PUBLIC_ELASTIC_APM_ENVIRONMENT=production
 
-# Copy all source files
-COPY . .
+# Copy source files and configuration
+COPY src ${APP_ROOT}/src
+COPY svelte.config.js vite.config.ts tsconfig.json ./
 
 # Build the application
 RUN echo "Starting build process..." && \
@@ -81,8 +83,9 @@ ENV NODE_ENV=production
 COPY --from=builder ${APP_ROOT}/build ${APP_ROOT}/build
 COPY --from=builder ${APP_ROOT}/static ${APP_ROOT}/static
 
-# Copy the entire src directory
+# Copy source files and configuration for runtime
 COPY src ${APP_ROOT}/src
+COPY svelte.config.js vite.config.ts tsconfig.json ./
 
 # Set default values for environment variables
 ENV ENABLE_FILE_LOGGING=false \
