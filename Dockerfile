@@ -89,6 +89,9 @@ RUN if [ -d "${APP_ROOT}/static" ]; then \
 COPY src ${APP_ROOT}/src
 COPY svelte.config.js vite.config.ts tsconfig.json ./
 
+# Create necessary directories and set permissions
+RUN mkdir -p ${APP_ROOT}/data && \
+    chown -R bun:bun ${APP_ROOT}
 
 # Set default values for environment variables
 ENV ENABLE_FILE_LOGGING=false \
