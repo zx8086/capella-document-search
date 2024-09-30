@@ -81,6 +81,9 @@ ENV NODE_ENV=production
 COPY --from=builder ${APP_ROOT}/build ${APP_ROOT}/build
 COPY --from=builder ${APP_ROOT}/static ${APP_ROOT}/static
 
+# Copy the entire src directory
+COPY src ${APP_ROOT}/src
+
 # Set default values for environment variables
 ENV ENABLE_FILE_LOGGING=false \
     LOG_LEVEL=log \
