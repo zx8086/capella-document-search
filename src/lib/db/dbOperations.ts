@@ -27,6 +27,8 @@ export function initializeDatabase() {
 
     log(`Database directory: ${dataDir}`);
     log(`Database path: ${dbPath}`);
+    log(`Current working directory: ${process.cwd()}`);
+    log(`Attempting to create database at: ${dbPath}`);
 
     if (!fs.existsSync(dataDir)) {
       try {
@@ -185,7 +187,9 @@ export function getTooltip(
   if (!getTooltipStmt) {
     throw new Error("Database not initialized");
   }
-  const result = getTooltipStmt.get(bucket, scopeName, collectionName);
+  const result = getTooltipStmt.get(bucket, scopeName, collectionName) as {
+    tooltip_content: string | null;
+  } | null;
   return result ? result.tooltip_content : null;
 }
 

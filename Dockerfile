@@ -9,9 +9,8 @@
 # Use the official Bun image
 FROM oven/bun:slim AS base
 
-# Set common environment variables
-ENV APP_ROOT=/usr/src/app
-WORKDIR ${APP_ROOT}
+# Set working directory
+WORKDIR /app
 
 # Install dependencies stage
 FROM base AS deps
@@ -28,13 +27,14 @@ FROM deps AS builder
 
 # Set environment variables for build
 ENV NODE_ENV=production
+ENV DB_DATA_DIR=src/data
+ENV NODE_ENV=production
 ENV DISABLE_OPENTELEMETRY=true
 ENV ENABLE_FILE_LOGGING=false
 ENV LOG_LEVEL=info
 ENV LOG_MAX_SIZE=20m
 ENV LOG_MAX_FILES=14d
 ENV GRAPHQL_ENDPOINT=http://localhost:4000/graphql
-ENV DB_DATA_DIR=src/data
 ENV API_BASE_URL=https://cloudapi.cloud.couchbase.com/v4
 ENV ORG_ID=your-org-id
 ENV PROJECT_ID=your-project-id
@@ -62,16 +62,17 @@ RUN echo "Starting build process..." && \
 # Final release stage
 FROM deps AS release
 
-# Set Node environment
-ENV NODE_ENV=production
+# Set Node environment and DB_DATA_DIR
+ENV NODE_ENV=production \
+    DB_DATA_DIR=src/data
 
 # Copy built files from builder stage
-COPY --from=builder ${APP_ROOT}/build ${APP_ROOT}/build
+COPY --from=builder /app/build /app/build
 
 # Create necessary directories and set permissions
-RUN mkdir -p ${APP_ROOT}/data && \
-    chown -R bun:bun ${APP_ROOT} && \
-    chmod 755 ${APP_ROOT}/data
+RUN mkdir -p ${DB_DATA_DIR} && \
+    chown -R bun:bun /app && \
+    chmod 755 ${DB_DATA_DIR}
 
 # Set default values for environment variables
 ENV ENABLE_FILE_LOGGING=false \
@@ -79,7 +80,6 @@ ENV ENABLE_FILE_LOGGING=false \
     LOG_MAX_SIZE=20m \
     LOG_MAX_FILES=14d \
     GRAPHQL_ENDPOINT=http://localhost:4000/graphql \
-    DB_DATA_DIR=${APP_ROOT}/data \
     PUBLIC_CSV_FILE_UPLOAD_LIMIT=50 \
     PUBLIC_VIDEO_BASE_URL="" \
     API_BASE_URL=https://example-api-url.com/v4 \
