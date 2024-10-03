@@ -80,8 +80,6 @@ ENV ENABLE_FILE_LOGGING=false \
     LOG_MAX_SIZE=20m \
     LOG_MAX_FILES=14d \
     GRAPHQL_ENDPOINT=http://localhost:4000/graphql \
-    PUBLIC_CSV_FILE_UPLOAD_LIMIT=50 \
-    PUBLIC_VIDEO_BASE_URL="" \
     API_BASE_URL=https://example-api-url.com/v4 \
     ORG_ID=aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee \
     PROJECT_ID=ffffffff-gggg-hhhh-iiii-jjjjjjjjjjjj \
@@ -102,7 +100,9 @@ ENV ENABLE_FILE_LOGGING=false \
     PUBLIC_ELASTIC_APM_SERVICE_NAME="Capella Document Search" \
     PUBLIC_ELASTIC_APM_SERVER_URL=https://your-apm-server-url \
     PUBLIC_ELASTIC_APM_SERVICE_VERSION=2.0.0 \
-    PUBLIC_ELASTIC_APM_ENVIRONMENT=production
+    PUBLIC_ELASTIC_APM_ENVIRONMENT=production \
+    PUBLIC_CSV_FILE_UPLOAD_LIMIT=50 \
+    PUBLIC_VIDEO_BASE_URL=""
 
 # Switch to non-root user
 USER bun

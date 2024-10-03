@@ -34,7 +34,7 @@ export function initializeDatabase() {
       try {
         fs.mkdirSync(dataDir, { recursive: true });
       } catch (error: any) {
-        err(`Failed to create database directory: ${error.message}`);
+        err(`Failed to create SQLite database directory: ${error.message}`);
         throw error;
       }
     }
