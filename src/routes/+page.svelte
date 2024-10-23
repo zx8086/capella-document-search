@@ -1,6 +1,8 @@
 <!-- src/routes/+page.svelte-->
 
 <script lang="ts">
+    import { run, preventDefault } from 'svelte/legacy';
+
     import { enhance } from "$app/forms";
     import { onMount, getContext } from "svelte";
     import { toast } from "svelte-sonner";
@@ -41,9 +43,9 @@
         }
     }
 
-    let allCollections: Collection[] = [];
-    let selectedCollections: Collection[] = [];
-    let errorMessage: string = "";
+    let allCollections: Collection[] = $state([]);
+    let selectedCollections: Collection[] = $state([]);
+    let errorMessage: string = $state("");
     let errorDetails: string = "";
 
     onMount(() => {
@@ -103,30 +105,32 @@
     let showDebugInfo: boolean = false;
     // let debugInfo = "";
 
-    let documentKey: string = "";
-    let processing: boolean = false;
-    let searchPerformed = false;
-    let sortedResults: any[] = [];
+    let documentKey: string = $state("");
+    let processing: boolean = $state(false);
+    let searchPerformed = $state(false);
+    let sortedResults: any[] = $state([]);
 
-    let searchResults: SearchResult[] = [];
+    let searchResults: SearchResult[] = $state([]);
 
-    let modalIsOpen: boolean = false;
-    let currentTooltip: string = "";
+    let modalIsOpen: boolean = $state(false);
+    let currentTooltip: string = $state("");
 
-    let buttonState = "ready";
-    let isSearchMode: boolean = true;
-    let file: File | null = null;
-    let fileUploadResults = [];
-    let fileInputFiles: FileList | null = null;
+    let buttonState = $state("ready");
+    let isSearchMode: boolean = $state(true);
+    let file: File | null = $state(null);
+    let fileUploadResults = $state([]);
+    let fileInputFiles: FileList | null = $state(null);
 
-    $: if (fileInputFiles && fileInputFiles.length > 0) {
-        file = fileInputFiles[0];
-    } else {
-        file = null;
-    }
+    run(() => {
+        if (fileInputFiles && fileInputFiles.length > 0) {
+            file = fileInputFiles[0];
+        } else {
+            file = null;
+        }
+    });
 
-    let isFileValid: boolean = false;
-    let showExampleModal: boolean = false;
+    let isFileValid: boolean = $state(false);
+    let showExampleModal: boolean = $state(false);
 
     function handleFileChange(event: Event): void {
         const target = event.target as HTMLInputElement;
@@ -371,7 +375,7 @@
         trackClick("TooltipModal", "Open");
     }
 
-    $: buttonClass = isSearchMode
+    let buttonClass = $derived(isSearchMode
         ? {
               ready: "cursor-pointer hover:bg-[#00174f]/80",
               searching: "cursor-not-allowed",
@@ -383,13 +387,13 @@
                 ready: "cursor-pointer hover:bg-[#00174f]/80",
                 searching: "cursor-not-allowed",
                 results: "cursor-not-allowed",
-            }[buttonState];
+            }[buttonState]);
 
-    $: buttonText = {
+    let buttonText = $derived({
         ready: isSearchMode ? "Search" : file ? "Search" : "Search",
         searching: isSearchMode ? "Searching..." : "Searching...",
         results: "Done",
-    }[buttonState];
+    }[buttonState]);
 
     function toggleMode(): void {
         isSearchMode = !isSearchMode;
@@ -422,7 +426,7 @@
         file = null;
     }
 
-    let isLoading: boolean = false;
+    let isLoading: boolean = $state(false);
 
     function toggleCollection(collection: {
         bucket: string;
@@ -468,15 +472,19 @@
         }
     }
 
-    $: if (documentKey) {
-        resetSearch();
-    }
+    run(() => {
+        if (documentKey) {
+            resetSearch();
+        }
+    });
 
-    $: if (documentKey) {
-        resetSearch();
-    }
+    run(() => {
+        if (documentKey) {
+            resetSearch();
+        }
+    });
 
-    $: isSelected = (collection: {
+    let isSelected = $derived((collection: {
         bucket: string;
         scope_name: string;
         collection_name: string;
@@ -487,7 +495,7 @@
                 c.scope_name === collection.scope_name &&
                 c.collection_name === collection.collection_name,
         );
-    };
+    });
 
     function groupCollectionsByScope(
         collections: Collection[],
@@ -512,9 +520,9 @@
         );
     }
 
-    $: groupedCollections = groupCollectionsByScope(allCollections);
+    let groupedCollections = $derived(groupCollectionsByScope(allCollections));
 
-    $: {
+    run(() => {
         if (isSearchMode && searchResults.length > 0) {
             sortedResults = [...searchResults].sort((a, b) => {
                 const aHasData =
@@ -533,7 +541,7 @@
         } else {
             sortedResults = [];
         }
-    }
+    });
 
     function handleCarouselStart() {
         console.log("Carousel started on another page");
@@ -601,10 +609,10 @@
                                     name="documentKey"
                                     data-transaction-name="Enter Document Key"
                                     bind:value={documentKey}
-                                    on:input={() => {
+                                    oninput={() => {
                                         searchPerformed = false;
                                     }}
-                                    on:click={handleInputClick}
+                                    onclick={handleInputClick}
                                     placeholder="Search for a single Document by typing in the key here and click the Search button below..."
                                     class="w-full py-2 pl-10 pr-4 text-sm rounded-md focus:outline-none bg-white border border-gray-300 text-gray-700 focus:ring-2 focus:ring-tommy-red focus:border-tommy-red transition duration-150 ease-in-out"
                                 />
@@ -648,7 +656,7 @@
                                                 class="sr-only"
                                                 aria-describedby="validFileFormats"
                                                 accept=".csv"
-                                                on:change={handleFileChange}
+                                                onchange={handleFileChange}
                                                 bind:files={fileInputFiles}
                                             />
                                         </label>
@@ -656,10 +664,10 @@
                                             a file with Document keys to check
                                             here
                                             <button
-                                                on:click|preventDefault={() =>
+                                                onclick={preventDefault(() =>
                                                     openTooltipModal(
                                                         fileUploadTooltipContent,
-                                                    )}
+                                                    ))}
                                                 class="ml-2 text-gray-500 hover:text-gray-700 focus:outline-none"
                                             >
                                                 <svg
@@ -709,7 +717,7 @@
                     >
                         <button
                             type="button"
-                            on:click={toggleMode}
+                            onclick={toggleMode}
                             data-transaction-name="Toggle Search Mode"
                             class="p-2 bg-gray-200 rounded-full hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-tommy-red animate-pulse"
                             title={isSearchMode
@@ -744,14 +752,14 @@
                             <div>
                                 <button
                                     type="button"
-                                    on:click={selectAllCollections}
+                                    onclick={selectAllCollections}
                                     data-transaction-name="Select All Collections"
                                     class="px-3 py-1 bg-[#00174f] text-white rounded hover:bg-[#00174f]/80 mr-2"
                                     >Select All</button
                                 >
                                 <button
                                     type="button"
-                                    on:click={deselectAllCollections}
+                                    onclick={deselectAllCollections}
                                     data-transaction-name="Deselect All Collections"
                                     class="px-3 py-1 bg-[#00174f] text-white rounded hover:bg-[#00174f]/80"
                                     >Deselect All</button
@@ -775,10 +783,10 @@
                                                 {collection.collection_name}
                                                 {#if collection.tooltip_content}
                                                     <button
-                                                        on:click|preventDefault={() =>
+                                                        onclick={preventDefault(() =>
                                                             openTooltipModal(
                                                                 collection.tooltip_content,
-                                                            )}
+                                                            ))}
                                                         class="ml-2 text-gray-500 hover:text-gray-700 focus:outline-none"
                                                     >
                                                         <svg
@@ -810,7 +818,7 @@
                                                     checked={isSelected(
                                                         collection,
                                                     )}
-                                                    on:change={() =>
+                                                    onchange={() =>
                                                         toggleCollection(
                                                             collection,
                                                         )}
@@ -894,7 +902,7 @@
                                 CSV File Examples
                             </h3>
                             <button
-                                on:click={closeExampleModal}
+                                onclick={closeExampleModal}
                                 data-transaction-name="Close Example Modal"
                                 class="text-white hover:text-gray-200 focus:outline-none"
                                 aria-label="close modal"
@@ -981,7 +989,7 @@ IMAGE_70_C51_LV04F1003GPDE</pre>
                         </div>
                         <div class="flex justify-end bg-gray-100 px-6 py-4">
                             <button
-                                on:click={closeExampleModal}
+                                onclick={closeExampleModal}
                                 data-transaction-name="Close Example Modal"
                                 type="button"
                                 class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
@@ -1052,7 +1060,7 @@ IMAGE_70_C51_LV04F1003GPDE</pre>
                     Tool Tip
                 </h3>
                 <button
-                    on:click={() => (modalIsOpen = false)}
+                    onclick={() => (modalIsOpen = false)}
                     data-transaction-name="Tooltip Modal"
                     aria-label="close modal"
                 >
@@ -1080,7 +1088,7 @@ IMAGE_70_C51_LV04F1003GPDE</pre>
                 class="flex justify-end border-t border-slate-300 bg-slate-100/60 p-4 dark:border-slate-700 dark:bg-slate-900/20"
             >
                 <button
-                    on:click={() => (modalIsOpen = false)}
+                    onclick={() => (modalIsOpen = false)}
                     type="button"
                     data-transaction-name="Tooltip Modal"
                     class="cursor-pointer whitespace-nowrap rounded-xl bg-blue-700 px-4 py-2 text-center text-sm font-medium tracking-wide text-slate-100 transition hover:opacity-75 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-700 active:opacity-100 active:outline-offset-0 dark:bg-blue-600 dark:text-slate-100 dark:focus-visible:outline-blue-600"

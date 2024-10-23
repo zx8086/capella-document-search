@@ -1,6 +1,8 @@
 <!-- src/lib/components/FileUploadResults.svelte -->
 
 <script lang="ts">
+    import { run } from 'svelte/legacy';
+
     import { onMount } from "svelte";
 
     type DetailedResult = {
@@ -22,23 +24,16 @@
     type SimpleResult = {
         message: string;
     };
-    export let results: (DetailedResult | SimpleResult)[];
-
-    let foundCount = 0;
-    let notFoundCount = 0;
-    let sortedResults: DetailedResult[] = [];
-
-    $: {
-        if (results.length > 0 && isDetailedResult(results[0])) {
-            sortedResults = (results as DetailedResult[]).sort((a, b) => {
-                if (a.found && !b.found) return -1;
-                if (!a.found && b.found) return 1;
-                return 0;
-            });
-            foundCount = sortedResults.filter((r) => r.found).length;
-            notFoundCount = sortedResults.filter((r) => !r.found).length;
-        }
+    interface Props {
+        results: (DetailedResult | SimpleResult)[];
     }
+
+    let { results }: Props = $props();
+
+    let foundCount = $state(0);
+    let notFoundCount = $state(0);
+    let sortedResults: DetailedResult[] = $state([]);
+
 
     function isDetailedResult(
         result: DetailedResult | SimpleResult,
@@ -89,6 +84,17 @@
                 details.removeEventListener("toggle", handleToggle);
             });
         };
+    });
+    run(() => {
+        if (results.length > 0 && isDetailedResult(results[0])) {
+            sortedResults = (results as DetailedResult[]).sort((a, b) => {
+                if (a.found && !b.found) return -1;
+                if (!a.found && b.found) return 1;
+                return 0;
+            });
+            foundCount = sortedResults.filter((r) => r.found).length;
+            notFoundCount = sortedResults.filter((r) => !r.found).length;
+        }
     });
 </script>
 
@@ -234,7 +240,7 @@
             <div class="flex items-center">
                 <span class="font-bold mr-2">Total Found: {foundCount}</span>
                 <button
-                    on:click={() => downloadCSV("found")}
+                    onclick={() => downloadCSV("found")}
                     class="p-2 rounded-full bg-green-100 hover:bg-green-200 transition-colors duration-200"
                     title="Download Found Keys"
                     data-transaction-name="Download Found Document Keys"
@@ -260,7 +266,7 @@
                     >Total Not Found: {notFoundCount}</span
                 >
                 <button
-                    on:click={() => downloadCSV("notFound")}
+                    onclick={() => downloadCSV("notFound")}
                     class="p-2 rounded-full bg-red-100 hover:bg-red-200 transition-colors duration-200"
                     title="Download Not Found Keys"
                     data-transaction-name="Download Not Found Document Keys"

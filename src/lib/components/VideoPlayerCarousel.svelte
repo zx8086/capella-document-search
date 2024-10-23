@@ -1,21 +1,28 @@
 <!-- src/lib/components/VideoPlayerCarousel.svelte -->
 
 <script lang="ts">
+    import { run } from 'svelte/legacy';
+
     import { onMount, onDestroy, createEventDispatcher } from "svelte";
     import { browser } from "$app/environment";
     import { fade } from "svelte/transition";
-    // import frontendConfig from "$frontendConfig";
+    
 
-    export let videos: string[] = [];
-    export let isVisible = false;
+    interface Props {
+        // import frontendConfig from "$frontendConfig";
+        videos?: string[];
+        isVisible?: boolean;
+    }
+
+    let { videos = [], isVisible = false }: Props = $props();
 
     const dispatch = createEventDispatcher();
 
-    let videoElement: HTMLVideoElement;
-    let currentVideoIndex = 0;
-    let isExiting = false;
-    let isInitialized = false;
-    let isPlaying = false;
+    let videoElement: HTMLVideoElement = $state();
+    let currentVideoIndex = $state(0);
+    let isExiting = $state(false);
+    let isInitialized = $state(false);
+    let isPlaying = $state(false);
 
     const videoBasePath = "https://d2bgp0ri487o97.cloudfront.net/idle-videos/";
     const effectiveVideoBasePath =
@@ -144,14 +151,16 @@
         }
     });
 
-    $: if (
-        isVisible &&
-        videos[currentVideoIndex] &&
-        isInitialized &&
-        !isPlaying
-    ) {
-        loadAndPlayVideo();
-    }
+    run(() => {
+        if (
+            isVisible &&
+            videos[currentVideoIndex] &&
+            isInitialized &&
+            !isPlaying
+        ) {
+            loadAndPlayVideo();
+        }
+    });
 </script>
 
 {#if isVisible}
@@ -171,7 +180,7 @@
                 playsinline
                 muted
                 use:initializeVideo
-                on:error={handleVideoError}
+                onerror={handleVideoError}
             >
                 <source
                     src={loadVideo(videos[currentVideoIndex])}

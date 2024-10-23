@@ -9,13 +9,24 @@
         timeTaken: number | null;
         documentKey: string;
     }
-    export let bucket: DocumentDisplayProps["bucket"] = null;
-    export let scope: DocumentDisplayProps["scope"] = null;
-    export let collection: DocumentDisplayProps["collection"] = null;
-    export let data: DocumentDisplayProps["data"] = null;
-    export let timeTaken: DocumentDisplayProps["timeTaken"] = null;
-    export let documentKey: DocumentDisplayProps["documentKey"] = "";
-    let isExpanded = false;
+    interface Props {
+        bucket?: DocumentDisplayProps["bucket"];
+        scope?: DocumentDisplayProps["scope"];
+        collection?: DocumentDisplayProps["collection"];
+        data?: DocumentDisplayProps["data"];
+        timeTaken?: DocumentDisplayProps["timeTaken"];
+        documentKey?: DocumentDisplayProps["documentKey"];
+    }
+
+    let {
+        bucket = null,
+        scope = null,
+        collection = null,
+        data = null,
+        timeTaken = null,
+        documentKey = ""
+    }: Props = $props();
+    let isExpanded = $state(false);
     function toggleExpand() {
         isExpanded = !isExpanded;
     }
@@ -35,7 +46,7 @@
             URL.revokeObjectURL(url);
         }
     }
-    $: hasData = data !== null && Object.keys(data).length > 0;
+    let hasData = $derived(data !== null && Object.keys(data).length > 0);
 </script>
 
 <div
@@ -53,7 +64,7 @@
     <div class="flex justify-between items-center">
         <div class="flex items-center space-x-2">
             <button
-                on:click={toggleExpand}
+                onclick={toggleExpand}
                 class="p-1 text-gray-500 hover:text-gray-700"
                 aria-label={isExpanded ? "Collapse" : "Expand"}
                 data-transaction-name={`${isExpanded ? "Collapse" : "Expand"} Document Display`}
@@ -108,7 +119,7 @@
         </div>
         {#if hasData}
             <button
-                on:click={downloadJson}
+                onclick={downloadJson}
                 class="p-2 rounded-full bg-green-100 hover:bg-green-200 transition-colors duration-200"
                 title="Download JSON"
                 data-transaction-name="Download Document JSON"

@@ -1,6 +1,8 @@
 <!-- src/routes/+layout.svelte -->
 
 <script lang="ts">
+    import { run } from 'svelte/legacy';
+
     import "../app.css";
     import "../apm-config";
     import * as Drawer from "$lib/components/ui/drawer";
@@ -12,6 +14,11 @@
     import { frontendConfig } from "$frontendConfig";
     import { writable } from "svelte/store";
     import { collections } from "../stores/collectionsStore";
+    interface Props {
+        children?: import('svelte').Snippet;
+    }
+
+    let { children }: Props = $props();
 
     let pollInterval: ReturnType<typeof setInterval>;
 
@@ -30,9 +37,11 @@
         }
     }
 
-    $: if (browser) {
-        applyDarkMode($darkMode);
-    }
+    run(() => {
+        if (browser) {
+            applyDarkMode($darkMode);
+        }
+    });
 
     async function initializeTracker() {
         if (isTrackerInitialized) return tracker;
@@ -110,8 +119,8 @@
         },
     ];
 
-    let currentQuoteIndex = 0;
-    let isPaused = false;
+    let currentQuoteIndex = $state(0);
+    let isPaused = $state(false);
     let autoplayIntervalTime = 4000;
     let autoplayInterval: ReturnType<typeof setInterval> | null = null;
 
@@ -253,7 +262,7 @@
                 },
             }}
         />
-        <slot />
+        {@render children?.()}
     </main>
 
     <!-- Footer Section -->
@@ -312,7 +321,7 @@
                                             type="button"
                                             data-transaction-name="Toggle Pause button"
                                             class="absolute bottom-4 right-4 z-20 rounded-full text-white opacity-50 hover:opacity-80 focus:opacity-80"
-                                            on:click={togglePause}
+                                            onclick={togglePause}
                                             aria-label={isPaused
                                                 ? "Play carousel"
                                                 : "Pause carousel"}
@@ -359,7 +368,7 @@
                                                         index}
                                                     class:bg-gray-400={currentQuoteIndex !==
                                                         index}
-                                                    on:click={() =>
+                                                    onclick={() =>
                                                         (currentQuoteIndex =
                                                             index)}
                                                     aria-label={`Quote ${index + 1}`}

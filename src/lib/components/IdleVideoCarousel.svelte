@@ -5,12 +5,16 @@
     import { browser } from "$app/environment";
     import VideoPlayerCarousel from "./VideoPlayerCarousel.svelte";
 
-    export let videos: string[] = [];
-    export let idleTime: number = 120000; // 120 seconds
+    interface Props {
+        videos?: string[];
+        idleTime?: number;
+    }
+
+    let { videos = [], idleTime = 120000 }: Props = $props();
 
     const dispatch = createEventDispatcher();
 
-    let showVideoCarousel = false;
+    let showVideoCarousel = $state(false);
     let idleTimer: ReturnType<typeof setTimeout> | null = null;
 
     function resetIdleTimer() {

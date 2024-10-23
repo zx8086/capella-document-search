@@ -10,10 +10,10 @@
             { status: string; message?: string; responseTime?: number }
         >;
         checkType: "Simple" | "Detailed";
-    } | null = null;
-    let loading = true;
-    let error = "";
-    let checkType: "Simple" | "Detailed" = "Simple";
+    } | null = $state(null);
+    let loading = $state(true);
+    let error = $state("");
+    let checkType: "Simple" | "Detailed" = $state("Simple");
 
     async function fetchHealthCheck() {
         loading = true;
@@ -38,7 +38,7 @@
     }
 
     onMount(fetchHealthCheck);
-    $: transactionName = `API Health Check Page - ${checkType} Check`;
+    let transactionName = $derived(`API Health Check Page - ${checkType} Check`);
 </script>
 
 <svelte:head>
@@ -54,7 +54,7 @@
 
     <div class="mb-6">
         <button
-            on:click={toggleCheckType}
+            onclick={toggleCheckType}
             class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded"
             data-transaction-name={`Switch to ${checkType === "Simple" ? "Detailed" : "Simple"} Check`}
         >
