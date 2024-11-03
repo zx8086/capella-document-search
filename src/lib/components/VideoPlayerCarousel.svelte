@@ -1,12 +1,11 @@
 <!-- src/lib/components/VideoPlayerCarousel.svelte -->
 
 <script lang="ts">
-    import { run } from 'svelte/legacy';
+    import { run } from "svelte/legacy";
 
     import { onMount, onDestroy, createEventDispatcher } from "svelte";
     import { browser } from "$app/environment";
     import { fade } from "svelte/transition";
-    
 
     interface Props {
         // import frontendConfig from "$frontendConfig";
@@ -120,7 +119,6 @@
 
     function handleVideoError(error: Event): void {
         console.error("Video playback error:", error);
-        // Attempt to load the next video or show a fallback image
         currentVideoIndex = (currentVideoIndex + 1) % videos.length;
         loadAndPlayVideo();
     }

@@ -6,16 +6,34 @@ import path from "path";
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), "PUBLIC_");
-
   const enableOpenTelemetry = env.ENABLE_OPENTELEMETRY === "true";
+  const isDevelopment = mode === "development";
+
+  const PROD_ORIGIN = "https://shared-services.eu.pvh.cloud";
 
   return {
     plugins: [sveltekit()],
+    envPrefix: ["PUBLIC_"],
     server: {
       fs: {
         allow: ["..", "./static"],
         strict: false,
       },
+      port: 5173,
+      host: true,
+      cors: isDevelopment
+        ? {
+            origin: [
+              "http://localhost:5173",
+              "http://localhost:3000",
+              PROD_ORIGIN,
+              /\.shared-services\.eu\.pvh\.cloud$/,
+            ],
+            methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+            allowedHeaders: ["Content-Type", "Authorization"],
+            credentials: true,
+          }
+        : false,
     },
     ssr: {
       noExternal: ["@apollo/client", "@openreplay/tracker"],

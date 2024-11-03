@@ -1,7 +1,7 @@
 <!-- src/routes/+page.svelte-->
 
 <script lang="ts">
-    import { run, preventDefault } from 'svelte/legacy';
+    import { run, preventDefault } from "svelte/legacy";
 
     import { enhance } from "$app/forms";
     import { onMount, getContext } from "svelte";
@@ -72,8 +72,6 @@
                     collection_name,
                 }),
             );
-
-            console.log("Selected collections:", selectedCollections);
 
             // Force a UI update
             allCollections = [...allCollections];
@@ -375,25 +373,29 @@
         trackClick("TooltipModal", "Open");
     }
 
-    let buttonClass = $derived(isSearchMode
-        ? {
-              ready: "cursor-pointer hover:bg-[#00174f]/80",
-              searching: "cursor-not-allowed",
-              results: "cursor-not-allowed",
-          }[buttonState]
-        : !file || !isFileValid
-          ? "cursor-not-allowed"
-          : {
-                ready: "cursor-pointer hover:bg-[#00174f]/80",
-                searching: "cursor-not-allowed",
-                results: "cursor-not-allowed",
-            }[buttonState]);
+    let buttonClass = $derived(
+        isSearchMode
+            ? {
+                  ready: "cursor-pointer hover:bg-[#00174f]/80",
+                  searching: "cursor-not-allowed",
+                  results: "cursor-not-allowed",
+              }[buttonState]
+            : !file || !isFileValid
+              ? "cursor-not-allowed"
+              : {
+                    ready: "cursor-pointer hover:bg-[#00174f]/80",
+                    searching: "cursor-not-allowed",
+                    results: "cursor-not-allowed",
+                }[buttonState],
+    );
 
-    let buttonText = $derived({
-        ready: isSearchMode ? "Search" : file ? "Search" : "Search",
-        searching: isSearchMode ? "Searching..." : "Searching...",
-        results: "Done",
-    }[buttonState]);
+    let buttonText = $derived(
+        {
+            ready: isSearchMode ? "Search" : file ? "Search" : "Search",
+            searching: isSearchMode ? "Searching..." : "Searching...",
+            results: "Done",
+        }[buttonState],
+    );
 
     function toggleMode(): void {
         isSearchMode = !isSearchMode;
@@ -484,18 +486,20 @@
         }
     });
 
-    let isSelected = $derived((collection: {
-        bucket: string;
-        scope_name: string;
-        collection_name: string;
-    }) => {
-        return selectedCollections.some(
-            (c) =>
-                c.bucket === collection.bucket &&
-                c.scope_name === collection.scope_name &&
-                c.collection_name === collection.collection_name,
-        );
-    });
+    let isSelected = $derived(
+        (collection: {
+            bucket: string;
+            scope_name: string;
+            collection_name: string;
+        }) => {
+            return selectedCollections.some(
+                (c) =>
+                    c.bucket === collection.bucket &&
+                    c.scope_name === collection.scope_name &&
+                    c.collection_name === collection.collection_name,
+            );
+        },
+    );
 
     function groupCollectionsByScope(
         collections: Collection[],
@@ -667,7 +671,8 @@
                                                 onclick={preventDefault(() =>
                                                     openTooltipModal(
                                                         fileUploadTooltipContent,
-                                                    ))}
+                                                    ),
+                                                )}
                                                 class="ml-2 text-gray-500 hover:text-gray-700 focus:outline-none"
                                             >
                                                 <svg
@@ -783,10 +788,12 @@
                                                 {collection.collection_name}
                                                 {#if collection.tooltip_content}
                                                     <button
-                                                        onclick={preventDefault(() =>
-                                                            openTooltipModal(
-                                                                collection.tooltip_content,
-                                                            ))}
+                                                        onclick={preventDefault(
+                                                            () =>
+                                                                openTooltipModal(
+                                                                    collection.tooltip_content,
+                                                                ),
+                                                        )}
                                                         class="ml-2 text-gray-500 hover:text-gray-700 focus:outline-none"
                                                     >
                                                         <svg

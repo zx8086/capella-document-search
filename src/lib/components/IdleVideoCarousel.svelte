@@ -3,6 +3,7 @@
 <script lang="ts">
     import { onMount, onDestroy, createEventDispatcher } from "svelte";
     import { browser } from "$app/environment";
+    import { dev } from "$app/environment";
     import VideoPlayerCarousel from "./VideoPlayerCarousel.svelte";
 
     interface Props {
@@ -11,6 +12,10 @@
     }
 
     let { videos = [], idleTime = 120000 }: Props = $props();
+
+    // In development, use just one specific video
+    // const devVideo = ["X1_Single_Lewis_Hamilton-GENERIC_1280x730.mp4"];
+    // const effectiveVideos = dev ? devVideo : videos;
 
     const dispatch = createEventDispatcher();
 
