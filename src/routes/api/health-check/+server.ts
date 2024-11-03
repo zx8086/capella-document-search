@@ -302,6 +302,7 @@ export async function GET({ url, fetch }: { url: URL; fetch: Function }) {
   return json(
     {
       status: overallStatus,
+      version: backendConfig.openTelemetry.SERVICE_VERSION,
       checks: sortedHealthStatus,
       checkType: isSimpleCheck ? "Simple" : "Detailed",
     },

@@ -5,6 +5,7 @@
 
     let healthStatus: {
         status: string;
+        version: string | { backend: string; frontend: string }; // Add this line
         checks: Record<
             string,
             { status: string; message?: string; responseTime?: number }
@@ -38,7 +39,9 @@
     }
 
     onMount(fetchHealthCheck);
-    let transactionName = $derived(`API Health Check Page - ${checkType} Check`);
+    let transactionName = $derived(
+        `API Health Check Page - ${checkType} Check`,
+    );
 </script>
 
 <svelte:head>
@@ -83,6 +86,25 @@
                     {healthStatus.status}
                 </span>
             </h2>
+
+            {#if healthStatus.version}
+                <p class="text-md text-gray-700 mb-4">
+                    {#if typeof healthStatus.version === "string"}
+                        Version: <span class="font-semibold"
+                            >{healthStatus.version}</span
+                        >
+                    {:else}
+                        Backend Version: <span class="font-semibold"
+                            >{healthStatus.version.backend}</span
+                        ><br />
+                        Frontend Version:
+                        <span class="font-semibold"
+                            >{healthStatus.version.frontend}</span
+                        >
+                    {/if}
+                </p>
+            {/if}
+
             <p class="text-md text-gray-700 mb-4">
                 Check Type: <span class="font-semibold"
                     >{healthStatus.checkType}</span
