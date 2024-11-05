@@ -79,7 +79,24 @@ jobs:
       - name: Test container
         if: github.event_name != 'pull_request'
         run: |
-          docker run -d -p 3000:3000 -e NODE_ENV=production zx8086/capella-document-search:latest
+          # Stop existing containers using port 3000
+          docker ps -q --filter publish=3000 | xargs -r docker stop
+          
+          # Remove existing container with same name if exists
+          docker rm -f capella-search-test 2>/dev/null || true
+          
+          # Run new container with specific name
+          docker run -d \
+            --name capella-search-test \
+            -p 3000:3000 \
+            -e NODE_ENV=production \
+            zx8086/capella-document-search:latest
+          
+          # Wait for container to be healthy (optional)
+          sleep 10
+          
+          # Verify container is running
+          docker ps | grep capella-search-test || (docker logs capella-search-test && exit 1)
 
       - name: Cleanup
         if: always()

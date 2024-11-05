@@ -65,8 +65,9 @@
         <div class="flex items-center space-x-2">
             <button
                 onclick={toggleExpand}
-                class="p-1 text-gray-500 hover:text-gray-700"
-                aria-label={isExpanded ? "Collapse document details" : "Expand document details"}
+                class="p-1 text-gray-500 hover:text-gray-700 focus:ring-2 focus:ring-offset-2 focus:ring-tommy-red rounded"
+                aria-expanded={isExpanded}
+                aria-controls={`content-${bucket}-${scope}-${collection}`}
                 data-transaction-name={`${isExpanded ? "Collapse" : "Expand"} Document Display`}
             >
                 {#if isExpanded}
@@ -78,7 +79,9 @@
                         stroke="currentColor"
                         class="size-6"
                         aria-hidden="true"
+                        role="img"
                     >
+                        <title>Collapse details</title>
                         <path
                             stroke-linecap="round"
                             stroke-linejoin="round"
@@ -94,7 +97,9 @@
                         stroke="currentColor"
                         class="size-6"
                         aria-hidden="true"
+                        role="img"
                     >
+                        <title>Expand details</title>
                         <path
                             stroke-linecap="round"
                             stroke-linejoin="round"
@@ -125,8 +130,8 @@
         {#if hasData}
             <button
                 onclick={downloadJson}
-                class="p-2 rounded-full bg-green-100 hover:bg-green-200 transition-colors duration-200"
-                title="Download JSON"
+                class="p-2 rounded-full bg-green-100 hover:bg-green-200 transition-colors duration-200 focus:ring-2 focus:ring-offset-2 focus:ring-tommy-red"
+                aria-label="Download document data as JSON"
                 data-transaction-name="Download Document JSON"
             >
                 <svg
@@ -136,7 +141,10 @@
                     stroke-width="1.5"
                     stroke="currentColor"
                     class="w-6 h-6 text-green-600"
+                    aria-hidden="true"
+                    role="img"
                 >
+                    <title>Download JSON</title>
                     <path
                         stroke-linecap="round"
                         stroke-linejoin="round"
@@ -150,7 +158,10 @@
         Time taken: {timeTaken !== null ? `${timeTaken}ms` : "Unknown"}
     </p>
     {#if isExpanded}
-        <div class="mt-2 max-h-[75vh] overflow-y-auto">
+        <div 
+            id={`content-${bucket}-${scope}-${collection}`}
+            class="mt-2 max-h-[75vh] overflow-y-auto"
+        >
             {#if hasData}
                 <pre class="whitespace-pre-wrap">{JSON.stringify(
                         data,

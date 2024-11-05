@@ -18,15 +18,15 @@
     "docker:dev:env": "cp .env.development .env 2>/dev/null || true",
     "docker:dev:build": "docker rmi capella-document-search:dev 2>/dev/null || true && docker build --build-arg NODE_ENV=development -t capella-document-search:dev .",
     "docker:dev": "bun run docker:dev:env && bun run docker:dev:build",
-    "docker:run:dev": "docker run -p 3000:3000 -e NODE_ENV=development capella-document-search:dev",
+    "docker:run:dev": "docker run --name capella-search-dev -p 3000:3000 -e NODE_ENV=development capella-document-search:dev",
     "docker:prod:env": "cp .env.production .env 2>/dev/null || true",
     "docker:prod:build": "docker rmi capella-document-search:prod 2>/dev/null || true && docker build --build-arg NODE_ENV=production -t capella-document-search:prod .",
     "docker:prod": "bun run docker:prod:env && bun run docker:prod:build",
-    "docker:run:prod": "docker run -p 3000:3000 -e NODE_ENV=production capella-document-search:prod",
+    "docker:run:prod": "docker run --name capella-search-prod -p 3000:3000 -e NODE_ENV=production capella-document-search:prod",
     "docker:clean": "docker system prune -af && docker volume prune -f",
-    "docker:stop": "docker stop $(docker ps -q) 2>/dev/null || true",
-    "docker:logs:dev": "docker logs -f $(docker ps -q --filter ancestor=capella-document-search:dev)",
-    "docker:logs:prod": "docker logs -f $(docker ps -q --filter ancestor=capella-document-search:prod)"
+    "docker:stop": "docker stop capella-search-dev capella-search-prod 2>/dev/null || true",
+    "docker:logs:dev": "docker logs -f capella-search-dev",
+    "docker:logs:prod": "docker logs -f capella-search-prod"
   },
   "devDependencies": {
     "@sveltejs/adapter-auto": "^3.0.0",
