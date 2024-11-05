@@ -1,0 +1,29 @@
+# Version control
+.git
+.gitignore
+.github
+
+# Dependencies
+node_modules
+.pnpm-store
+
+# Build outputs
+build
+.svelte-kit
+
+# Development files
+.vscode
+.idea
+*.log
+.DS_Store
+coverage
+
+# Environment (we'll copy the specific one we need)
+.env
+.env.*
+!.env.development
+!.env.production
+
+# Temporary files
+*.tmp
+*.temp

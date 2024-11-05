@@ -6,123 +6,47 @@
 # Description: Integer Overflow or Wraparound
 # Info: https://security.snyk.io/vuln/SNYK-DEBIAN11-ZLIB-6008961
 # This vulnerability is present in the base image and cannot be immediately resolved.
-# Use the official Bun image
-FROM oven/bun:slim AS base
+FROM oven/bun:slim AS builder
 
 # Set working directory
 WORKDIR /app
 
-# Install dependencies stage
-FROM base AS deps
+# Copy package files and install dependencies
+COPY package.json bun.lockb ./
+RUN bun install --frozen-lockfile
 
-# Copy the entire project
+# Copy all files
 COPY . .
 
-# Install dependencies
-RUN --mount=type=cache,target=/root/.bun \
-    bun install
-
-# Build stage
-FROM deps AS builder
-
-# Define build arguments
-ARG PUBLIC_OPENREPLAY_PROJECT_KEY
-ARG PUBLIC_OPENREPLAY_INGEST_POINT
-ARG PUBLIC_ELASTIC_APM_SERVICE_NAME
-ARG PUBLIC_ELASTIC_APM_SERVER_URL
-ARG PUBLIC_ELASTIC_APM_SERVICE_VERSION
-ARG PUBLIC_ELASTIC_APM_ENVIRONMENT
-ARG PUBLIC_CSV_FILE_UPLOAD_LIMIT
-ARG PUBLIC_VIDEO_BASE_URL
-
-# Set environment variables for build
-ENV NODE_ENV=production
-ENV DB_DATA_DIR=src/data
-ENV NODE_ENV=production
-ENV DISABLE_OPENTELEMETRY=true
-ENV ENABLE_FILE_LOGGING=false
-ENV LOG_LEVEL=info
-ENV LOG_MAX_SIZE=20m
-ENV LOG_MAX_FILES=14d
-ENV GRAPHQL_ENDPOINT=http://localhost:4000/graphql
-ENV API_BASE_URL=https://cloudapi.cloud.couchbase.com/v4
-ENV ORG_ID=your-org-id
-ENV PROJECT_ID=your-project-id
-ENV CLUSTER_ID=your-cluster-id
-ENV BUCKET_ID=your-bucket-id
-ENV AUTH_TOKEN=your-auth-token
-ENV SERVICE_NAME="Capella Document Search"
-ENV SERVICE_VERSION=2.0.0
-ENV DEPLOYMENT_ENVIRONMENT=production
-ENV TRACES_ENDPOINT=https://your-traces-endpoint
-ENV METRICS_ENDPOINT=https://your-metrics-endpoint
-ENV LOGS_ENDPOINT=https://your-logs-endpoint
-ENV METRIC_READER_INTERVAL=60000
-ENV SUMMARY_LOG_INTERVAL=300000
-ENV PUBLIC_OPENREPLAY_PROJECT_KEY=$PUBLIC_OPENREPLAY_PROJECT_KEY
-ENV PUBLIC_OPENREPLAY_INGEST_POINT=$PUBLIC_OPENREPLAY_INGEST_POINT
-ENV PUBLIC_ELASTIC_APM_SERVICE_NAME=$PUBLIC_ELASTIC_APM_SERVICE_NAME
-ENV PUBLIC_ELASTIC_APM_SERVER_URL=$PUBLIC_ELASTIC_APM_SERVER_URL
-ENV PUBLIC_ELASTIC_APM_SERVICE_VERSION=$PUBLIC_ELASTIC_APM_SERVICE_VERSION
-ENV PUBLIC_ELASTIC_APM_ENVIRONMENT=$PUBLIC_ELASTIC_APM_ENVIRONMENT
-ENV PUBLIC_CSV_FILE_UPLOAD_LIMIT=$PUBLIC_CSV_FILE_UPLOAD_LIMIT
-ENV PUBLIC_VIDEO_BASE_URL=$PUBLIC_VIDEO_BASE_URL
+# Copy appropriate .env file based on build arg
+ARG ENV_FILE=.env.development
+ARG NODE_ENV=development
+COPY ${ENV_FILE} .env
 
 # Build the application
-RUN echo "Starting build process..." && \
+RUN bun run svelte-kit sync && \
+    NODE_ENV=${NODE_ENV} \
+    DISABLE_OPENTELEMETRY=true \
     bun run build
 
-# Final release stage
-FROM deps AS release
+# Production image
+FROM oven/bun:slim
 
-# Set Node environment and DB_DATA_DIR
-ENV NODE_ENV=production \
-    DB_DATA_DIR=src/data
+WORKDIR /app
 
-# Copy built files from builder stage
-COPY --from=builder /app/build /app/build
+# Copy everything from builder
+COPY --from=builder /app/ ./
 
-# Create necessary directories and set permissions
-RUN mkdir -p ${DB_DATA_DIR} && \
-    chown -R bun:bun /app && \
-    chmod 755 ${DB_DATA_DIR}
+# Install production dependencies
+RUN bun install --production --frozen-lockfile && \
+    mkdir -p src/data && \
+    chown -R bun:bun /app
 
-# Set default values for environment variables
-ENV ENABLE_FILE_LOGGING=false \
-    LOG_LEVEL=log \
-    LOG_MAX_SIZE=20m \
-    LOG_MAX_FILES=14d \
-    GRAPHQL_ENDPOINT=http://localhost:4000/graphql \
-    API_BASE_URL=https://example-api-url.com/v4 \
-    ORG_ID=aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee \
-    PROJECT_ID=ffffffff-gggg-hhhh-iiii-jjjjjjjjjjjj \
-    CLUSTER_ID=kkkkkkkk-llll-mmmm-nnnn-oooooooooooo \
-    BUCKET_ID=XXXXXXXXXXXX== \
-    AUTH_TOKEN=your-auth-token \
-    ENABLE_OPENTELEMETRY=false \
-    SERVICE_NAME="Capella Document Search" \
-    SERVICE_VERSION=2.0.0 \
-    DEPLOYMENT_ENVIRONMENT=production \
-    TRACES_ENDPOINT=https://your-traces-endpoint \
-    METRICS_ENDPOINT=https://your-metrics-endpoint \
-    LOGS_ENDPOINT=https://your-logs-endpoint \
-    METRIC_READER_INTERVAL=60000 \
-    CONSOLE_METRIC_READER_INTERVAL=60000 \
-    SUMMARY_LOG_INTERVAL=300000 \
-    PUBLIC_OPENREPLAY_INGEST_POINT=https://your-openreplay-ingest-point \
-    PUBLIC_OPENREPLAY_PROJECT_KEY="796868686868" \
-    PUBLIC_ELASTIC_APM_SERVICE_NAME="Capella Document Search" \
-    PUBLIC_ELASTIC_APM_SERVER_URL=https://your-apm-server-url \
-    PUBLIC_ELASTIC_APM_SERVICE_VERSION=2.0.0 \
-    PUBLIC_ELASTIC_APM_ENVIRONMENT=production \
-    PUBLIC_CSV_FILE_UPLOAD_LIMIT=50 \
-    PUBLIC_VIDEO_BASE_URL=""
-
-# Switch to non-root user
 USER bun
-
-# Expose the port the app runs on
 EXPOSE 3000
 
-# Run the application
-CMD ["bun", "run", "start"]
+# Make sure to get NODE_ENV from build arg
+ARG NODE_ENV
+ENV NODE_ENV=${NODE_ENV}
+
+CMD ["bun", "run", "--preload", "./src/instrumentation.ts", "./build/index.js"]

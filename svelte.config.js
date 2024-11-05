@@ -4,11 +4,16 @@ import adapter from "svelte-adapter-bun";
 import { vitePreprocess } from "@sveltejs/vite-plugin-svelte";
 import path from "path";
 
+const dev = process.env.NODE_ENV === 'development';
+
 /** @type {import('@sveltejs/kit').Config} */
 const config = {
   preprocess: vitePreprocess(),
   kit: {
-    adapter: adapter(),
+    adapter: adapter({
+      dynamic_origin: true,
+      precompress: false
+    }),
     alias: {
       $lib: path.resolve("./src/lib"),
       $utils: path.resolve("./src/utils"),
@@ -28,6 +33,7 @@ const config = {
         "default-src": ["'self'"],
         "connect-src": [
           "'self'",
+          ...(dev ? ["http://localhost:*"] : []),
           "https://eu-b2b.apm.eu-central-1.aws.cloud.es.io",
           "https://eu-b2b.apm.vpce.eu-central-1.aws.elastic-cloud.com",
           "https://apm.vpce.eu-central-1.aws.elastic-cloud.com",

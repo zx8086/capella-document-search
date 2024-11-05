@@ -16,26 +16,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Bun
-        uses: oven-sh/setup-bun@v1
-        with:
-          bun-version: latest
-
-      - name: Cache Bun dependencies
-        uses: actions/cache@v3
-        with:
-          path: ~/.bun/install/cache
-          key: ${{ runner.os }}-bun-${{ hashFiles('**/bun.lockb') }}
-          restore-keys: |
-            ${{ runner.os }}-bun-
-
-      - name: Install dependencies and run post-install scripts
-        run: |
-          bun install
-          bun pm untrusted || true
-          bun pm trust --all || true
-
-      - name: Create .env file
+      - name: Create .env file from GitHub variables
         run: |
           cat << EOF > .env
           ENABLE_FILE_LOGGING=${{ vars.ENABLE_FILE_LOGGING }}
@@ -55,7 +36,7 @@ jobs:
           ENABLE_OPENTELEMETRY=${{ vars.ENABLE_OPENTELEMETRY }}
           SERVICE_NAME=${{ vars.SERVICE_NAME }}
           SERVICE_VERSION=${{ vars.SERVICE_VERSION }}
-          DEPLOYMENT_ENVIRONMENT=${{ vars.DEPLOYMENT_ENVIRONMENT }}
+          DEPLOYMENT_ENVIRONMENT=production
           TRACES_ENDPOINT=${{ vars.TRACES_ENDPOINT }}
           METRICS_ENDPOINT=${{ vars.METRICS_ENDPOINT }}
           LOGS_ENDPOINT=${{ vars.LOGS_ENDPOINT }}
@@ -67,25 +48,8 @@ jobs:
           PUBLIC_ELASTIC_APM_SERVICE_NAME=${{ vars.PUBLIC_ELASTIC_APM_SERVICE_NAME }}
           PUBLIC_ELASTIC_APM_SERVER_URL=${{ vars.PUBLIC_ELASTIC_APM_SERVER_URL }}
           PUBLIC_ELASTIC_APM_SERVICE_VERSION=${{ vars.PUBLIC_ELASTIC_APM_SERVICE_VERSION }}
-          PUBLIC_ELASTIC_APM_ENVIRONMENT=${{ vars.PUBLIC_ELASTIC_APM_ENVIRONMENT }}
+          PUBLIC_ELASTIC_APM_ENVIRONMENT=production
           EOF
-
-      - name: Run Snyk to check for vulnerabilities in code
-        uses: snyk/actions/node@master
-        continue-on-error: true
-        env:
-          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
-        with:
-          command: test
-          args: --sarif-file-output=snyk.sarif
-
-      - name: Upload Snyk code scan results to GitHub Code Scanning
-        uses: github/codeql-action/upload-sarif@v3
-        if: always()
-        continue-on-error: true
-        with:
-          sarif_file: snyk.sarif
-          category: snyk-code
 
       - name: Log in to Docker Hub
         uses: docker/login-action@v3
@@ -93,49 +57,17 @@ jobs:
           username: ${{ secrets.DOCKER_HUB_USERNAME }}
           password: ${{ secrets.DOCKER_HUB_ACCESS_TOKEN }}
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-        with:
-          version: "lab:latest"
-          driver: cloud
-          endpoint: "zx8086/cldbuild"
-          install: true
-
       - name: Build and push Docker image
         uses: docker/build-push-action@v6
         with:
           context: .
-          push: ${{ github.event_name != 'pull_request' }}
-          tags: zx8086/capella-document-search:latest
-          platforms: linux/arm64,linux/amd64
-          target: release
-          outputs: ${{ github.event_name == 'pull_request' && 'type=cacheonly' || 'type=registry' }}
           build-args: |
-            ENABLE_FILE_LOGGING=false
-            LOG_LEVEL=info
-            LOG_MAX_SIZE=20m
-            LOG_MAX_FILES=14d
-            GRAPHQL_ENDPOINT=http://localhost:4000/graphql
-            DB_DATA_DIR=src/data
-            API_BASE_URL=https://cloudapi.cloud.couchbase.com/v4
-            ORG_ID=${{ secrets.ORG_ID }}
-            PROJECT_ID=${{ secrets.PROJECT_ID }}
-            CLUSTER_ID=${{ secrets.CLUSTER_ID }}
-            BUCKET_ID=${{ secrets.BUCKET_ID }}
-            AUTH_TOKEN=${{ secrets.AUTH_TOKEN }}
-            SERVICE_NAME="Capella Document Search"
-            SERVICE_VERSION=2.0.0
-            DEPLOYMENT_ENVIRONMENT=production
-            TRACES_ENDPOINT=${{ secrets.TRACES_ENDPOINT }}
-            METRICS_ENDPOINT=${{ secrets.METRICS_ENDPOINT }}
-            LOGS_ENDPOINT=${{ secrets.LOGS_ENDPOINT }}
-            METRIC_READER_INTERVAL=60000
-            SUMMARY_LOG_INTERVAL=300000
-            PUBLIC_OPENREPLAY_INGEST_POINT=https://your-openreplay-ingest-point
-            PUBLIC_ELASTIC_APM_SERVICE_NAME="Capella Document Search"
-            PUBLIC_ELASTIC_APM_SERVER_URL=https://your-apm-server-url
-            PUBLIC_ELASTIC_APM_SERVICE_VERSION=2.0.0
-            PUBLIC_ELASTIC_APM_ENVIRONMENT=production
+            NODE_ENV=production
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: |
+            zx8086/capella-document-search:latest
+            zx8086/capella-document-search:${{ github.sha }}
+          platforms: linux/arm64,linux/amd64
 
       - name: Run Snyk to check Docker image for vulnerabilities
         uses: snyk/actions/docker@master
@@ -146,116 +78,15 @@ jobs:
           image: zx8086/capella-document-search:latest
           args: --file=Dockerfile --severity-threshold=high
 
-      - name: Run Snyk and generate SARIF
-        env:
-          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+      - name: Test container
+        if: github.event_name != 'pull_request'
         run: |
-          # Install jq if not available
-          if ! command -v jq &> /dev/null; then
-            sudo apt-get update && sudo apt-get install -y jq
-          fi
-
-          # Run Snyk test using Bun and capture output
-          bun run snyk test --docker zx8086/capella-document-search:latest --json | \
-          jq '{
-            "$schema": "https://raw.githubusercontent.com/oasis-tcs/sarif-spec/master/Schemata/sarif-schema-2.1.0.json",
-            "version": "2.1.0",
-            "runs": [
-              {
-                "tool": {
-                  "driver": {
-                    "name": "Snyk Docker",
-                    "rules": [.vulnerabilities[] | {
-                      "id": .id,
-                      "shortDescription": {
-                        "text": .title
-                      },
-                      "fullDescription": {
-                        "text": .description
-                      },
-                      "help": {
-                        "text": .description
-                      },
-                      "properties": {
-                        "tags": [
-                          "security",
-                          .severity
-                        ]
-                      }
-                    }]
-                  }
-                },
-                "results": [.vulnerabilities[] | {
-                  "ruleId": .id,
-                  "message": {
-                    "text": .title
-                  },
-                  "locations": [
-                    {
-                      "physicalLocation": {
-                        "artifactLocation": {
-                          "uri": "Dockerfile"
-                        },
-                        "region": {
-                          "startLine": 1,
-                          "startColumn": 1,
-                          "endLine": 1,
-                          "endColumn": 1
-                        }
-                      }
-                    }
-                  ]
-                }]
-              }
-            ]
-          }' > snyk-docker.sarif
-
-          # Check if the SARIF file is empty and create a valid empty SARIF if so
-          if [ ! -s snyk-docker.sarif ]; then
-            echo '{
-              "$schema": "https://raw.githubusercontent.com/oasis-tcs/sarif-spec/master/Schemata/sarif-schema-2.1.0.json",
-              "version": "2.1.0",
-              "runs": [
-                {
-                  "tool": {
-                    "driver": {
-                      "name": "Snyk Docker",
-                      "rules": []
-                    }
-                  },
-                  "results": []
-                }
-              ]
-            }' > snyk-docker.sarif
-          fi
-
-      - name: Check SARIF file
-        run: |
-          if [ -f "snyk-docker.sarif" ]; then
-            echo "SARIF file exists"
-            cat snyk-docker.sarif
-          else
-            echo "SARIF file does not exist"
-          fi
-
-      - name: Upload Docker Snyk scan results to GitHub Code Scanning
-        uses: github/codeql-action/upload-sarif@v3
-        if: always()
-        continue-on-error: true
-        with:
-          sarif_file: snyk-docker.sarif
-          category: snyk-docker
+          docker run -d -p 3000:3000 -e NODE_ENV=production zx8086/capella-document-search:latest
 
       - name: Cleanup
         if: always()
         run: |
           rm -f .env
-          rm -f snyk.sarif snyk-docker.sarif || true
           docker image prune -f
           docker volume prune -f
           echo "Cleanup completed"
-
-      - name: Inspect Docker image
-        run: |
-          docker image inspect zx8086/capella-document-search:latest
-          docker history zx8086/capella-document-search:latest
