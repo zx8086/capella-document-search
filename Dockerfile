@@ -18,10 +18,8 @@ RUN bun install --frozen-lockfile
 # Copy all files
 COPY . .
 
-# Copy appropriate .env file based on build arg
-ARG ENV_FILE=.env.development
+# Build arg for environment
 ARG NODE_ENV=development
-COPY ${ENV_FILE} .env
 
 # Build the application
 RUN bun run svelte-kit sync && \
@@ -45,7 +43,6 @@ RUN bun install --production --frozen-lockfile && \
 USER bun
 EXPOSE 3000
 
-# Make sure to get NODE_ENV from build arg
 ARG NODE_ENV
 ENV NODE_ENV=${NODE_ENV}
 
