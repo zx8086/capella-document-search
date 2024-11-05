@@ -4,11 +4,11 @@
     import { run } from "svelte/legacy";
 
     import { onMount, onDestroy, createEventDispatcher } from "svelte";
-    import { browser } from "$app/environment";
+    import { browser, dev } from "$app/environment";
     import { fade } from "svelte/transition";
+    import { videoConfig } from "$lib/config/video.config";
 
     interface Props {
-        // import frontendConfig from "$frontendConfig";
         videos?: string[];
         isVisible?: boolean;
     }
@@ -23,7 +23,7 @@
     let isInitialized = $state(false);
     let isPlaying = $state(false);
 
-    const videoBasePath = "https://d2bgp0ri487o97.cloudfront.net/idle-videos/";
+    const videoBasePath = dev ? '/idle-videos/' : videoConfig.baseUrl;
     const effectiveVideoBasePath =
         videoBasePath.trim() === "" ? "/idle-videos/" : videoBasePath;
 
@@ -50,6 +50,9 @@
     }
 
     function loadVideo(filename: string): string {
+        if (dev && !videos.includes(filename)) {
+            return `/idle-videos/${videoConfig.defaultVideos[0]}`;
+        }
         return `${videoBasePath}${filename}`;
     }
 
