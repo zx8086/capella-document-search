@@ -29,13 +29,13 @@ jobs:
             image=moby/buildkit:latest
           platforms: linux/amd64,linux/arm64
 
-      - name: Create .env file (like our docker:prod:env script)
+      - name: Create .env file for build
         run: |
-          cat << EOF > .env.production
-          ENABLE_FILE_LOGGING=${{ vars.ENABLE_FILE_LOGGING }}
-          LOG_LEVEL=${{ vars.LOG_LEVEL }}
-          LOG_MAX_SIZE=${{ vars.LOG_MAX_SIZE }}
-          LOG_MAX_FILES=${{ vars.LOG_MAX_FILES }}
+          cat << EOF > .env
+          ENABLE_FILE_LOGGING=false
+          LOG_LEVEL=info
+          LOG_MAX_SIZE=10m
+          LOG_MAX_FILES=7
           GRAPHQL_ENDPOINT=${{ vars.GRAPHQL_ENDPOINT }}
           DB_DATA_DIR=${{ vars.DB_DATA_DIR }}
           PUBLIC_CSV_FILE_UPLOAD_LIMIT=${{ vars.PUBLIC_CSV_FILE_UPLOAD_LIMIT }}
@@ -46,7 +46,7 @@ jobs:
           CLUSTER_ID=${{ vars.CLUSTER_ID }}
           BUCKET_ID=${{ vars.BUCKET_ID }}
           AUTH_TOKEN=${{ vars.AUTH_TOKEN }}
-          ENABLE_OPENTELEMETRY=${{ vars.ENABLE_OPENTELEMETRY }}
+          ENABLE_OPENTELEMETRY=false
           SERVICE_NAME=${{ vars.SERVICE_NAME }}
           SERVICE_VERSION=${{ vars.SERVICE_VERSION }}
           TRACES_ENDPOINT=${{ vars.TRACES_ENDPOINT }}
@@ -63,8 +63,9 @@ jobs:
           PUBLIC_ELASTIC_APM_ENVIRONMENT=production
           EOF
 
-      - name: Copy .env.production to .env (matching our local pattern)
-        run: cp .env.production .env
+      - name: Create production env file
+        run: |
+          cp .env .env.production
 
       - name: Log in to Docker Hub
         uses: docker/login-action@v3
@@ -84,8 +85,6 @@ jobs:
             zx8086/capella-document-search:latest
             zx8086/capella-document-search:${{ github.sha }}
           platforms: linux/amd64,linux/arm64
-          cache-from: type=registry,ref=zx8086/capella-document-search:buildcache
-          cache-to: type=registry,ref=zx8086/capella-document-search:buildcache,mode=max
           provenance: false
 
       - name: Run Snyk to check Docker image for vulnerabilities
