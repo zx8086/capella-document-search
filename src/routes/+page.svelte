@@ -119,7 +119,7 @@
     let fileUploadResults = $state([]);
     let fileInputFiles: FileList | null = $state(null);
 
-    run(() => {
+    $effect(() => {
         if (fileInputFiles && fileInputFiles.length > 0) {
             file = fileInputFiles[0];
         } else {
@@ -474,13 +474,13 @@
         }
     }
 
-    run(() => {
+    $effect(() => {
         if (documentKey) {
             resetSearch();
         }
     });
 
-    run(() => {
+    $effect(() => {
         if (documentKey) {
             resetSearch();
         }
@@ -504,7 +504,7 @@
     function groupCollectionsByScope(
         collections: Collection[],
     ): Record<string, Collection[]> {
-        const sorted = collections.sort((a, b) => {
+        const sortedCollections = [...collections].sort((a, b) => {
             if (a.scope_name < b.scope_name) return -1;
             if (a.scope_name > b.scope_name) return 1;
             if (a.collection_name < b.collection_name) return -1;
@@ -512,21 +512,18 @@
             return 0;
         });
 
-        return sorted.reduce(
-            (acc, collection) => {
-                if (!acc[collection.scope_name]) {
-                    acc[collection.scope_name] = [];
-                }
-                acc[collection.scope_name].push(collection);
-                return acc;
-            },
-            {} as Record<string, Collection[]>,
-        );
+        return sortedCollections.reduce((acc, collection) => {
+            if (!acc[collection.scope_name]) {
+                acc[collection.scope_name] = [];
+            }
+            acc[collection.scope_name] = [...acc[collection.scope_name], collection];
+            return acc;
+        }, {} as Record<string, Collection[]>);
     }
 
     let groupedCollections = $derived(groupCollectionsByScope(allCollections));
 
-    run(() => {
+    $effect(() => {
         if (isSearchMode && searchResults.length > 0) {
             sortedResults = [...searchResults].sort((a, b) => {
                 const aHasData =
@@ -593,18 +590,22 @@
                                 >
                                     <button
                                         type="button"
-                                        title="search"
                                         class="p-1 focus:outline-none focus:ring focus:ring-tommy-red/50 rounded-full"
+                                        aria-label="Search documents"
+                                        title="Search documents"
                                     >
                                         <svg
                                             fill="currentColor"
                                             viewBox="0 0 512 512"
                                             class="w-4 h-4 text-gray-500"
+                                            aria-hidden="true"
+                                            role="img"
                                         >
                                             <path
                                                 d="M479.6,399.716l-81.084-81.084-62.368-25.767A175.014,175.014,0,0,0,368,192c0-97.047-78.953-176-176-176S16,94.953,16,192,94.953,368,192,368a175.034,175.034,0,0,0,101.619-32.377l25.7,62.2L400.4,478.911a56,56,0,1,0,79.2-79.195ZM48,192c0-79.4,64.6-144,144-144s144,64.6,144,144S271.4,336,192,336,48,271.4,48,192ZM456.971,456.284a24.028,24.028,0,0,1-33.942,0l-76.572-76.572-23.894-57.835L380.4,345.771l76.573,76.572A24.028,24.028,0,0,1,456.971,456.284Z"
                                             />
                                         </svg>
+                                        <span class="sr-only">Search documents</span>
                                     </button>
                                 </span>
                                 <input
@@ -674,6 +675,7 @@
                                                     ),
                                                 )}
                                                 class="ml-2 text-gray-500 hover:text-gray-700 focus:outline-none"
+                                                aria-label="Show file upload information"
                                             >
                                                 <svg
                                                     xmlns="http://www.w3.org/2000/svg"
@@ -681,6 +683,7 @@
                                                     viewBox="0 0 24 24"
                                                     stroke="currentColor"
                                                     class="w-4 h-4"
+                                                    aria-hidden="true"
                                                 >
                                                     <path
                                                         stroke-linecap="round"
@@ -689,6 +692,7 @@
                                                         d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
                                                     />
                                                 </svg>
+                                                <span class="sr-only">Show file upload information</span>
                                             </button>
                                         </span>
                                         <small
@@ -725,9 +729,8 @@
                             onclick={toggleMode}
                             data-transaction-name="Toggle Search Mode"
                             class="p-2 bg-gray-200 rounded-full hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-tommy-red animate-pulse"
-                            title={isSearchMode
-                                ? "Switch to Upload Mode"
-                                : "Switch to Search Mode"}
+                            title={isSearchMode ? "Switch to Upload Mode" : "Switch to Search Mode"}
+                            aria-label={isSearchMode ? "Switch to Upload Mode" : "Switch to Search Mode"}
                         >
                             <svg
                                 xmlns="http://www.w3.org/2000/svg"
@@ -736,6 +739,7 @@
                                 stroke-width="1.5"
                                 stroke="currentColor"
                                 class="w-6 h-6"
+                                aria-hidden="true"
                             >
                                 <path
                                     stroke-linecap="round"
@@ -743,6 +747,7 @@
                                     d="M19.5 12c0-1.232-.046-2.453-.138-3.662a4.006 4.006 0 0 0-3.7-3.7 48.678 48.678 0 0 0-7.324 0 4.006 4.006 0 0 0-3.7 3.7c-.017.22-.032.441-.046.662M19.5 12l3-3m-3 3-3-3m-12 3c0 1.232.046 2.453.138 3.662a4.006 4.006 0 0 0 3.7 3.7 48.656 48.656 0 0 0 7.324 0 4.006 4.006 0 0 0 3.7-3.7c.017-.22.032-.441.046-.662M4.5 12l3 3m-3-3-3 3"
                                 />
                             </svg>
+                            <span class="sr-only">{isSearchMode ? "Switch to Upload Mode" : "Switch to Search Mode"}</span>
                         </button>
                     </div>
                 </div>
@@ -1000,6 +1005,7 @@ IMAGE_70_C51_LV04F1003GPDE</pre>
                                 data-transaction-name="Close Example Modal"
                                 type="button"
                                 class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+                                aria-label="Close example modal"
                             >
                                 Close
                             </button>
@@ -1069,7 +1075,8 @@ IMAGE_70_C51_LV04F1003GPDE</pre>
                 <button
                     onclick={() => (modalIsOpen = false)}
                     data-transaction-name="Tooltip Modal"
-                    aria-label="close modal"
+                    aria-label="Close tooltip modal"
+                    class="cursor-pointer whitespace-nowrap rounded-xl bg-blue-700 px-4 py-2 text-center text-sm font-medium tracking-wide text-slate-100 transition hover:opacity-75 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-700 active:opacity-100 active:outline-offset-0 dark:bg-blue-600 dark:text-slate-100 dark:focus-visible:outline-blue-600"
                 >
                     <svg
                         xmlns="http://www.w3.org/2000/svg"
@@ -1086,6 +1093,7 @@ IMAGE_70_C51_LV04F1003GPDE</pre>
                             d="M6 18L18 6M6 6l12 12"
                         />
                     </svg>
+                    <span class="sr-only">Close tooltip modal</span>
                 </button>
             </div>
             <div class="px-4 py-8">
@@ -1099,6 +1107,7 @@ IMAGE_70_C51_LV04F1003GPDE</pre>
                     type="button"
                     data-transaction-name="Tooltip Modal"
                     class="cursor-pointer whitespace-nowrap rounded-xl bg-blue-700 px-4 py-2 text-center text-sm font-medium tracking-wide text-slate-100 transition hover:opacity-75 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-700 active:opacity-100 active:outline-offset-0 dark:bg-blue-600 dark:text-slate-100 dark:focus-visible:outline-blue-600"
+                    aria-label="Close tooltip modal"
                 >
                     Close
                 </button>

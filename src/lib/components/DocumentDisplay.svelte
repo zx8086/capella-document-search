@@ -66,7 +66,7 @@
             <button
                 onclick={toggleExpand}
                 class="p-1 text-gray-500 hover:text-gray-700"
-                aria-label={isExpanded ? "Collapse" : "Expand"}
+                aria-label={isExpanded ? "Collapse document details" : "Expand document details"}
                 data-transaction-name={`${isExpanded ? "Collapse" : "Expand"} Document Display`}
             >
                 {#if isExpanded}
@@ -77,6 +77,7 @@
                         stroke-width="1.5"
                         stroke="currentColor"
                         class="size-6"
+                        aria-hidden="true"
                     >
                         <path
                             stroke-linecap="round"
@@ -92,6 +93,7 @@
                         stroke-width="1.5"
                         stroke="currentColor"
                         class="size-6"
+                        aria-hidden="true"
                     >
                         <path
                             stroke-linecap="round"
@@ -100,6 +102,9 @@
                         />
                     </svg>
                 {/if}
+                <span class="sr-only">
+                    {isExpanded ? "Collapse document details" : "Expand document details"}
+                </span>
             </button>
             <h3 class="font-bold">
                 <span class="font-semibold text-gray-600">Bucket:</span>

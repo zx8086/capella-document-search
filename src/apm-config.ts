@@ -1,12 +1,22 @@
 /* src/apm-config.ts */
 
 import { init as initApm } from "@elastic/apm-rum";
+import { envSchema } from "./env/schema";
+
+const env = import.meta.env;
 
 const apm = initApm({
-  serviceName: process.env.PUBLIC_ELASTIC_APM_SERVICE_NAME,
-  serverUrl: process.env.PUBLIC_ELASTIC_APM_SERVER_URL,
-  serviceVersion: process.env.PUBLIC_ELASTIC_APM_SERVICE_VERSION,
-  environment: process.env.PUBLIC_ELASTIC_APM_ENVIRONMENT,
+  serviceName: env[envSchema.elastic.serviceName],
+  serverUrl: env[envSchema.elastic.serverUrl],
+  serviceVersion: env[envSchema.elastic.serviceVersion],
+  environment: env[envSchema.elastic.environment],
+});
+
+console.log("APM Config:", {
+  serviceName: env[envSchema.elastic.serviceName],
+  serverUrl: env[envSchema.elastic.serverUrl],
+  serviceVersion: env[envSchema.elastic.serviceVersion],
+  environment: env[envSchema.elastic.environment],
 });
 
 export default apm;

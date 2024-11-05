@@ -180,6 +180,29 @@
 
         if (pollInterval) clearInterval(pollInterval);
     });
+
+    function groupCollectionsByScope(collections: Collection[]): Record<string, Collection[]> {
+        // Create a new array instead of mutating the input
+        const sortedCollections = [...collections].sort((a, b) => {
+            if (a.scope_name < b.scope_name) return -1;
+            if (a.scope_name > b.scope_name) return 1;
+            if (a.collection_name < b.collection_name) return -1;
+            if (a.collection_name > b.collection_name) return 1;
+            return 0;
+        });
+
+        return sortedCollections.reduce((acc, collection) => {
+            // Create a new object instead of mutating the accumulator
+            if (!acc[collection.scope_name]) {
+                acc[collection.scope_name] = [];
+            }
+            acc[collection.scope_name] = [...acc[collection.scope_name], collection];
+            return acc;
+        }, {} as Record<string, Collection[]>);
+    }
+
+    // Change the derived value to a computed value
+    const groupedCollections = $derived(() => groupCollectionsByScope(allCollections));
 </script>
 
 <div class="flex flex-col min-h-screen">
@@ -271,7 +294,7 @@
             <div class="flex justify-between items-center">
                 <!-- Copyright and B2B Platform Engineering -->
                 <div class="flex-grow text-center">
-                    <p>
+                    <div>
                         &copy; {new Date().getFullYear()} PVH. Powered by
                         <Drawer.Root>
                             <Drawer.Trigger>
@@ -404,7 +427,7 @@
                                 </Drawer.Footer>
                             </Drawer.Content>
                         </Drawer.Root>
-                    </p>
+                    </div>
                 </div>
                 <!-- Health Check Icon and Text -->
                 <a

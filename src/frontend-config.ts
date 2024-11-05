@@ -1,42 +1,27 @@
 /* src/frontend-config.ts */
 
-import {
-  PUBLIC_OPENREPLAY_PROJECT_KEY,
-  PUBLIC_OPENREPLAY_INGEST_POINT,
-  PUBLIC_CSV_FILE_UPLOAD_LIMIT,
-  PUBLIC_ELASTIC_APM_SERVICE_NAME,
-  PUBLIC_ELASTIC_APM_SERVER_URL,
-  PUBLIC_ELASTIC_APM_SERVICE_VERSION,
-  PUBLIC_ELASTIC_APM_ENVIRONMENT,
-} from "$env/static/public";
-
-// Debug log
-// console.log("Environment Variables:", {
-//   PUBLIC_OPENREPLAY_PROJECT_KEY,
-//   PUBLIC_OPENREPLAY_INGEST_POINT,
-//   PUBLIC_CSV_FILE_UPLOAD_LIMIT,
-//   PUBLIC_ELASTIC_APM_SERVICE_NAME,
-//   PUBLIC_ELASTIC_APM_SERVER_URL,
-//   PUBLIC_ELASTIC_APM_SERVICE_VERSION,
-//   PUBLIC_ELASTIC_APM_ENVIRONMENT,
-// });
-
+import { envSchema } from "./env/schema";
 import type { FrontendConfig } from "./models/types";
+
+const env = import.meta.env;
 
 export const frontendConfig: FrontendConfig = {
   openreplay: {
-    PROJECT_KEY: PUBLIC_OPENREPLAY_PROJECT_KEY,
-    INGEST_POINT: PUBLIC_OPENREPLAY_INGEST_POINT,
+    PROJECT_KEY: env[envSchema.openreplay.projectKey],
+    INGEST_POINT: env[envSchema.openreplay.ingestPoint],
   },
   csv: {
-    FILE_UPLOAD_LIMIT: Number(PUBLIC_CSV_FILE_UPLOAD_LIMIT),
+    FILE_UPLOAD_LIMIT: Number(env[envSchema.csv.uploadLimit]),
   },
   elasticApm: {
-    SERVICE_NAME: PUBLIC_ELASTIC_APM_SERVICE_NAME,
-    SERVER_URL: PUBLIC_ELASTIC_APM_SERVER_URL,
-    SERVICE_VERSION: PUBLIC_ELASTIC_APM_SERVICE_VERSION,
-    ENVIRONMENT: PUBLIC_ELASTIC_APM_ENVIRONMENT,
+    SERVICE_NAME: env[envSchema.elastic.serviceName],
+    SERVER_URL: env[envSchema.elastic.serverUrl],
+    SERVICE_VERSION: env[envSchema.elastic.serviceVersion],
+    ENVIRONMENT: env[envSchema.elastic.environment],
   },
 } as const;
+
+// Debug log to verify values are loaded correctly
+console.log("Frontend Config:", frontendConfig);
 
 export type { FrontendConfig } from "./models/types";

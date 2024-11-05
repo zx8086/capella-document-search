@@ -3,9 +3,20 @@
 import { sveltekit } from "@sveltejs/kit/vite";
 import { defineConfig, loadEnv } from "vite";
 import path from "path";
+import { envSchema } from "./src/env/schema";
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), "PUBLIC_");
+
+  // Automatically create define object from schema
+  const defineObj = Object.entries(env).reduce(
+    (acc, [key, value]) => ({
+      ...acc,
+      [`import.meta.env.${key}`]: JSON.stringify(value),
+    }),
+    {},
+  );
+
   const enableOpenTelemetry = env.ENABLE_OPENTELEMETRY === "true";
   const isDevelopment = mode === "development";
 
@@ -54,29 +65,7 @@ export default defineConfig(({ mode }) => {
     optimizeDeps: {
       exclude: enableOpenTelemetry ? ["src/utils/serverLogger"] : [],
     },
-    define: {
-      "process.env.PUBLIC_ELASTIC_APM_SERVICE_NAME": JSON.stringify(
-        process.env.PUBLIC_ELASTIC_APM_SERVICE_NAME,
-      ),
-      "process.env.PUBLIC_ELASTIC_APM_SERVER_URL": JSON.stringify(
-        process.env.PUBLIC_ELASTIC_APM_SERVER_URL,
-      ),
-      "process.env.PUBLIC_ELASTIC_APM_SERVICE_VERSION": JSON.stringify(
-        process.env.PUBLIC_ELASTIC_APM_SERVICE_VERSION,
-      ),
-      "process.env.PUBLIC_ELASTIC_APM_ENVIRONMENT": JSON.stringify(
-        process.env.PUBLIC_ELASTIC_APM_ENVIRONMENT,
-      ),
-      "import.meta.env.PUBLIC_OPENREPLAY_PROJECT_KEY": JSON.stringify(
-        process.env.PUBLIC_OPENREPLAY_PROJECT_KEY,
-      ),
-      "import.meta.env.PUBLIC_OPENREPLAY_INGEST_POINT": JSON.stringify(
-        process.env.PUBLIC_OPENREPLAY_INGEST_POINT,
-      ),
-      "import.meta.env.PUBLIC_CSV_FILE_UPLOAD_LIMIT": JSON.stringify(
-        process.env.PUBLIC_CSV_FILE_UPLOAD_LIMIT,
-      ),
-    },
+    define: defineObj,
     esbuild: {
       target: "esnext",
     },
