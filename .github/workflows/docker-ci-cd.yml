@@ -42,6 +42,14 @@ jobs:
           username: ${{ secrets.DOCKER_HUB_USERNAME }}
           password: ${{ secrets.DOCKER_HUB_ACCESS_TOKEN }}
 
+      - name: Cache Docker layers
+        uses: actions/cache@v3
+        with:
+          path: /tmp/.buildx-cache
+          key: ${{ runner.os }}-buildx-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-buildx-
+
       - name: Build and push Docker image
         uses: docker/build-push-action@v6
         with:
@@ -49,6 +57,9 @@ jobs:
           builder: ${{ steps.buildx.outputs.name }}
           build-args: |
             NODE_ENV=production
+            BUILDKIT_INLINE_CACHE=1
+          cache-from: type=local,src=/tmp/.buildx-cache
+          cache-to: type=local,dest=/tmp/.buildx-cache-new,mode=max
           push: ${{ github.event_name != 'pull_request' }}
           tags: |
             zx8086/capella-document-search:latest
