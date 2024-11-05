@@ -29,43 +29,9 @@ jobs:
             image=moby/buildkit:latest
           platforms: linux/amd64,linux/arm64
 
-      - name: Create .env file for build
+      - name: Setup environment files
         run: |
-          cat << EOF > .env
-          ENABLE_FILE_LOGGING=false
-          LOG_LEVEL=info
-          LOG_MAX_SIZE=10m
-          LOG_MAX_FILES=7
-          GRAPHQL_ENDPOINT=${{ vars.GRAPHQL_ENDPOINT }}
-          DB_DATA_DIR=${{ vars.DB_DATA_DIR }}
-          PUBLIC_CSV_FILE_UPLOAD_LIMIT=${{ vars.PUBLIC_CSV_FILE_UPLOAD_LIMIT }}
-          PUBLIC_VIDEO_BASE_URL=${{ vars.PUBLIC_VIDEO_BASE_URL }}
-          API_BASE_URL=${{ vars.API_BASE_URL }}
-          ORG_ID=${{ vars.ORG_ID }}
-          PROJECT_ID=${{ vars.PROJECT_ID }}
-          CLUSTER_ID=${{ vars.CLUSTER_ID }}
-          BUCKET_ID=${{ vars.BUCKET_ID }}
-          AUTH_TOKEN=${{ vars.AUTH_TOKEN }}
-          ENABLE_OPENTELEMETRY=false
-          SERVICE_NAME=${{ vars.SERVICE_NAME }}
-          SERVICE_VERSION=${{ vars.SERVICE_VERSION }}
-          TRACES_ENDPOINT=${{ vars.TRACES_ENDPOINT }}
-          METRICS_ENDPOINT=${{ vars.METRICS_ENDPOINT }}
-          LOGS_ENDPOINT=${{ vars.LOGS_ENDPOINT }}
-          METRIC_READER_INTERVAL=${{ vars.METRIC_READER_INTERVAL }}
-          CONSOLE_METRIC_READER_INTERVAL=${{ vars.CONSOLE_METRIC_READER_INTERVAL }}
-          SUMMARY_LOG_INTERVAL=${{ vars.SUMMARY_LOG_INTERVAL }}
-          PUBLIC_OPENREPLAY_PROJECT_KEY=${{ vars.PUBLIC_OPENREPLAY_PROJECT_KEY }}
-          PUBLIC_OPENREPLAY_INGEST_POINT=${{ vars.PUBLIC_OPENREPLAY_INGEST_POINT }}
-          PUBLIC_ELASTIC_APM_SERVICE_NAME=${{ vars.PUBLIC_ELASTIC_APM_SERVICE_NAME }}
-          PUBLIC_ELASTIC_APM_SERVER_URL=${{ vars.PUBLIC_ELASTIC_APM_SERVER_URL }}
-          PUBLIC_ELASTIC_APM_SERVICE_VERSION=${{ vars.PUBLIC_ELASTIC_APM_SERVICE_VERSION }}
-          PUBLIC_ELASTIC_APM_ENVIRONMENT=production
-          EOF
-
-      - name: Create production env file
-        run: |
-          cp .env .env.production
+          cp .env.production .env
 
       - name: Log in to Docker Hub
         uses: docker/login-action@v3
@@ -104,7 +70,7 @@ jobs:
       - name: Cleanup
         if: always()
         run: |
-          rm -f .env
+          rm -f .env .env.production
           docker image prune -f
           docker volume prune -f
           echo "Cleanup completed"
