@@ -51,20 +51,17 @@ export default defineConfig(({ mode }): UserConfig => {
         },
         port: parseInt(env.PORT || "5173"),
         host: true,
-        cors: isDevelopment
-          ? {
-              origin: [
-                "http://localhost:5173",
-                "http://localhost:3000",
-                ...ALLOWED_ORIGINS,
-                /\.shared-services\.eu\.pvh\.cloud$/,
-                CDN_ORIGIN
-              ],
-              methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-              allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"],
-              credentials: true,
-            }
-          : false,
+        cors: {
+          origin: [
+            'http://localhost:5173',
+            'http://localhost:3000',
+            'https://capella-document-search.prd.shared-services.eu.pvh.cloud',
+            ...ALLOWED_ORIGINS,
+          ],
+          methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+          allowedHeaders: ['Content-Type', 'Authorization'],
+          credentials: true,
+        },
       },
       ssr: {
         noExternal: ["@apollo/client", "@openreplay/tracker"],

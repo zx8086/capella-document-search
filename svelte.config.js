@@ -79,6 +79,9 @@ const config = {
         "child-src": ["'self'", "blob:"],
       },
     },
+    csrf: {
+      checkOrigin: false
+    }
   },
 };
 

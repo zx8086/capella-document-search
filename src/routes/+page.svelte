@@ -104,7 +104,7 @@
     // let debugInfo = "";
 
     let documentKey: string = $state("");
-    let processing: boolean = $state(false);
+    let processing = $state(false);
     let searchPerformed = $state(false);
     let sortedResults: any[] = $state([]);
 
@@ -114,7 +114,7 @@
     let currentTooltip: string = $state("");
 
     let buttonState = $state("ready");
-    let isSearchMode: boolean = $state(true);
+    let isSearchMode = $state(true);
     let file: File | null = $state(null);
     let fileUploadResults = $state([]);
     let fileInputFiles: FileList | null = $state(null);
@@ -428,7 +428,7 @@
         file = null;
     }
 
-    let isLoading: boolean = $state(false);
+    let isLoading = $state(false);
 
     function toggleCollection(collection: {
         bucket: string;

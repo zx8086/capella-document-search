@@ -109,7 +109,16 @@ export const actions: Actions = {
           JSON.stringify(returnData, null, 2),
         );
 
-        return returnData;
+        return {
+          type: 'success',
+          data: response.data,
+          headers: {
+            'Access-Control-Allow-Origin': '*',
+            'Access-Control-Allow-Methods': 'POST, OPTIONS',
+            'Access-Control-Allow-Headers': 'Content-Type',
+            'Access-Control-Allow-Credentials': 'true',
+          }
+        };
       } catch (error: unknown) {
         retries++;
         err(`Error in searchDocuments action (attempt ${retries}):`, error);
