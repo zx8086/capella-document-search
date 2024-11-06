@@ -5,7 +5,11 @@
 
     let healthStatus: {
         status: string;
-        version: string | { backend: string; frontend: string }; // Add this line
+        version: {
+            build: string;
+            commit: string;
+            buildDate: string;
+        };
         checks: Record<
             string,
             { status: string; message?: string; responseTime?: number }
@@ -87,22 +91,20 @@
                 </span>
             </h2>
 
-            {#if healthStatus.version}
-                <p class="text-md text-gray-700 mb-4">
-                    {#if typeof healthStatus.version === "string"}
-                        Version: <span class="font-semibold"
-                            >{healthStatus.version}</span
-                        >
-                    {:else}
-                        Backend Version: <span class="font-semibold"
-                            >{healthStatus.version.backend}</span
-                        ><br />
-                        Frontend Version:
-                        <span class="font-semibold"
-                            >{healthStatus.version.frontend}</span
-                        >
-                    {/if}
-                </p>
+            {#if healthStatus?.version}
+                <div class="bg-gray-100 p-4 rounded-lg mb-4">
+                    <h3 class="text-lg font-semibold mb-2">Version Information</h3>
+                    <div class="grid grid-cols-2 gap-2 text-sm">
+                        <div class="text-gray-600">Build:</div>
+                        <div>{healthStatus.version.build}</div>
+                        
+                        <div class="text-gray-600">Commit:</div>
+                        <div class="font-mono">{healthStatus.version.commit}</div>
+                        
+                        <div class="text-gray-600">Build Date:</div>
+                        <div>{new Date(healthStatus.version.buildDate).toLocaleString()}</div>
+                    </div>
+                </div>
             {/if}
 
             <p class="text-md text-gray-700 mb-4">

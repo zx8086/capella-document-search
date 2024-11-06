@@ -57,7 +57,9 @@ jobs:
           builder: ${{ steps.buildx.outputs.name }}
           build-args: |
             NODE_ENV=production
-            BUILDKIT_INLINE_CACHE=1
+            BUILD_VERSION=${{ github.ref_name }}
+            COMMIT_HASH=${{ github.sha }}
+            BUILD_DATE=$(date -u +'%Y-%m-%dT%H:%M:%SZ')
           cache-from: type=local,src=/tmp/.buildx-cache
           cache-to: type=local,dest=/tmp/.buildx-cache-new,mode=max
           push: ${{ github.event_name != 'pull_request' }}
@@ -85,11 +87,14 @@ jobs:
           # Remove existing container with same name if exists
           docker rm -f capella-search-test 2>/dev/null || true
           
-          # Run new container with specific name
+          # Run new container with specific name and environment variables
           docker run -d \
             --name capella-search-test \
             -p 3000:3000 \
             -e NODE_ENV=production \
+            -e BUILD_VERSION=${{ github.ref_name }} \
+            -e COMMIT_HASH=${{ github.sha }} \
+            -e BUILD_DATE=$(date -u +'%Y-%m-%dT%H:%M:%SZ') \
             zx8086/capella-document-search:latest
           
           # Wait for container to be healthy (optional)

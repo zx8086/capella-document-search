@@ -23,6 +23,10 @@ const INDIVIDUAL_CHECK_TIMEOUT = 15000; // 15 seconds timeout for most checks
 const CAPELLA_API_TIMEOUT = 30000; // 30 seconds timeout for Capella API
 const GLOBAL_CHECK_TIMEOUT = 60000; // 60 seconds timeout for the entire health check
 
+const BUILD_VERSION = process.env.BUILD_VERSION || 'development';
+const COMMIT_HASH = process.env.COMMIT_HASH || 'unknown';
+const BUILD_DATE = process.env.BUILD_DATE || new Date().toISOString();
+
 async function checkOpenTelemetryEndpoint(
   url: string,
   name: string,
@@ -302,7 +306,11 @@ export async function GET({ url, fetch }: { url: URL; fetch: Function }) {
   return json(
     {
       status: overallStatus,
-      version: backendConfig.openTelemetry.SERVICE_VERSION,
+      version: {
+        build: BUILD_VERSION,
+        commit: COMMIT_HASH,
+        buildDate: BUILD_DATE
+      },
       checks: sortedHealthStatus,
       checkType: isSimpleCheck ? "Simple" : "Detailed",
     },

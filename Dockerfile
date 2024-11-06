@@ -8,6 +8,18 @@
 # This vulnerability is present in the base image and cannot be immediately resolved.
 FROM oven/bun:slim AS builder
 
+# Add build args
+ARG BUILD_VERSION=development
+ARG COMMIT_HASH=unknown
+ARG BUILD_DATE
+ARG NODE_ENV=development
+
+# Set as environment variables
+ENV BUILD_VERSION=${BUILD_VERSION}
+ENV COMMIT_HASH=${COMMIT_HASH}
+ENV BUILD_DATE=${BUILD_DATE}
+ENV NODE_ENV=${NODE_ENV}
+
 # Set working directory
 WORKDIR /app
 
@@ -18,9 +30,6 @@ RUN bun install --frozen-lockfile
 # Copy all files
 COPY . .
 
-# Build arg for environment
-ARG NODE_ENV=development
-
 # Build the application
 RUN bun run svelte-kit sync && \
     NODE_ENV=${NODE_ENV} \
@@ -29,6 +38,12 @@ RUN bun run svelte-kit sync && \
 
 # Production image
 FROM oven/bun:slim
+
+# Important: Copy the environment variables to the final stage
+ENV BUILD_VERSION=${BUILD_VERSION}
+ENV COMMIT_HASH=${COMMIT_HASH}
+ENV BUILD_DATE=${BUILD_DATE}
+ENV NODE_ENV=${NODE_ENV}
 
 WORKDIR /app
 
@@ -42,8 +57,5 @@ RUN bun install --production --frozen-lockfile && \
 
 USER bun
 EXPOSE 3000
-
-ARG NODE_ENV
-ENV NODE_ENV=${NODE_ENV}
 
 CMD ["bun", "run", "--preload", "./src/instrumentation.ts", "./build/index.js"]
