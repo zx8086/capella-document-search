@@ -10,41 +10,39 @@ export const handle: Handle = async ({ event, resolve }) => {
     headers: new Headers(response.headers),
   });
 
-  // Production origin and development check
-  const PROD_ORIGIN = "https://shared-services.eu.pvh.cloud";
+  // Define allowed origins
+  const ALLOWED_ORIGINS = [
+    "https://capella-document-search.prd.shared-services.eu.pvh.cloud",
+    "https://capellaql.prd.shared-services.eu.pvh.cloud",
+    "https://shared-services.eu.pvh.cloud"
+  ];
+  
   const isDevelopment = import.meta.env.DEV;
   const requestOrigin = event.request.headers.get("Origin");
 
   // CORS headers
   if (requestOrigin) {
     if (isDevelopment && requestOrigin.includes("localhost")) {
-      // Allow localhost in development
       newResponse.headers.set("Access-Control-Allow-Origin", requestOrigin);
     } else if (
-      requestOrigin === PROD_ORIGIN ||
+      ALLOWED_ORIGINS.includes(requestOrigin) ||
       requestOrigin.endsWith(".shared-services.eu.pvh.cloud")
     ) {
-      // Allow production domain and its subdomains
       newResponse.headers.set("Access-Control-Allow-Origin", requestOrigin);
-    } else {
-      // Default to production origin
-      newResponse.headers.set("Access-Control-Allow-Origin", PROD_ORIGIN);
     }
+    
+    newResponse.headers.set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
+    newResponse.headers.set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With");
+    newResponse.headers.set("Access-Control-Allow-Credentials", "true");
+    newResponse.headers.set("Vary", "Origin");
   }
-
-  newResponse.headers.set(
-    "Access-Control-Allow-Methods",
-    "GET, POST, PUT, DELETE, OPTIONS",
-  );
-  newResponse.headers.set(
-    "Access-Control-Allow-Headers",
-    "Content-Type, Authorization",
-  );
-  newResponse.headers.set("Access-Control-Allow-Credentials", "true");
 
   // Remove any existing CSP headers to avoid conflicts
   newResponse.headers.delete("Content-Security-Policy");
   newResponse.headers.delete("Content-Security-Policy-Report-Only");
+
+  const PROD_ORIGIN = "https://shared-services.eu.pvh.cloud";
+  const CDN_ORIGIN = "https://d2bgp0ri487o97.cloudfront.net";
 
   // CSP headers based on environment
   const cspDirectives = isDevelopment
@@ -64,14 +62,14 @@ export const handle: Handle = async ({ event, resolve }) => {
       default-src 'self' ${PROD_ORIGIN};
       script-src 'self' 'unsafe-inline' 'unsafe-eval' https://vjs.zencdn.net ${PROD_ORIGIN};
       style-src 'self' 'unsafe-inline' ${PROD_ORIGIN};
-      img-src 'self' data: blob: ${PROD_ORIGIN};
+      img-src 'self' data: blob: ${PROD_ORIGIN} ${CDN_ORIGIN};
       font-src 'self' ${PROD_ORIGIN};
-      connect-src 'self' ${PROD_ORIGIN} *.shared-services.eu.pvh.cloud;
+      connect-src 'self' ${PROD_ORIGIN} ${CDN_ORIGIN} *.shared-services.eu.pvh.cloud;
       base-uri 'self';
-      form-action 'self';
+      form-action 'self' https://capellaql.prd.shared-services.eu.pvh.cloud https://capella-document-search.prd.shared-services.eu.pvh.cloud;
       frame-ancestors 'none';
       worker-src 'self' blob:;
-      media-src 'self' blob: ${PROD_ORIGIN};
+      media-src 'self' blob: ${PROD_ORIGIN} ${CDN_ORIGIN};
     `;
 
   // Set the new CSP header

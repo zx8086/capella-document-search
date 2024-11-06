@@ -34,16 +34,19 @@ const config = {
         "connect-src": [
           "'self'",
           ...(dev ? ["http://localhost:*"] : []),
+          "https://capella-document-search.prd.shared-services.eu.pvh.cloud",
+          "https://capellaql.prd.shared-services.eu.pvh.cloud",
+          "https://d2bgp0ri487o97.cloudfront.net",
           "https://eu-b2b.apm.eu-central-1.aws.cloud.es.io",
           "https://eu-b2b.apm.vpce.eu-central-1.aws.elastic-cloud.com",
           "https://apm.vpce.eu-central-1.aws.elastic-cloud.com",
           "https://apm.eu-central-1.aws.cloud.es.io",
           "https://cloudapi.cloud.couchbase.com",
-          "https://capellaql.prd.shared-services.eu.pvh.cloud",
           "https://openreplay.prd.shared-services.eu.pvh.cloud",
           "http://collector.prd.shared-services.eu.pvh.cloud",
           "https://apm.siobytes.com",
           "https://api.openreplay.com",
+          "https://*.shared-services.eu.pvh.cloud"
         ],
         "script-src": [
           "'self'",
@@ -61,7 +64,11 @@ const config = {
         "font-src": ["'self'", "data:"],
         "object-src": ["'none'"],
         "base-uri": ["'self'"],
-        "form-action": ["'self'"],
+        "form-action": [
+          "'self'",
+          "https://capellaql.prd.shared-services.eu.pvh.cloud",
+          "https://capella-document-search.prd.shared-services.eu.pvh.cloud"
+        ],
         "frame-ancestors": ["'none'"],
         "worker-src": ["'self'", "blob:"],
         "media-src": [

@@ -54,20 +54,6 @@
         return "documentKey" in result;
     }
 
-    function handleToggle(event: Event) {
-        const details = event.target as HTMLDetailsElement;
-        const icon = details.querySelector("svg");
-        if (icon) {
-            if (details.open) {
-                icon.innerHTML =
-                    '<path stroke-linecap="round" stroke-linejoin="round" d="m4.5 5.25 7.5 7.5 7.5-7.5m-15 6 7.5 7.5 7.5-7.5" />';
-            } else {
-                icon.innerHTML =
-                    '<path stroke-linecap="round" stroke-linejoin="round" d="m5.25 4.5 7.5 7.5-7.5 7.5m6-15 7.5 7.5-7.5 7.5" />';
-            }
-        }
-    }
-
     function downloadCSV(type: "found" | "notFound") {
         const filteredResults = sortedResults.filter(
             (r) => r.found === (type === "found"),
@@ -98,6 +84,18 @@
             });
         };
     });
+
+    function handleToggle(event: Event) {
+        const details = event.target as HTMLDetailsElement;
+        const icon = details.querySelector("svg");
+        if (icon) {
+            if (details.open) {
+                icon.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />';
+            } else {
+                icon.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" />';
+            }
+        }
+    }
 </script>
 
 <div class="mt-8">
@@ -106,16 +104,16 @@
             <table class="min-w-full divide-y divide-gray-200">
                 <thead class="bg-gray-50">
                     <tr>
-                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        <th scope="col" class="w-1/4 px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                             Document Key
                         </th>
-                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        <th scope="col" class="w-1/6 px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                             Status
                         </th>
-                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        <th scope="col" class="w-1/3 px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                             Found In
                         </th>
-                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        <th scope="col" class="w-1/4 px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                             Search Summary
                         </th>
                     </tr>
@@ -123,10 +121,10 @@
                 <tbody class="bg-white divide-y divide-gray-200">
                     {#each sortedResults as result}
                         <tr>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                            <td class="w-1/4 px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                                 {result.documentKey}
                             </td>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            <td class="w-1/6 px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                                 {#if result.found}
                                     <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
                                         Found
@@ -137,11 +135,11 @@
                                     </span>
                                 {/if}
                             </td>
-                            <td class="px-6 py-4 text-sm text-gray-500">
+                            <td class="w-1/3 px-6 py-4 text-sm text-gray-500">
                                 {#if result.foundIn.length > 0}
                                     <details>
                                         <summary class="cursor-pointer text-blue-600 hover:text-blue-800">
-                                            View locations ({result.foundIn.length})
+                                            View collections ({result.foundIn.length})
                                         </summary>
                                         <ul class="mt-2 list-disc pl-5">
                                             {#each result.foundIn as location}
@@ -153,7 +151,7 @@
                                     Not found in any collection
                                 {/if}
                             </td>
-                            <td class="px-6 py-4 text-sm text-gray-500">
+                            <td class="w-1/4 px-6 py-4 text-sm text-gray-500">
                                 Found in {result.foundIn.length} of {result.totalCollectionsSearched} collections
                             </td>
                         </tr>

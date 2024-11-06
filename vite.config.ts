@@ -31,6 +31,14 @@ export default defineConfig(({ mode }): UserConfig => {
     const isDevelopment = mode === "development";
 
     const PROD_ORIGIN = "https://shared-services.eu.pvh.cloud";
+    const CDN_ORIGIN = "https://d2bgp0ri487o97.cloudfront.net";
+
+    const ALLOWED_ORIGINS = [
+      "https://capella-document-search.prd.shared-services.eu.pvh.cloud",
+      "https://capellaql.prd.shared-services.eu.pvh.cloud",
+      "https://shared-services.eu.pvh.cloud",
+      CDN_ORIGIN
+    ];
 
     // Configuration object with error handling
     const config: UserConfig = {
@@ -48,11 +56,12 @@ export default defineConfig(({ mode }): UserConfig => {
               origin: [
                 "http://localhost:5173",
                 "http://localhost:3000",
-                PROD_ORIGIN,
+                ...ALLOWED_ORIGINS,
                 /\.shared-services\.eu\.pvh\.cloud$/,
+                CDN_ORIGIN
               ],
               methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-              allowedHeaders: ["Content-Type", "Authorization"],
+              allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"],
               credentials: true,
             }
           : false,

@@ -27,6 +27,8 @@
     const effectiveVideoBasePath =
         videoBasePath.trim() === "" ? "/idle-videos/" : videoBasePath;
 
+    let failedVideos = $state(new Set<string>());
+
     function getVideoPath(filename: string): string {
         return `${effectiveVideoBasePath}${filename}`;
     }
@@ -50,8 +52,12 @@
     }
 
     function loadVideo(filename: string): string {
+        if (failedVideos.has(filename)) {
+            return `${videoConfig.fallbackBaseUrl}${videoConfig.defaultVideos[currentVideoIndex % videoConfig.defaultVideos.length]}`;
+        }
+        
         if (dev && !videos.includes(filename)) {
-            return `/idle-videos/${videoConfig.defaultVideos[0]}`;
+            return `${videoConfig.fallbackBaseUrl}${videoConfig.defaultVideos[0]}`;
         }
         return `${videoBasePath}${filename}`;
     }
@@ -122,8 +128,16 @@
 
     function handleVideoError(error: Event): void {
         console.error("Video playback error:", error);
-        currentVideoIndex = (currentVideoIndex + 1) % videos.length;
-        loadAndPlayVideo();
+        
+        failedVideos.add(videos[currentVideoIndex]);
+        
+        if (!dev && !failedVideos.has(videoConfig.defaultVideos[currentVideoIndex % videoConfig.defaultVideos.length])) {
+            console.debug("Falling back to dev video");
+            loadAndPlayVideo();
+        } else {
+            currentVideoIndex = (currentVideoIndex + 1) % videos.length;
+            loadAndPlayVideo();
+        }
     }
 
     function startFadeOut() {
