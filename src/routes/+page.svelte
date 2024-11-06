@@ -373,17 +373,19 @@
     let buttonClass = $derived(
         isSearchMode
             ? {
-                  ready: "cursor-pointer hover:bg-[#00174f]/80",
+                  ready: !documentKey.trim() 
+                      ? "cursor-not-allowed opacity-50" 
+                      : "cursor-pointer hover:bg-[#00174f]/80",
                   searching: "cursor-not-allowed",
                   results: "cursor-not-allowed",
               }[buttonState]
             : !file || !isFileValid
-              ? "cursor-not-allowed"
-              : {
-                    ready: "cursor-pointer hover:bg-[#00174f]/80",
-                    searching: "cursor-not-allowed",
-                    results: "cursor-not-allowed",
-                }[buttonState],
+                ? "cursor-not-allowed"
+                : {
+                      ready: "cursor-pointer hover:bg-[#00174f]/80",
+                      searching: "cursor-not-allowed",
+                      results: "cursor-not-allowed",
+                  }[buttonState],
     );
 
     let buttonText = $derived(
@@ -856,7 +858,8 @@
                             : "Upload File"}
                         disabled={isSearchMode
                             ? buttonState === "searching" ||
-                              buttonState === "results"
+                              buttonState === "results" ||
+                              !documentKey.trim()
                             : buttonState === "searching" ||
                               buttonState === "results" ||
                               !file ||

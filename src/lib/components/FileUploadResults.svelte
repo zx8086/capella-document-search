@@ -32,6 +32,8 @@
     let notFoundCount = $state(0);
     let sortedResults = $state<DetailedResult[]>([]);
 
+    let expandedStates = $state<Record<string, boolean>>({});
+
     $effect(() => {
         if (results.length > 0 && isDetailedResult(results[0])) {
             sortedResults = [...results].sort((a, b) => {
@@ -72,6 +74,10 @@
         }
     }
 
+    function toggleExpand(documentKey: string) {
+        expandedStates[documentKey] = !expandedStates[documentKey];
+    }
+
     onMount(() => {
         const detailsElements = document.querySelectorAll("details");
         detailsElements.forEach((details) => {
@@ -87,12 +93,12 @@
 
     function handleToggle(event: Event) {
         const details = event.target as HTMLDetailsElement;
-        const icon = details.querySelector("svg");
+        const icon = details.querySelector("svg path");
         if (icon) {
             if (details.open) {
-                icon.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />';
+                icon.setAttribute('d', 'M19.5 8.25l-7.5 7.5-7.5-7.5m15 6l-7.5 7.5-7.5-7.5');
             } else {
-                icon.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" />';
+                icon.setAttribute('d', 'M8.25 4.5l7.5 7.5-7.5 7.5M3 4.5l7.5 7.5-7.5 7.5');
             }
         }
     }
@@ -137,16 +143,59 @@
                             </td>
                             <td class="w-1/3 px-6 py-4 text-sm text-gray-500">
                                 {#if result.foundIn.length > 0}
-                                    <details>
-                                        <summary class="cursor-pointer text-blue-600 hover:text-blue-800">
-                                            View collections ({result.foundIn.length})
-                                        </summary>
-                                        <ul class="mt-2 list-disc pl-5">
-                                            {#each result.foundIn as location}
-                                                <li>{location.bucket}/{location.scope}/{location.collection}</li>
-                                            {/each}
-                                        </ul>
-                                    </details>
+                                    <div>
+                                        <button 
+                                            onclick={() => toggleExpand(result.documentKey)}
+                                            class="cursor-pointer text-blue-600 hover:text-blue-800 flex items-center space-x-2"
+                                            aria-expanded={!!expandedStates[result.documentKey]}
+                                        >
+                                            {#if expandedStates[result.documentKey]}
+                                                <svg
+                                                    xmlns="http://www.w3.org/2000/svg"
+                                                    fill="none"
+                                                    viewBox="0 0 24 24"
+                                                    stroke-width="1.5"
+                                                    stroke="currentColor"
+                                                    class="size-6"
+                                                    aria-hidden="true"
+                                                    role="img"
+                                                >
+                                                    <title>Collapse details</title>
+                                                    <path
+                                                        stroke-linecap="round"
+                                                        stroke-linejoin="round"
+                                                        d="m4.5 5.25 7.5 7.5 7.5-7.5m-15 6 7.5 7.5 7.5-7.5"
+                                                    />
+                                                </svg>
+                                            {:else}
+                                                <svg
+                                                    xmlns="http://www.w3.org/2000/svg"
+                                                    fill="none"
+                                                    viewBox="0 0 24 24"
+                                                    stroke-width="1.5"
+                                                    stroke="currentColor"
+                                                    class="size-6"
+                                                    aria-hidden="true"
+                                                    role="img"
+                                                >
+                                                    <title>Expand details</title>
+                                                    <path
+                                                        stroke-linecap="round"
+                                                        stroke-linejoin="round"
+                                                        d="m5.25 4.5 7.5 7.5-7.5 7.5m6-15 7.5 7.5-7.5 7.5"
+                                                    />
+                                                </svg>
+                                            {/if}
+                                            <span>View collections ({result.foundIn.length})</span>
+                                        </button>
+                                        {#if expandedStates[result.documentKey]}
+                                            <ul class="mt-2 list-disc pl-5">
+                                                {#each result.foundIn as location}
+                                                    <li>{location.bucket}/{location.scope}/{location.collection}</li>
+                                                {/each}
+                                            </ul>
+                                        {/if}
+                                    </div>
                                 {:else}
                                     Not found in any collection
                                 {/if}

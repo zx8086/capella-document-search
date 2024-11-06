@@ -115,5 +115,8 @@
     "svelte-preprocess",
     "ws"
   ],
-  "snyk": true
+  "snyk": true,
+  "resolutions": {
+    "xmlhttprequest": "1.7.0"
+  }
 }
