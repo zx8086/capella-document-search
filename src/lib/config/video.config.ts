@@ -6,6 +6,5 @@ export const videoConfig = {
         'FA24_TH_T1_OCTOBER_DUO_6_A_ECOM_ NO LOGO_SOUND_3412_1892.mp4',
         'X1_DUO_GR_LH-GENERIC_1280x730.mp4'
     ],
-    // Add fallback URL for development videos
     fallbackBaseUrl: '/idle-videos/'
 }; 

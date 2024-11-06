@@ -6,6 +6,12 @@ import path from "path";
 import { envSchema } from "./src/env/schema";
 
 export default defineConfig(({ mode }): UserConfig => {
+  // Add signal handling
+  process.on('SIGINT', () => {
+    console.log('\nGracefully shutting down from SIGINT (Ctrl+C)');
+    process.exit(0);
+  });
+
   try {
     // Load environment variables
     const env = loadEnv(mode, process.cwd(), "");
@@ -62,6 +68,9 @@ export default defineConfig(({ mode }): UserConfig => {
           allowedHeaders: ['Content-Type', 'Authorization'],
           credentials: true,
         },
+        hmr: {
+          timeout: 5000
+        }
       },
       ssr: {
         noExternal: ["@apollo/client", "@openreplay/tracker"],
@@ -108,6 +117,9 @@ export default defineConfig(({ mode }): UserConfig => {
         server: {
           port: 5173,
           host: true,
+          hmr: {
+            timeout: 5000
+          }
         },
       };
     }

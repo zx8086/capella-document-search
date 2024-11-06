@@ -21,6 +21,8 @@
     import { collections } from "../stores/collectionsStore";
     import type { Collection } from "../models";
 
+    import { pushState, replaceState } from '$app/navigation';
+
     interface SearchResult {
         collection: string;
         data: any;
@@ -265,14 +267,9 @@
                     if (isSearchMode) {
                         if (data && data.data && data.data.searchDocuments) {
                             searchResults = data.data.searchDocuments;
-                            console.log("Search results:", searchResults);
 
                             const foundCollectionsCount =
                                 data.foundCollectionsCount;
-                            console.log(
-                                "Found collections count:",
-                                foundCollectionsCount,
-                            );
 
                             if (foundCollectionsCount === 0) {
                                 toast.error(
@@ -793,13 +790,9 @@
                                                 {collection.collection_name}
                                                 {#if collection.tooltip_content}
                                                     <button
-                                                        onclick={preventDefault(
-                                                            () =>
-                                                                openTooltipModal(
-                                                                    collection.tooltip_content,
-                                                                ),
-                                                        )}
+                                                        onclick={() => openTooltipModal(collection.tooltip_content)}
                                                         class="ml-2 text-gray-500 hover:text-gray-700 focus:outline-none"
+                                                        aria-label="Show collection information"
                                                     >
                                                         <svg
                                                             xmlns="http://www.w3.org/2000/svg"
@@ -807,6 +800,7 @@
                                                             viewBox="0 0 24 24"
                                                             stroke="currentColor"
                                                             class="w-4 h-4"
+                                                            aria-hidden="true"
                                                         >
                                                             <path
                                                                 stroke-linecap="round"
@@ -815,6 +809,7 @@
                                                                 d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
                                                             />
                                                         </svg>
+                                                        <span class="sr-only">Show information about {collection.collection_name}</span>
                                                     </button>
                                                 {/if}
                                             </span>
