@@ -22,7 +22,7 @@
     "docker:prod:env": "cp .env.production .env 2>/dev/null || true",
     "docker:prod:build": "bun run docker:cleanup:prod && docker rmi capella-document-search:prod 2>/dev/null || true && docker build --build-arg NODE_ENV=production --build-arg BUILD_VERSION=$(node -p \"require('./package.json').version\") --build-arg COMMIT_HASH=$(git rev-parse --short HEAD || echo 'production') --build-arg BUILD_DATE=$(date -u +'%Y-%m-%dT%H:%M:%SZ') -t capella-document-search:prod .",
     "docker:prod": "bun run docker:prod:env && bun run docker:prod:build",
-    "docker:run:prod": "bun run docker:cleanup:prod && docker run --name capella-search-prod -p 3000:3000 -e NODE_ENV=production capella-document-search:prod",
+    "docker:run:prod": "bun run docker:cleanup:prod && docker run --name capella-search-prod -p 3000:3000 -e NODE_ENV=production -e BUILD_VERSION=$(node -p \"require('./package.json').version\") -e COMMIT_HASH=$(git rev-parse --short HEAD || echo 'production') -e BUILD_DATE=$(date -u +'%Y-%m-%dT%H:%M:%SZ') capella-document-search:prod",
     "docker:clean": "bun run docker:cleanup:dev && bun run docker:cleanup:prod && docker system prune -af && docker volume prune -f",
     "docker:stop": "docker stop capella-search-dev capella-search-prod 2>/dev/null || true",
     "docker:logs:dev": "docker logs -f capella-search-dev",

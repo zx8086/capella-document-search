@@ -8,13 +8,13 @@
 # This vulnerability is present in the base image and cannot be immediately resolved.
 FROM oven/bun:slim AS builder
 
-# Add build args
+# Add build args with defaults
 ARG BUILD_VERSION=development
 ARG COMMIT_HASH=unknown
 ARG BUILD_DATE
 ARG NODE_ENV=development
 
-# Set as environment variables
+# Set as environment variables for build process
 ENV BUILD_VERSION=${BUILD_VERSION}
 ENV COMMIT_HASH=${COMMIT_HASH}
 ENV BUILD_DATE=${BUILD_DATE}
@@ -39,7 +39,13 @@ RUN bun run svelte-kit sync && \
 # Production image
 FROM oven/bun:slim
 
-# Important: Copy the environment variables to the final stage
+# Copy build args to production stage
+ARG BUILD_VERSION
+ARG COMMIT_HASH
+ARG BUILD_DATE
+ARG NODE_ENV
+
+# Set as environment variables for runtime
 ENV BUILD_VERSION=${BUILD_VERSION}
 ENV COMMIT_HASH=${COMMIT_HASH}
 ENV BUILD_DATE=${BUILD_DATE}
