@@ -23,11 +23,13 @@
     let isInitialized = $state(false);
     let isPlaying = $state(false);
 
-    const videoBasePath = dev ? '/idle-videos/' : import.meta.env.PUBLIC_VIDEO_BASE_URL;
+    const videoBasePath = dev ? '/idle-videos/' : 'https://d2bgp0ri487o97.cloudfront.net/';
     const effectiveVideoBasePath =
         videoBasePath.trim() === "" ? "/idle-videos/" : videoBasePath;
 
     let failedVideos = $state(new Set<string>());
+
+    let fallbackVideo = '/idle-videos/X1_DUO_GR_LH-GENERIC_1280x730.mp4';
 
     function getVideoPath(filename: string): string {
         return `${effectiveVideoBasePath}${filename}`;
@@ -132,8 +134,12 @@
         currentVideoIndex = (currentVideoIndex + 1) % videos.length;
         
         if (failedVideos.size === videos.length) {
-            console.debug("All videos failed to load, stopping carousel");
-            dispatch("exit");
+            console.debug("All videos failed to load, using fallback video");
+            videoElement.src = fallbackVideo;
+            videoElement.play().catch(err => {
+                console.error("Error playing fallback video:", err);
+                dispatch("exit");
+            });
             return;
         }
         
