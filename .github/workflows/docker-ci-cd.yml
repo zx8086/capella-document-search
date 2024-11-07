@@ -53,6 +53,8 @@ jobs:
 
       - name: Build and push Docker image
         uses: docker/build-push-action@v6
+        env:
+          BUILD_TIMESTAMP: ${{ format('{0:yyyy-MM-ddTHH:mm:ss.fffZ}', github.event.repository.updated_at) }}
         with:
           context: .
           builder: ${{ steps.buildx.outputs.name }}
@@ -60,7 +62,7 @@ jobs:
             NODE_ENV=production
             BUILD_VERSION=${{ github.ref_name }}
             COMMIT_HASH=${{ github.sha }}
-            BUILD_DATE=$(date -u +'%Y-%m-%dT%H:%M:%SZ')
+            BUILD_DATE=${{ env.BUILD_TIMESTAMP }}
           cache-from: type=local,src=/tmp/.buildx-cache
           cache-to: type=local,dest=/tmp/.buildx-cache-new,mode=max
           push: ${{ github.event_name != 'pull_request' }}

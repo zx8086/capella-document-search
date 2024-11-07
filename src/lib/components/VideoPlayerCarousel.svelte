@@ -23,7 +23,7 @@
     let isInitialized = $state(false);
     let isPlaying = $state(false);
 
-    const videoBasePath = dev ? '/idle-videos/' : videoConfig.baseUrl;
+    const videoBasePath = dev ? '/idle-videos/' : import.meta.env.PUBLIC_VIDEO_BASE_URL;
     const effectiveVideoBasePath =
         videoBasePath.trim() === "" ? "/idle-videos/" : videoBasePath;
 
@@ -52,13 +52,10 @@
     }
 
     function loadVideo(filename: string): string {
-        if (failedVideos.has(filename)) {
-            return `${videoConfig.fallbackBaseUrl}${videoConfig.defaultVideos[currentVideoIndex % videoConfig.defaultVideos.length]}`;
+        if (dev) {
+            return `/idle-videos/${filename}`;
         }
         
-        if (dev && !videos.includes(filename)) {
-            return `${videoConfig.fallbackBaseUrl}${videoConfig.defaultVideos[0]}`;
-        }
         return `${videoBasePath}${filename}`;
     }
 
@@ -129,15 +126,18 @@
     function handleVideoError(error: Event): void {
         console.error("Video playback error:", error);
         
-        failedVideos.add(videos[currentVideoIndex]);
+        const currentVideo = videos[currentVideoIndex];
+        failedVideos.add(currentVideo);
         
-        if (!dev && !failedVideos.has(videoConfig.defaultVideos[currentVideoIndex % videoConfig.defaultVideos.length])) {
-            console.debug("Falling back to dev video");
-            loadAndPlayVideo();
-        } else {
-            currentVideoIndex = (currentVideoIndex + 1) % videos.length;
-            loadAndPlayVideo();
+        currentVideoIndex = (currentVideoIndex + 1) % videos.length;
+        
+        if (failedVideos.size === videos.length) {
+            console.debug("All videos failed to load, stopping carousel");
+            dispatch("exit");
+            return;
         }
+        
+        loadAndPlayVideo();
     }
 
     function startFadeOut() {
