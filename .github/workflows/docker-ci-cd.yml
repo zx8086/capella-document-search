@@ -51,16 +51,18 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-buildx-
 
+      - name: Set build timestamp
+        id: timestamp
+        run: echo "BUILD_TIMESTAMP=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" >> $GITHUB_ENV
+
       - name: Build and push Docker image
         uses: docker/build-push-action@v6
-        env:
-          BUILD_TIMESTAMP: ${{ format('{0:yyyy-MM-ddTHH:mm:ss.fffZ}', github.event.repository.updated_at) }}
         with:
           context: .
           builder: ${{ steps.buildx.outputs.name }}
           build-args: |
             NODE_ENV=production
-            BUILD_VERSION=${{ github.ref_name }}
+            BUILD_VERSION=${{ github.ref_name || '0.0.1' }}
             COMMIT_HASH=${{ github.sha }}
             BUILD_DATE=${{ env.BUILD_TIMESTAMP }}
           cache-from: type=local,src=/tmp/.buildx-cache
@@ -95,9 +97,9 @@ jobs:
             --name capella-search-test \
             -p 3000:3000 \
             -e NODE_ENV=production \
-            -e BUILD_VERSION=${{ github.ref_name }} \
+            -e BUILD_VERSION=${{ github.ref_name || '0.0.1' }} \
             -e COMMIT_HASH=${{ github.sha }} \
-            -e BUILD_DATE=$(date -u +'%Y-%m-%dT%H:%M:%SZ') \
+            -e BUILD_DATE=${{ env.BUILD_TIMESTAMP }} \
             zx8086/capella-document-search:latest
           
           # Wait for container to be healthy (optional)
