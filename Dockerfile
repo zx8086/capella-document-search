@@ -17,7 +17,7 @@ ARG NODE_ENV=development
 # Set as environment variables for build process
 ENV BUILD_VERSION=${BUILD_VERSION}
 ENV COMMIT_HASH=${COMMIT_HASH}
-ENV BUILD_DATE=${BUILD_DATE:-$(date -u +'%Y-%m-%dT%H:%M:%SZ')}
+ENV BUILD_DATE=${BUILD_DATE}
 ENV NODE_ENV=${NODE_ENV}
 
 # Set working directory
@@ -48,7 +48,7 @@ ARG NODE_ENV
 # Set as environment variables for runtime
 ENV BUILD_VERSION=${BUILD_VERSION}
 ENV COMMIT_HASH=${COMMIT_HASH}
-ENV BUILD_DATE=${BUILD_DATE:-$(date -u +'%Y-%m-%dT%H:%M:%SZ')}
+ENV BUILD_DATE=${BUILD_DATE}
 ENV NODE_ENV=${NODE_ENV}
 
 WORKDIR /app
