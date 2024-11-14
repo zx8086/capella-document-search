@@ -6,8 +6,12 @@ import { redirect } from '@sveltejs/kit';
 export const load: LayoutLoad = async ({ url }) => {
     if (!browser) return {};
 
+    // List of public paths
+    const publicPaths = ['/login'];
+    const isPublicPath = publicPaths.some(path => url.pathname.startsWith(path));
+
     try {
-        // Check if we're handling a redirect
+        // Handle auth redirect
         if (url.searchParams.has('code') || url.searchParams.has('error')) {
             await auth.handleRedirectPromise();
             return {};
@@ -16,24 +20,12 @@ export const load: LayoutLoad = async ({ url }) => {
         // Initialize auth state
         const isAuthed = await auth.initialize();
         
-        // If not authenticated, clear any cached MSAL accounts
-        if (!isAuthed) {
-            const instance = await getMsalInstance();
-            const accounts = instance.getAllAccounts();
-            if (accounts.length > 0) {
-                accounts.forEach(account => {
-                    instance.removeAccount(account);
-                });
-            }
+        if (!isPublicPath && !isAuthed) {
+            throw redirect(307, '/login');
         }
 
-        // Handle protected routes
-        if (url.pathname === '/login') {
-            if (isAuthed) {
-                throw redirect(307, '/');
-            }
-        } else if (!isAuthed && !url.pathname.includes('login')) {
-            throw redirect(307, '/login');
+        if (isPublicPath && isAuthed) {
+            throw redirect(307, '/');
         }
 
         return {};

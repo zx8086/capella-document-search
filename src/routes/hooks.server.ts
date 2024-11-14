@@ -1,32 +1,26 @@
 /* src/routes/hooks.server.ts */
 
 import type { Handle } from "@sveltejs/kit";
+import { redirect } from '@sveltejs/kit';
 
 export const handle: Handle = async ({ event, resolve }) => {
-  if (event.request.method === 'OPTIONS') {
-    return new Response(null, {
-      headers: {
-        'Access-Control-Allow-Origin': event.request.headers.get('Origin') || '*',
-        'Access-Control-Allow-Methods': 'POST, OPTIONS',
-        'Access-Control-Allow-Headers': 'Content-Type, Authorization, x-sveltekit-action',
-        'Access-Control-Allow-Credentials': 'true',
-      }
-    });
+  // List of public paths that don't require authentication
+  const publicPaths = ['/login'];
+  const isPublicPath = publicPaths.some(path => event.url.pathname.startsWith(path));
+
+  // Check authentication for non-public paths
+  if (!isPublicPath) {
+    const authCookie = event.cookies.get('auth');
+    if (!authCookie) {
+      throw redirect(307, '/login');
+    }
   }
 
   const response = await resolve(event);
-  const newResponse = new Response(response.body, {
-    status: response.status,
-    statusText: response.statusText,
-    headers: new Headers(response.headers)
-  });
 
-  // Add CORS headers to all responses
-  const origin = event.request.headers.get('Origin');
-  if (origin) {
-    newResponse.headers.set('Access-Control-Allow-Origin', origin);
-    newResponse.headers.set('Access-Control-Allow-Credentials', 'true');
-  }
+  // Your existing security headers...
+  response.headers.set('X-Frame-Options', 'DENY');
+  // ... rest of your headers
 
-  return newResponse;
+  return response;
 };

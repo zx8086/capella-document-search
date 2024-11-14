@@ -1,7 +1,7 @@
 import { writable } from 'svelte/store';
 import { getMsalInstance, loginRequest } from '../config/authConfig';
 import type { AccountInfo } from '@azure/msal-browser';
-import { goto } from '$app/navigation';
+import { browser } from '$app/environment';
 
 export const isAuthenticated = writable(false);
 export const userAccount = writable<AccountInfo | null>(null);
@@ -11,22 +11,27 @@ export const auth = {
     async initialize() {
         try {
             const instance = await getMsalInstance();
+            if (!instance) return false;
             
-            // Check for existing account first
             const accounts = instance.getAllAccounts();
             if (accounts.length > 0) {
-                // Validate the account's token
                 try {
-                    await instance.acquireTokenSilent({
+                    const tokenResponse = await instance.acquireTokenSilent({
                         ...loginRequest,
                         account: accounts[0]
                     });
+                    
                     instance.setActiveAccount(accounts[0]);
                     isAuthenticated.set(true);
                     userAccount.set(accounts[0]);
+
+                    // Set authentication cookie
+                    if (browser) {
+                        document.cookie = `auth=${tokenResponse.accessToken}; path=/; secure; samesite=strict`;
+                    }
+                    
                     return true;
                 } catch (tokenError) {
-                    // Token is invalid or expired
                     console.warn('Token validation failed:', tokenError);
                     instance.removeAccount(accounts[0]);
                     isAuthenticated.set(false);
@@ -34,20 +39,6 @@ export const auth = {
                     return false;
                 }
             }
-
-            // Then try to handle any pending redirects
-            try {
-                const response = await instance.handleRedirectPromise();
-                if (response) {
-                    instance.setActiveAccount(response.account);
-                    isAuthenticated.set(true);
-                    userAccount.set(response.account);
-                    return true;
-                }
-            } catch (redirectError) {
-                console.warn('Redirect handling failed:', redirectError);
-            }
-
             return false;
         } catch (error) {
             console.error('Failed to initialize auth:', error);
@@ -59,7 +50,8 @@ export const auth = {
         isLoading.set(true);
         try {
             const instance = await getMsalInstance();
-            // Store the current path to return to after login
+            if (!instance) throw new Error('MSAL not initialized');
+            
             sessionStorage.setItem('loginRedirectPath', window.location.pathname);
             await instance.loginRedirect(loginRequest);
         } catch (error) {
@@ -72,17 +64,18 @@ export const auth = {
     async handleRedirectPromise() {
         try {
             const instance = await getMsalInstance();
+            if (!instance) return false;
+
             const response = await instance.handleRedirectPromise();
-            
             if (response) {
                 instance.setActiveAccount(response.account);
                 isAuthenticated.set(true);
                 userAccount.set(response.account);
-                
-                // Restore the previous path if available
-                const redirectPath = sessionStorage.getItem('loginRedirectPath') || '/';
-                sessionStorage.removeItem('loginRedirectPath');
-                await goto(redirectPath);
+
+                // Set authentication cookie
+                if (browser) {
+                    document.cookie = `auth=${response.accessToken}; path=/; secure; samesite=strict`;
+                }
                 
                 return true;
             }
@@ -96,11 +89,18 @@ export const auth = {
     async logout() {
         try {
             const instance = await getMsalInstance();
-            // Clear session storage before logout
-            sessionStorage.clear();
+            if (!instance) return;
+            
+            // Clear cookies and session storage
+            if (browser) {
+                document.cookie = 'auth=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT';
+                sessionStorage.clear();
+            }
+            
             await instance.logoutRedirect({
                 postLogoutRedirectUri: window.location.origin + '/login'
             });
+            
             isAuthenticated.set(false);
             userAccount.set(null);
         } catch (error) {

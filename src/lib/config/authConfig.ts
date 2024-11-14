@@ -33,34 +33,8 @@ export const loginRequest = {
 };
 
 export const getMsalInstance = async () => {
-    if (!msalInstance) {
-        msalInstance = new PublicClientApplication({
-            ...msalConfig,
-            system: {
-                ...msalConfig.system,
-                networkClient: {
-                    sendGetRequestAsync: async (url: string, options: any) => {
-                        const response = await fetch(url, options);
-                        return {
-                            headers: Object.fromEntries(response.headers.entries()),
-                            body: await response.text(),
-                            status: response.status
-                        };
-                    },
-                    sendPostRequestAsync: async (url: string, options: any) => {
-                        const response = await fetch(url, {
-                            ...options,
-                            method: 'POST'
-                        });
-                        return {
-                            headers: Object.fromEntries(response.headers.entries()),
-                            body: await response.text(),
-                            status: response.status
-                        };
-                    }
-                }
-            }
-        });
+    if (!msalInstance && browser) {
+        msalInstance = new PublicClientApplication(msalConfig);
         await msalInstance.initialize();
     }
     return msalInstance;
