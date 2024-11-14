@@ -2,7 +2,6 @@
 
 import { initializeBackendConfig } from "$backendConfig";
 
-// Initialize the backend configuration
 const backendConfig = initializeBackendConfig();
 
 import {
@@ -19,7 +18,6 @@ import {
   initializeDatabase,
 } from "$lib/db/dbOperations";
 import { log, err, debug } from "../utils/serverLogger";
-// import { backendConfig } from "$backendConfig";
 
 import type { Collection, SearchResult } from "../models";
 
@@ -95,23 +93,21 @@ export const actions: Actions = {
 
         const searchResults: SearchResult[] = response.data.searchDocuments;
         const foundCollectionsCount = searchResults.filter(
-          (result) => result.data !== null,
+          (result) => result.data !== null && result.data !== undefined
         ).length;
 
-        const returnData = {
-          type: "success",
-          data: response.data,
-          foundCollectionsCount: foundCollectionsCount,
-        };
-
         debug(
-          "Data being returned from searchDocuments action:",
-          JSON.stringify(returnData, null, 2),
+          "Search results:",
+          { meta: { 
+            results: searchResults,
+            foundCount: foundCollectionsCount 
+          }}
         );
 
         return {
-          type: 'success',
+          type: "success",
           data: response.data,
+          foundCollectionsCount,
           headers: {
             'Access-Control-Allow-Origin': '*',
             'Access-Control-Allow-Methods': 'POST, OPTIONS',

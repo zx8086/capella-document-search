@@ -550,6 +550,12 @@
     function handleCarouselEnd() {
         console.log("Carousel ended on another page");
     }
+
+    let isOpen = false;
+    
+    function toggle() {
+        isOpen = !isOpen;
+    }
 </script>
 
 <svelte:head>

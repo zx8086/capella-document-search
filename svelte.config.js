@@ -33,7 +33,9 @@ const config = {
         "default-src": ["'self'"],
         "connect-src": [
           "'self'",
-          ...(dev ? ["http://localhost:*"] : []),
+          ...(dev ? ["http://localhost:*", "ws://localhost:*"] : []),
+          "https://login.microsoftonline.com",
+          "https://*.microsoftonline.com",
           "https://capella-document-search.prd.shared-services.eu.pvh.cloud",
           "https://capellaql.prd.shared-services.eu.pvh.cloud",
           "https://d2bgp0ri487o97.cloudfront.net",
@@ -50,34 +52,43 @@ const config = {
         ],
         "script-src": [
           "'self'",
-          "https://vjs.zencdn.net",
           "'unsafe-inline'",
-          "blob:",
+          "'unsafe-eval'",
+          "https://vjs.zencdn.net",
+          "blob:"
         ],
         "style-src": ["'self'", "https://vjs.zencdn.net", "'unsafe-inline'"],
         "img-src": [
           "'self'",
           "data:",
           "blob:",
-          "https://d2bgp0ri487o97.cloudfront.net",
+          "https:",
+          "https://d2bgp0ri487o97.cloudfront.net"
         ],
         "font-src": ["'self'", "data:"],
         "object-src": ["'none'"],
         "base-uri": ["'self'"],
         "form-action": [
           "'self'",
+          "https://login.microsoftonline.com",
+          "https://*.microsoftonline.com",
           "https://capellaql.prd.shared-services.eu.pvh.cloud",
           "https://capella-document-search.prd.shared-services.eu.pvh.cloud"
         ],
-        "frame-ancestors": ["'none'"],
+        "frame-src": [
+          "'self'",
+          "https://login.microsoftonline.com",
+          "https://*.microsoftonline.com"
+        ],
+        "frame-ancestors": ["'self'"],
         "worker-src": ["'self'", "blob:"],
         "media-src": [
           "'self'",
           "blob:",
-          "https://d2bgp0ri487o97.cloudfront.net",
+          "https://d2bgp0ri487o97.cloudfront.net"
         ],
-        "child-src": ["'self'", "blob:"],
-      },
+        "child-src": ["'self'", "blob:"]
+      }
     },
     csrf: {
       checkOrigin: false

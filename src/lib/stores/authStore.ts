@@ -1,5 +1,5 @@
 import { writable } from 'svelte/store';
-import { msalInstance, loginRequest } from '../config/authConfig';
+import { getMsalInstance, loginRequest } from '../config/authConfig';
 import type { AccountInfo } from '@azure/msal-browser';
 import { goto } from '$app/navigation';
 
@@ -10,58 +10,85 @@ export const isLoading = writable(false);
 export const auth = {
     async initialize() {
         try {
-            if (!msalInstance.getActiveAccount()) {
-                await msalInstance.initialize();
-            }
-            const accounts = msalInstance.getAllAccounts();
+            const instance = await getMsalInstance();
+            
+            // Check for existing account first
+            const accounts = instance.getAllAccounts();
             if (accounts.length > 0) {
+                instance.setActiveAccount(accounts[0]);
                 isAuthenticated.set(true);
                 userAccount.set(accounts[0]);
                 return true;
             }
+
+            // Then try to handle any pending redirects
+            try {
+                const response = await instance.handleRedirectPromise();
+                if (response) {
+                    instance.setActiveAccount(response.account);
+                    isAuthenticated.set(true);
+                    userAccount.set(response.account);
+                    return true;
+                }
+            } catch (redirectError) {
+                console.warn('Redirect handling failed:', redirectError);
+            }
+
             return false;
         } catch (error) {
-            console.error('Failed to initialize MSAL:', error);
+            console.error('Failed to initialize auth:', error);
             return false;
         }
     },
 
-    async loginPopup() {
+    async login() {
         isLoading.set(true);
         try {
-            if (msalInstance.getActiveAccount()) {
-                await msalInstance.handleRedirectPromise();
-                return;
-            }
-
-            const response = await msalInstance.loginPopup(loginRequest);
-            if (response) {
-                isAuthenticated.set(true);
-                userAccount.set(response.account);
-                msalInstance.setActiveAccount(response.account);
-                await goto('/', { replaceState: true });
-            }
+            const instance = await getMsalInstance();
+            // Store the current path to return to after login
+            sessionStorage.setItem('loginRedirectPath', window.location.pathname);
+            await instance.loginRedirect(loginRequest);
         } catch (error) {
             console.error('Login failed:', error);
-            msalInstance.clearCache();
-            throw error;
-        } finally {
             isLoading.set(false);
+            throw error;
+        }
+    },
+
+    async handleRedirectPromise() {
+        try {
+            const instance = await getMsalInstance();
+            const response = await instance.handleRedirectPromise();
+            
+            if (response) {
+                instance.setActiveAccount(response.account);
+                isAuthenticated.set(true);
+                userAccount.set(response.account);
+                
+                // Restore the previous path if available
+                const redirectPath = sessionStorage.getItem('loginRedirectPath') || '/';
+                sessionStorage.removeItem('loginRedirectPath');
+                await goto(redirectPath);
+                
+                return true;
+            }
+            return false;
+        } catch (error) {
+            console.error('Handle redirect failed:', error);
+            return false;
         }
     },
 
     async logout() {
         try {
-            await msalInstance.logoutPopup({
-                postLogoutRedirectUri: "/login",
+            const instance = await getMsalInstance();
+            await instance.logoutRedirect({
+                postLogoutRedirectUri: window.location.origin + '/login'
             });
             isAuthenticated.set(false);
             userAccount.set(null);
-            msalInstance.clearCache();
-            await goto('/login', { replaceState: true });
         } catch (error) {
             console.error('Logout failed:', error);
-            throw error;
         }
     }
 }; 

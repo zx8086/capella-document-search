@@ -2,6 +2,7 @@
 
 <script lang="ts">
     import { run } from 'svelte/legacy';
+    import { page } from '$app/stores';
 
     import "../app.css";
     import "../apm-config";
@@ -69,6 +70,9 @@
                         capturePerformance: true,
                         respectDoNotTrack: false,
                     });
+
+                    // Start the tracker
+                    tracker.start();
                 } else {
                     console.warn(
                         "OpenReplay configuration is missing or incomplete.",

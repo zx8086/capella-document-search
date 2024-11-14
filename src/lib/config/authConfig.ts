@@ -1,39 +1,27 @@
-import { PublicClientApplication, LogLevel } from '@azure/msal-browser';
+import { PublicClientApplication, LogLevel, type Configuration } from '@azure/msal-browser';
 import { frontendConfig } from '$frontendConfig';
+import { browser } from '$app/environment';
 
-const redirectUri = frontendConfig.azure.REDIRECT_URI;
+let msalInstance: PublicClientApplication | null = null;
 
-export const msalConfig = {
+const msalConfig: Configuration = {
     auth: {
         clientId: frontendConfig.azure.CLIENT_ID,
         authority: `https://login.microsoftonline.com/${frontendConfig.azure.TENANT_ID}`,
-        redirectUri,
-        navigateToLoginRequestUrl: true,
-        postLogoutRedirectUri: redirectUri
+        redirectUri: frontendConfig.azure.REDIRECT_URI,
+        navigateToLoginRequestUrl: false
     },
     cache: {
         cacheLocation: "sessionStorage",
-        storeAuthStateInCookie: false,
+        storeAuthStateInCookie: false
     },
     system: {
-        allowRedirectInIframe: true,
         loggerOptions: {
-            loggerCallback: (level: LogLevel, message: string, containsPii: boolean) => {
+            logLevel: LogLevel.Error,
+            loggerCallback: (level, message, containsPii) => {
                 if (containsPii) return;
-                
-                switch (level) {
-                    case LogLevel.Error:
-                        console.error(message);
-                        return;
-                    case LogLevel.Info:
-                        console.info(message);
-                        return;
-                    case LogLevel.Verbose:
-                        console.debug(message);
-                        return;
-                    case LogLevel.Warning:
-                        console.warn(message);
-                        return;
+                if (level <= LogLevel.Error) {
+                    console.error(message);
                 }
             }
         }
@@ -44,4 +32,40 @@ export const loginRequest = {
     scopes: ["User.Read", "email", "profile"]
 };
 
-export const msalInstance = new PublicClientApplication(msalConfig); 
+export const getMsalInstance = async () => {
+    if (!msalInstance) {
+        msalInstance = new PublicClientApplication({
+            ...msalConfig,
+            system: {
+                ...msalConfig.system,
+                networkClient: {
+                    sendGetRequestAsync: async (url: string, options: any) => {
+                        const response = await fetch(url, options);
+                        return {
+                            headers: Object.fromEntries(response.headers.entries()),
+                            body: await response.text(),
+                            status: response.status
+                        };
+                    },
+                    sendPostRequestAsync: async (url: string, options: any) => {
+                        const response = await fetch(url, {
+                            ...options,
+                            method: 'POST'
+                        });
+                        return {
+                            headers: Object.fromEntries(response.headers.entries()),
+                            body: await response.text(),
+                            status: response.status
+                        };
+                    }
+                }
+            }
+        });
+        await msalInstance.initialize();
+    }
+    return msalInstance;
+};
+
+export const graphConfig = {
+    graphMeEndpoint: "https://graph.microsoft.com/v1.0/me"
+}; 

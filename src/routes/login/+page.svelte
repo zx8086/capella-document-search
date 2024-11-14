@@ -1,7 +1,8 @@
 <script lang="ts">
-    import { auth, isLoading } from '$lib/stores/authStore';
+    import { auth, isLoading, isAuthenticated } from '$lib/stores/authStore';
     import { toast } from 'svelte-sonner';
     import { onMount } from 'svelte';
+    import { goto } from '$app/navigation';
 
     let loginAttempts = 0;
 
@@ -9,24 +10,25 @@
         try {
             loginAttempts++;
             if (loginAttempts > 1) {
-                // Clear cache on subsequent attempts
                 await auth.logout();
             }
-            await auth.loginPopup();
+            await auth.login();
         } catch (error) {
             console.error('Login error:', error);
             toast.error('Login failed. Please try again.');
         }
     }
 
-    onMount(() => {
-        // Clear any stuck interaction state on page load
-        if (window.sessionStorage) {
-            Object.keys(window.sessionStorage).forEach(key => {
-                if (key.includes('msal')) {
-                    window.sessionStorage.removeItem(key);
-                }
-            });
+    onMount(async () => {
+        try {
+            await auth.initialize();
+            if ($isAuthenticated) {
+                await goto('/', { replaceState: true });
+                return;
+            }
+            await auth.handleRedirectPromise();
+        } catch (error) {
+            console.error('Redirect handling error:', error);
         }
     });
 </script>
@@ -43,7 +45,7 @@
         </div>
 
         <button
-            onclick={handleLogin}
+            on:click={handleLogin}
             disabled={$isLoading}
             class="w-full flex items-center justify-center gap-3 bg-[#00174f] text-white py-3 px-4 rounded-lg hover:bg-[#002280] transition-colors duration-200"
             data-transaction-name="Login Button"
