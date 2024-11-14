@@ -45,6 +45,12 @@ export interface CSVConfig {
   FILE_UPLOAD_LIMIT: number;
 }
 
+export interface AzureConfig {
+  CLIENT_ID: string;
+  TENANT_ID: string;
+  REDIRECT_URI: string;
+}
+
 export interface BackendConfig {
   application: ApplicationConfig;
   capella: CapellaConfig;
@@ -55,4 +61,5 @@ export interface FrontendConfig {
   openreplay: OpenReplayConfig;
   csv: CSVConfig;
   elasticApm: ElasticApmConfig;
+  azure: AzureConfig;
 }

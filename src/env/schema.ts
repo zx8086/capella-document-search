@@ -14,4 +14,9 @@ export const envSchema = {
   csv: {
     uploadLimit: "PUBLIC_CSV_FILE_UPLOAD_LIMIT",
   },
+  azure: {
+    CLIENT_ID: "PUBLIC_AZURE_CLIENT_ID",
+    TENANT_ID: "PUBLIC_AZURE_TENANT_ID",
+    REDIRECT_URI: "PUBLIC_AZURE_REDIRECT_URI",
+  },
 } as const;

@@ -19,6 +19,11 @@ export const frontendConfig: FrontendConfig = {
     SERVICE_VERSION: env[envSchema.elastic.serviceVersion],
     ENVIRONMENT: env[envSchema.elastic.environment],
   },
+  azure: {
+    CLIENT_ID: env[envSchema.azure.CLIENT_ID],
+    TENANT_ID: env[envSchema.azure.TENANT_ID],
+    REDIRECT_URI: env[envSchema.azure.REDIRECT_URI],
+  }
 } as const;
 
 // Debug log to verify values are loaded correctly

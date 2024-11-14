@@ -100,7 +100,6 @@ export default defineConfig(({ mode }): UserConfig => {
       },
     };
 
-    // Validate configuration
     if (!config.plugins || !config.server || !config.build) {
       throw new Error("Invalid configuration object");
     }
@@ -124,6 +123,6 @@ export default defineConfig(({ mode }): UserConfig => {
       };
     }
     
-    throw error; // Re-throw in production for explicit failure
+    throw error;
   }
 });
