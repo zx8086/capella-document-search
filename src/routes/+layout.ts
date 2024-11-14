@@ -15,6 +15,17 @@ export const load: LayoutLoad = async ({ url }) => {
 
         // Initialize auth state
         const isAuthed = await auth.initialize();
+        
+        // If not authenticated, clear any cached MSAL accounts
+        if (!isAuthed) {
+            const instance = await getMsalInstance();
+            const accounts = instance.getAllAccounts();
+            if (accounts.length > 0) {
+                accounts.forEach(account => {
+                    instance.removeAccount(account);
+                });
+            }
+        }
 
         // Handle protected routes
         if (url.pathname === '/login') {
@@ -28,12 +39,9 @@ export const load: LayoutLoad = async ({ url }) => {
         return {};
     } catch (error) {
         if (error instanceof redirect) {
-            throw error; // Let SvelteKit handle the redirect
+            throw error;
         }
-        // Only log other types of errors
-        if (!(error instanceof redirect)) {
-            console.error('Layout load error:', error);
-        }
+        console.error('Layout load error:', error);
         return {};
     }
 }; 

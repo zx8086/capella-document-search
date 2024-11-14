@@ -15,10 +15,24 @@ export const auth = {
             // Check for existing account first
             const accounts = instance.getAllAccounts();
             if (accounts.length > 0) {
-                instance.setActiveAccount(accounts[0]);
-                isAuthenticated.set(true);
-                userAccount.set(accounts[0]);
-                return true;
+                // Validate the account's token
+                try {
+                    await instance.acquireTokenSilent({
+                        ...loginRequest,
+                        account: accounts[0]
+                    });
+                    instance.setActiveAccount(accounts[0]);
+                    isAuthenticated.set(true);
+                    userAccount.set(accounts[0]);
+                    return true;
+                } catch (tokenError) {
+                    // Token is invalid or expired
+                    console.warn('Token validation failed:', tokenError);
+                    instance.removeAccount(accounts[0]);
+                    isAuthenticated.set(false);
+                    userAccount.set(null);
+                    return false;
+                }
             }
 
             // Then try to handle any pending redirects
@@ -82,6 +96,8 @@ export const auth = {
     async logout() {
         try {
             const instance = await getMsalInstance();
+            // Clear session storage before logout
+            sessionStorage.clear();
             await instance.logoutRedirect({
                 postLogoutRedirectUri: window.location.origin + '/login'
             });
