@@ -9,35 +9,21 @@ export const isLoading = writable(false);
 
 export const auth = {
     async initialize() {
+        console.log('Initializing auth...');
         try {
             const instance = await getMsalInstance();
-            if (!instance) return false;
-            
+            if (!instance) {
+                console.log('MSAL instance not available');
+                return false;
+            }
+
             const accounts = instance.getAllAccounts();
             if (accounts.length > 0) {
-                try {
-                    const tokenResponse = await instance.acquireTokenSilent({
-                        ...loginRequest,
-                        account: accounts[0]
-                    });
-                    
-                    instance.setActiveAccount(accounts[0]);
-                    isAuthenticated.set(true);
-                    userAccount.set(accounts[0]);
-
-                    // Set authentication cookie
-                    if (browser) {
-                        document.cookie = `auth=${tokenResponse.accessToken}; path=/; secure; samesite=strict`;
-                    }
-                    
-                    return true;
-                } catch (tokenError) {
-                    console.warn('Token validation failed:', tokenError);
-                    instance.removeAccount(accounts[0]);
-                    isAuthenticated.set(false);
-                    userAccount.set(null);
-                    return false;
-                }
+                instance.setActiveAccount(accounts[0]);
+                isAuthenticated.set(true);
+                userAccount.set(accounts[0]);
+                console.log('User authenticated from existing account');
+                return true;
             }
             return false;
         } catch (error) {
@@ -47,12 +33,11 @@ export const auth = {
     },
 
     async login() {
+        console.log('Attempting login...');
         isLoading.set(true);
         try {
             const instance = await getMsalInstance();
             if (!instance) throw new Error('MSAL not initialized');
-            
-            sessionStorage.setItem('loginRedirectPath', window.location.pathname);
             await instance.loginRedirect(loginRequest);
         } catch (error) {
             console.error('Login failed:', error);
@@ -62,6 +47,7 @@ export const auth = {
     },
 
     async handleRedirectPromise() {
+        console.log('Handling redirect promise...');
         try {
             const instance = await getMsalInstance();
             if (!instance) return false;
@@ -71,12 +57,7 @@ export const auth = {
                 instance.setActiveAccount(response.account);
                 isAuthenticated.set(true);
                 userAccount.set(response.account);
-
-                // Set authentication cookie
-                if (browser) {
-                    document.cookie = `auth=${response.accessToken}; path=/; secure; samesite=strict`;
-                }
-                
+                console.log('Successfully handled redirect');
                 return true;
             }
             return false;
@@ -87,20 +68,15 @@ export const auth = {
     },
 
     async logout() {
+        console.log('Logging out...');
         try {
             const instance = await getMsalInstance();
             if (!instance) return;
-            
-            // Clear cookies and session storage
-            if (browser) {
-                document.cookie = 'auth=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT';
-                sessionStorage.clear();
-            }
-            
+
             await instance.logoutRedirect({
                 postLogoutRedirectUri: window.location.origin + '/login'
             });
-            
+
             isAuthenticated.set(false);
             userAccount.set(null);
         } catch (error) {

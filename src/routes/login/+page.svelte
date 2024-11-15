@@ -22,13 +22,23 @@
     onMount(async () => {
         try {
             await auth.initialize();
+            const redirectResult = await auth.handleRedirectPromise();
+            
             if ($isAuthenticated) {
-                await goto('/', { replaceState: true });
+                const redirectPath = sessionStorage.getItem('loginRedirectPath') || '/';
+                sessionStorage.removeItem('loginRedirectPath');
+                await goto(redirectPath, { replaceState: true });
                 return;
             }
-            await auth.handleRedirectPromise();
+            
+            if (redirectResult) {
+                const redirectPath = sessionStorage.getItem('loginRedirectPath') || '/';
+                sessionStorage.removeItem('loginRedirectPath');
+                await goto(redirectPath, { replaceState: true });
+            }
         } catch (error) {
             console.error('Redirect handling error:', error);
+            toast.error('Authentication failed. Please try again.');
         }
     });
 </script>

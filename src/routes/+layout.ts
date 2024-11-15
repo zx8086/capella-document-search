@@ -9,22 +9,31 @@ export const load: LayoutLoad = async ({ url }) => {
     // List of public paths
     const publicPaths = ['/login'];
     const isPublicPath = publicPaths.some(path => url.pathname.startsWith(path));
+    
+    console.log('Route accessed:', url.pathname);
+    console.log('Is public path:', isPublicPath);
 
     try {
-        // Handle auth redirect
+        // Skip auth checks if we're handling a redirect
         if (url.searchParams.has('code') || url.searchParams.has('error')) {
+            console.log('Handling auth redirect...');
             await auth.handleRedirectPromise();
             return {};
         }
 
         // Initialize auth state
         const isAuthed = await auth.initialize();
-        
+        console.log('Authentication status:', isAuthed);
+
+        // Only redirect to login if we're not already there
         if (!isPublicPath && !isAuthed) {
+            console.log('Redirecting to login...');
             throw redirect(307, '/login');
         }
 
-        if (isPublicPath && isAuthed) {
+        // Only redirect to home if we're authenticated and trying to access login
+        if (isPublicPath && isAuthed && url.pathname === '/login') {
+            console.log('Redirecting to home...');
             throw redirect(307, '/');
         }
 
@@ -36,4 +45,4 @@ export const load: LayoutLoad = async ({ url }) => {
         console.error('Layout load error:', error);
         return {};
     }
-}; 
+};
