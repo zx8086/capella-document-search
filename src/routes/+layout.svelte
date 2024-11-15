@@ -18,6 +18,7 @@
     import { writable } from "svelte/store";
     import { collections } from "../stores/collectionsStore";
     import { auth, isAuthenticated, userAccount } from '$lib/stores/authStore';
+    import { quotes } from '../stores/quotesStore';
     interface Props {
         children?: import('svelte').Snippet;
     }
@@ -57,7 +58,7 @@
                         projectKey: frontendConfig.openreplay.PROJECT_KEY,
                         ingestPoint: frontendConfig.openreplay.INGEST_POINT,
                         obscureTextNumbers: false,
-                        obscureTextEmails: true,
+                        obscureTextEmails: false,
                         __DISABLE_SECURE_MODE: true,
                         network: {
                             capturePayload: true,
@@ -74,7 +75,6 @@
                         respectDoNotTrack: false,
                     });
 
-                    // Start the tracker
                     tracker.start();
                 } else {
                     console.warn(
@@ -102,43 +102,20 @@
 
     setContext(key, { getTracker });
 
-    let quotes = [
-        {
-            text: `Prove by Doing !`,
-        },
-        {
-            text: "First make it Work, then make it Better, then make it Beautiful !",
-        },
-        {
-            text: `It's not possible ! - "No, it is necessary !" (No Time For Caution) !`,
-        },
-        {
-            text: "#TEGID - The Enemy's Gate Is Down !",
-        },
-        {
-            text: "De-coupled & Agnostic !",
-        },
-        {
-            text: "We Build it, We Support it !",
-        },
-        {
-            text: "The way you do Anything, is the way you do Everything !",
-        },
-    ];
-
     let currentQuoteIndex = $state(0);
     let isPaused = $state(false);
     let autoplayIntervalTime = 4000;
     let autoplayInterval: ReturnType<typeof setInterval> | null = null;
 
+    const quotesArray = $derived($quotes);
+
     function nextQuote() {
-        currentQuoteIndex = (currentQuoteIndex + 1) % quotes.length;
+        currentQuoteIndex = (currentQuoteIndex + 1) % $quotes.length;
     }
 
-    // function previousQuote() {
-    //     currentQuoteIndex =
-    //         (currentQuoteIndex - 1 + quotes.length) % quotes.length;
-    // }
+    function togglePause() {
+        isPaused = !isPaused;
+    }
 
     function startAutoplay() {
         if (autoplayInterval) clearInterval(autoplayInterval);
@@ -149,21 +126,35 @@
         }, autoplayIntervalTime);
     }
 
-    function togglePause() {
-        isPaused = !isPaused;
-    }
+    let currentUser = $state({
+        id: '',
+        email: '',
+        name: ''
+    });
 
     onMount(async () => {
         startAutoplay();
+
+        // Add subscription to userAccount store
+        const unsubscribeUser = userAccount.subscribe((account) => {
+            if (account) {
+                currentUser = {
+                    id: account.localAccountId || account.homeAccountId || '',
+                    email: account.username || '',
+                    name: account.name || ''
+                };
+            }
+        });
+
         try {
             const trackerInstance = await initializeTracker();
             if (trackerInstance) {
                 await trackerInstance.start({
-                    userID: "simonowusu@pvh.com",
+                    userID: currentUser.name,
                     metadata: {
-                        balance: "10M",
-                        plan: "free",
-                    },
+                        email: currentUser.email,
+                        name: currentUser.id,
+                    }
                 });
             }
         } catch (error) {
@@ -180,6 +171,11 @@
             },
             60 * 60 * 1000,
         ); // Poll every 60 minutes
+
+        return () => {
+            if (pollInterval) clearInterval(pollInterval);
+            unsubscribeUser(); // Clean up the subscription
+        };
     });
 
     onDestroy(() => {
@@ -189,7 +185,6 @@
     });
 
     function groupCollectionsByScope(collections: Collection[]): Record<string, Collection[]> {
-        // Create a new array instead of mutating the input
         const sortedCollections = [...collections].sort((a, b) => {
             if (a.scope_name < b.scope_name) return -1;
             if (a.scope_name > b.scope_name) return 1;
@@ -199,7 +194,6 @@
         });
 
         return sortedCollections.reduce((acc, collection) => {
-            // Create a new object instead of mutating the accumulator
             if (!acc[collection.scope_name]) {
                 acc[collection.scope_name] = [];
             }
@@ -208,13 +202,11 @@
         }, {} as Record<string, Collection[]>);
     }
 
-    // Change the derived value to a computed value
     const groupedCollections = $derived(() => groupCollectionsByScope(allCollections));
 
     async function signOut() {
         console.log('Starting signOut process...');
         try {
-            // Prevent multiple clicks
             const logoutButton = document.querySelector('[data-logout-button]');
             if (logoutButton) {
                 logoutButton.setAttribute('disabled', 'true');
@@ -223,7 +215,6 @@
             await auth.logout();
         } catch (error) {
             console.error('Sign out error:', error);
-            // Force redirect on error
             window.location.href = '/login';
         }
     }
@@ -332,7 +323,7 @@
                                         <div
                                             class="absolute inset-0 flex items-center justify-center"
                                         >
-                                            {#each quotes as quote, index}
+                                            {#each quotesArray as quote, index}
                                                 <div
                                                     class="absolute inset-0 flex flex-col items-center justify-center text-center p-4 transition-opacity duration-1000"
                                                     class:opacity-100={currentQuoteIndex ===
@@ -394,7 +385,7 @@
                                         <div
                                             class="absolute bottom-4 left-1/2 z-20 flex -translate-x-1/2 gap-2"
                                         >
-                                            {#each quotes as _, index}
+                                            {#each quotesArray as _, index}
                                                 <button
                                                     class="w-3 h-3 rounded-full transition-colors"
                                                     class:bg-white={currentQuoteIndex ===

@@ -1,6 +1,18 @@
 import type { Handle } from '@sveltejs/kit';
+import { redirect } from '@sveltejs/kit';
 
 export const handle: Handle = async ({ event, resolve }) => {
+    // Authentication logic
+    const publicPaths = ['/login'];
+    const isPublicPath = publicPaths.some(path => event.url.pathname.startsWith(path));
+
+    if (!isPublicPath) {
+        const authCookie = event.cookies.get('auth');
+        if (!authCookie) {
+            throw redirect(307, '/login');
+        }
+    }
+
     const response = await resolve(event);
     
     // Add security headers

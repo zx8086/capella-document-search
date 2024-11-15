@@ -23,17 +23,28 @@
 
     import { pushState, replaceState } from '$app/navigation';
 
+    import { userAccount } from '$lib/stores/authStore';
+
     interface SearchResult {
         collection: string;
         data: any;
     }
 
-    const { getTracker } = getContext(key) as { getTracker: () => any };
+    const { getTracker } = getContext(key) as { 
+        getTracker: typeof import('$lib/context/tracker').getTracker 
+    };
 
-    let currentUser: string = $state('');
+    let currentUser = $state({
+        id: '',
+        email: '',
+        name: ''
+    });
 
     function trackClick(elementName: string, action: string) {
         if (browser) {
+
+            console.log("Current user:", currentUser);
+
             const tracker = getTracker();
             if (tracker) {
                 tracker.event("User_Interaction", {
@@ -42,7 +53,11 @@
                     action: action,
                     page: "Document Search",
                     timestamp: new Date().toISOString(),
-                    user: currentUser
+                    userId: currentUser.id,
+                    metadata: {
+                        isSearchMode,
+                        buttonState,
+                    }
                 });
             }
         }
@@ -83,14 +98,34 @@
             selectedCollections = [...selectedCollections];
         });
 
+        // Add subscription to userAccount store
+        const unsubscribeUser = userAccount.subscribe((account) => {
+            if (account) {
+                currentUser = {
+                    id: account.localAccountId || account.homeAccountId || '',
+                    email: account.username || '',
+                    name: account.name || ''
+                };
+            }
+        });
+
         if (browser) {
             const tracker = getTracker();
+
             if (tracker) {
+
+                console.log("Tracking page view for user:", currentUser.id);
+                
                 tracker.event("Page_View", {
                     page: "Document Search",
                     category: "Navigation",
                     action: "View",
-                    user: currentUser
+                    userId: currentUser.name,
+                    timestamp: new Date().toISOString(),
+                    metadata: {
+                        url: window.location.href,
+                        referrer: document.referrer
+                    }
                 });
             }
         }
@@ -103,6 +138,7 @@
 
         return () => {
             unsubscribe();
+            unsubscribeUser();
         };
     });
 

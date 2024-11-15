@@ -50,7 +50,7 @@ export const auth = {
             if (!instance) return false;
 
             const response = await instance.handleRedirectPromise();
-            console.log('Redirect response:', response);
+            // console.debug('Redirect response:', response);
 
             if (response) {
                 const account = response.account;

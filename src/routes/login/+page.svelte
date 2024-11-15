@@ -94,7 +94,7 @@
                             <path fill="#03a9f4" d="M26 26h16v16H26z" />
                         </svg>
                     </span>
-                    Sign in with Microsoft
+                    Sign in with Microsoft Azure ID
                 {/if}
             </button>
         </div>

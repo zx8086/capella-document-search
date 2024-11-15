@@ -94,6 +94,11 @@ const config = {
       checkOrigin: false
     }
   },
+  vitePlugin: {
+    experimental: {
+      inspector: true
+    }
+  },
 };
 
 export default config;

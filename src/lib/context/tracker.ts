@@ -2,30 +2,32 @@
 
 import { browser } from '$app/environment';
 import { frontendConfig } from '$frontendConfig';
-import Tracker from '@openreplay/tracker';
+import type OpenReplayTracker from "@openreplay/tracker";
 
-let tracker: any = null;
+export const key = Symbol("openreplay tracker symbol");
 
-export const key = Symbol();
+let Tracker: typeof OpenReplayTracker | null = null;
 
 export async function initTracker() {
-    if (!browser) return null;
-    
-    try {
-        const Tracker = (await import('@openreplay/tracker')).default;
-        return Tracker;
-    } catch (error) {
-        console.error('Failed to import OpenReplay tracker:', error);
-        return null;
-    }
+  if (typeof window !== "undefined" && !Tracker) {
+    const module = await import("@openreplay/tracker");
+    Tracker = module.default;
+  }
+  return Tracker;
+}
+
+export { Tracker };
+
+export function getTracker() {
+    return Tracker;
 }
 
 export function identify(userId: string, metadata?: Record<string, any>) {
-    if (!tracker) return;
-    tracker.identify(userId, metadata);
+    if (!Tracker) return;
+    Tracker.identify(userId, metadata);
 }
 
 export function trackEvent(name: string, payload?: Record<string, any>) {
-    if (!tracker) return;
-    tracker.event(name, payload);
+    if (!Tracker) return;
+    Tracker.event(name, payload);
 }

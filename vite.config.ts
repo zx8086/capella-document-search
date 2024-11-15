@@ -87,10 +87,18 @@ export default defineConfig(({ mode }): UserConfig => {
             : [],
         },
         target: "esnext",
-        sourcemap: isDevelopment,
+        sourcemap: false,
       },
       optimizeDeps: {
         exclude: enableOpenTelemetry ? ["src/utils/serverLogger"] : [],
+        include: [
+          'svelte',
+          'svelte/internal',
+          'svelte/store',
+          'svelte/easing',
+          'bits-ui',
+          'tailwind-merge'
+        ],
       },
       define: {
         ...publicEnvVars,

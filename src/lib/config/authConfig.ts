@@ -46,8 +46,3 @@ export const getMsalInstance = async () => {
 export const graphConfig = {
     graphMeEndpoint: "https://graph.microsoft.com/v1.0/me"
 }; 
-
-
-
-        // redirectUri: frontendConfig.azure.REDIRECT_URI,
-        //     navigateToLoginRequestUrl: true

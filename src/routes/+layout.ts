@@ -1,4 +1,4 @@
-import { tracker } from '$lib/services/tracker';
+import { initTracker, key, getTracker } from '$lib/context/tracker';
 import type { LayoutLoad } from './$types';
 import { browser } from '$app/environment';
 import { redirect } from '@sveltejs/kit';
@@ -41,7 +41,7 @@ export const load: LayoutLoad = async ({ url }) => {
     }
 
     if (browser) {
-        await tracker.init();
+        await initTracker();
         tracker.event('page_view', {
             path: url.pathname,
             search: url.search,
@@ -51,5 +51,8 @@ export const load: LayoutLoad = async ({ url }) => {
 
     return {
         url: url.pathname,
+        [key]: {
+            getTracker
+        }
     };
 };
