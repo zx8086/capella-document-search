@@ -212,25 +212,33 @@
     const groupedCollections = $derived(() => groupCollectionsByScope(allCollections));
 
     async function signOut() {
-        await auth.logout();
+        try {
+            await auth.logout();
+        } catch (error) {
+            console.error('Sign out error:', error);
+            // Force redirect to login page if logout fails
+            window.location.href = '/login';
+        }
     }
 </script>
 
 <div class="flex flex-col min-h-screen">
     <!-- Header Section -->
-    <header class="bg-[#00174f] text-white py-4">
-        <div class="container mx-auto px-4">
-            <div class="flex justify-between items-center">
-                <!-- Left column (empty for balance) -->
-                <div class="w-1/4"></div>
+<!-- Header Section -->
+<header class="bg-[#00174f] text-white py-4">
+    <div class="container mx-auto px-4">
+        <div class="flex justify-between items-center">
+            <!-- Left column (empty for balance) -->
+            <div class="w-1/4"></div>
 
-                <!-- Middle column (title) -->
-                <div class="w-1/2 text-center">
-                    <h1 class="text-xl">Couchbase Capella Document Search</h1>
-                </div>
+            <!-- Middle column (title) -->
+            <div class="w-1/2 text-center">
+                <h1 class="text-xl">Couchbase Capella Document Search</h1>
+            </div>
 
-                <!-- Right column (dark mode toggle) -->
-                <div class="w-1/4 flex justify-end items-center space-x-2">
+            <!-- Right column (sign out button) -->
+            <div class="w-1/4 flex justify-end items-center space-x-2">
+                {#if $page.url.pathname !== '/login'}
                     <button
                         type="button"
                         onclick={() => signOut()}
@@ -253,10 +261,11 @@
                             />
                         </svg>
                     </button>
-                </div>
+                {/if}
             </div>
         </div>
-    </header>
+    </div>
+</header>
 
     <!-- Main Content -->
     <main

@@ -73,14 +73,38 @@ export const auth = {
             const instance = await getMsalInstance();
             if (!instance) return;
 
-            await instance.logoutRedirect({
-                postLogoutRedirectUri: window.location.origin + '/login'
-            });
+            // Check if there's an interaction in progress
+            if (instance.getActiveAccount()) {
+                try {
+                    // Try to clear the interaction in progress
+                    await instance.handleRedirectPromise();
+                } catch (e) {
+                    console.warn('Could not clear existing interaction:', e);
+                }
+            }
 
-            isAuthenticated.set(false);
-            userAccount.set(null);
+            // Add a small delay to ensure any pending interactions are cleared
+            await new Promise(resolve => setTimeout(resolve, 100));
+
+            await instance.logoutRedirect({
+                postLogoutRedirectUri: window.location.origin + '/login',
+                onRedirectNavigate: () => {
+                    // Clear auth state immediately
+                    isAuthenticated.set(false);
+                    userAccount.set(null);
+                    return true;
+                }
+            });
         } catch (error) {
             console.error('Logout failed:', error);
+            // Force clear auth state even if logout fails
+            isAuthenticated.set(false);
+            userAccount.set(null);
+
+            // Fallback: force redirect to login page
+            if (browser) {
+                window.location.href = '/login';
+            }
         }
     }
 }; 
