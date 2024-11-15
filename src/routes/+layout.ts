@@ -1,7 +1,8 @@
-import { auth } from '$lib/stores/authStore';
+import { tracker } from '$lib/services/tracker';
 import type { LayoutLoad } from './$types';
 import { browser } from '$app/environment';
 import { redirect } from '@sveltejs/kit';
+import { auth } from '$lib/stores/authStore';
 
 export const load: LayoutLoad = async ({ url }) => {
     if (!browser) return {};
@@ -32,4 +33,17 @@ export const load: LayoutLoad = async ({ url }) => {
         console.error('Layout load error:', error);
         return {};
     }
+
+    if (browser) {
+        await tracker.init();
+        tracker.event('page_view', {
+            path: url.pathname,
+            search: url.search,
+            title: document.title
+        });
+    }
+
+    return {
+        url: url.pathname,
+    };
 };
