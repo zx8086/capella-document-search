@@ -30,6 +30,8 @@
 
     const { getTracker } = getContext(key) as { getTracker: () => any };
 
+    let currentUser: string = $state('');
+
     function trackClick(elementName: string, action: string) {
         if (browser) {
             const tracker = getTracker();
@@ -40,6 +42,7 @@
                     action: action,
                     page: "Document Search",
                     timestamp: new Date().toISOString(),
+                    user: currentUser
                 });
             }
         }
@@ -87,6 +90,7 @@
                     page: "Document Search",
                     category: "Navigation",
                     action: "View",
+                    user: currentUser
                 });
             }
         }

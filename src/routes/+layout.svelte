@@ -17,7 +17,7 @@
     import { frontendConfig } from "$frontendConfig";
     import { writable } from "svelte/store";
     import { collections } from "../stores/collectionsStore";
-    import { auth } from '$lib/stores/authStore';
+    import { auth, isAuthenticated, userAccount } from '$lib/stores/authStore';
     interface Props {
         children?: import('svelte').Snippet;
     }
@@ -212,11 +212,18 @@
     const groupedCollections = $derived(() => groupCollectionsByScope(allCollections));
 
     async function signOut() {
+        console.log('Starting signOut process...');
         try {
+            // Prevent multiple clicks
+            const logoutButton = document.querySelector('[data-logout-button]');
+            if (logoutButton) {
+                logoutButton.setAttribute('disabled', 'true');
+            }
+
             await auth.logout();
         } catch (error) {
             console.error('Sign out error:', error);
-            // Force redirect to login page if logout fails
+            // Force redirect on error
             window.location.href = '/login';
         }
     }
@@ -224,7 +231,6 @@
 
 <div class="flex flex-col min-h-screen">
     <!-- Header Section -->
-<!-- Header Section -->
 <header class="bg-[#00174f] text-white py-4">
     <div class="container mx-auto px-4">
         <div class="flex justify-between items-center">

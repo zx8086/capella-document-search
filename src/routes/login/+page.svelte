@@ -7,24 +7,36 @@
     let loginAttempts = 0;
 
     async function handleLogin() {
+        console.log('Login button clicked, starting login process...');
         try {
             loginAttempts++;
+            console.log(`Login attempt #${loginAttempts}`);
+            
             if (loginAttempts > 1) {
+                console.log('Multiple login attempts detected, logging out first...');
                 await auth.logout();
             }
+
+            console.log('Calling auth.login()...');
             await auth.login();
         } catch (error) {
-            console.error('Login error:', error);
+            console.error('Login error in component:', error);
             toast.error('Login failed. Please try again.');
         }
     }
 
     onMount(async () => {
+        console.log('Login page mounted');
         try {
+            console.log('Initializing auth on login page...');
             await auth.initialize();
+            
+            console.log('Handling any pending redirects...');
             const redirectResult = await auth.handleRedirectPromise();
+            console.log('Redirect result:', redirectResult);
             
             if ($isAuthenticated) {
+                console.log('User is already authenticated, redirecting...');
                 const redirectPath = sessionStorage.getItem('loginRedirectPath') || '/';
                 sessionStorage.removeItem('loginRedirectPath');
                 await goto(redirectPath, { replaceState: true });
@@ -32,6 +44,7 @@
             }
             
             if (redirectResult) {
+                console.log('Successful redirect, navigating to app...');
                 const redirectPath = sessionStorage.getItem('loginRedirectPath') || '/';
                 sessionStorage.removeItem('loginRedirectPath');
                 await goto(redirectPath, { replaceState: true });

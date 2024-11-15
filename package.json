@@ -44,6 +44,7 @@
     "autoprefixer": "^10.4.20",
     "bun-types": "latest",
     "postcss": "^8.4.45",
+    "process": "^0.11.10",
     "svelte": "^5.0.0",
     "svelte-adapter-bun": "^0.5.2",
     "svelte-check": "^4.0.0",

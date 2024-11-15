@@ -4,26 +4,29 @@ import { browser } from '$app/environment';
 
 let msalInstance: PublicClientApplication | null = null;
 
-const msalConfig: Configuration = {
+export const msalConfig = {
     auth: {
         clientId: frontendConfig.azure.CLIENT_ID,
         authority: `https://login.microsoftonline.com/${frontendConfig.azure.TENANT_ID}`,
         redirectUri: frontendConfig.azure.REDIRECT_URI,
-        navigateToLoginRequestUrl: false
+        navigateToLoginRequestUrl: true,
     },
     cache: {
         cacheLocation: "sessionStorage",
-        storeAuthStateInCookie: false
+        storeAuthStateInCookie: true,
+        secureCookies: true
     },
     system: {
+        allowRedirectInIframe: true,
+        tokenRenewalOffsetSeconds: 300,
+        redirectNavigationTimeout: 10000, // 10 seconds timeout for redirects
         loggerOptions: {
-            logLevel: LogLevel.Error,
             loggerCallback: (level, message, containsPii) => {
-                if (containsPii) return;
-                if (level <= LogLevel.Error) {
-                    console.error(message);
+                if (!containsPii) {
+                    console.log(`MSAL - ${level}: ${message}`);
                 }
-            }
+            },
+            piiLoggingEnabled: false
         }
     }
 };
@@ -43,3 +46,8 @@ export const getMsalInstance = async () => {
 export const graphConfig = {
     graphMeEndpoint: "https://graph.microsoft.com/v1.0/me"
 }; 
+
+
+
+        // redirectUri: frontendConfig.azure.REDIRECT_URI,
+        //     navigateToLoginRequestUrl: true
