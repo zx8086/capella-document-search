@@ -11,27 +11,24 @@ export const load: LayoutLoad = async ({ url }) => {
     const isPublicPath = publicPaths.some(path => url.pathname.startsWith(path));
     
     try {
-        if (url.searchParams.has('code') || url.searchParams.has('error')) {
-            console.log('Handling auth redirect...');
-            await auth.handleRedirectPromise();
+        if (url.pathname === '/login') {
             return {};
         }
 
-        const isAuthed = await auth.initialize();
-        
-        if (!isPublicPath && !isAuthed) {
-            throw redirect(307, '/login');
-        }
+        const success = await auth.handleRedirect();
+        const isAuthenticated = await auth.isAuthenticated();
 
-        if (isPublicPath && isAuthed && url.pathname === '/login') {
-            throw redirect(307, '/');
+        if (!isAuthenticated) {
+            throw redirect(307, '/login');
         }
 
         return {};
     } catch (error) {
-        if (error instanceof redirect) throw error;
+        if (error.status === 307) {
+            throw error;
+        }
         console.error('Layout load error:', error);
-        return {};
+        throw redirect(307, '/login');
     }
 
     if (browser) {

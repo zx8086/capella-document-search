@@ -1,129 +1,104 @@
 import { browser } from '$app/environment';
 import { writable } from 'svelte/store';
 import { getMsalInstance } from '$lib/config/authConfig';
-import { identify, trackEvent } from '$lib/context/tracker';
 
 export const isAuthenticated = writable(false);
-export const userAccount = writable(null);
 export const isLoading = writable(false);
+export const userAccount = writable(null);
 
-async function login() {
-    console.log('Auth store: Starting login process...');
-    isLoading.set(true);
-    try {
-        const instance = await getMsalInstance();
-        if (!instance) {
-            throw new Error('No MSAL instance available');
+export const auth = {
+    async login() {
+        console.log('Auth store: Starting login process...');
+        try {
+            const instance = await getMsalInstance();
+            if (!instance) return;
+
+            // Check if there's an ongoing interaction
+            if (instance.getAllAccounts().length > 0) {
+                // User is already logged in
+                isAuthenticated.set(true);
+                userAccount.set(instance.getAllAccounts()[0]);
+                return;
+            }
+
+            // Clear any existing interaction before starting new one
+            if (browser) {
+                try {
+                    await instance.clearCache();
+                    await instance.handleRedirectPromise();
+                } catch (e) {
+                    console.warn('Error clearing interaction state:', e);
+                }
+            }
+
+            await instance.loginRedirect({
+                scopes: ['User.Read', 'email', 'openid', 'profile']
+            });
+        } catch (error) {
+            console.error('Login failed:', error);
+            isAuthenticated.set(false);
+            userAccount.set(null);
+            throw error;
         }
+    },
 
-        if (browser) {
-            trackEvent('login_attempt');
+    async handleRedirect() {
+        if (!browser) return false;
+        
+        try {
+            const instance = await getMsalInstance();
+            if (!instance) return false;
+
+            const response = await instance.handleRedirectPromise();
+            console.log('Redirect response:', response);
+
+            if (response) {
+                const account = response.account;
+                if (account) {
+                    instance.setActiveAccount(account);
+                    isAuthenticated.set(true);
+                    userAccount.set(account);
+                    return true;
+                }
+            }
+
+            // Check if user is already logged in
+            const accounts = instance.getAllAccounts();
+            if (accounts.length > 0) {
+                instance.setActiveAccount(accounts[0]);
+                isAuthenticated.set(true);
+                userAccount.set(accounts[0]);
+                return true;
+            }
+
+            return false;
+        } catch (error) {
+            console.error('Handle redirect failed:', error);
+            return false;
         }
+    },
 
-        const loginRequest = {
-            scopes: ['User.Read', 'profile', 'openid'],
-            prompt: 'select_account'
-        };
+    async isAuthenticated() {
+        if (!browser) return false;
 
-        await instance.loginRedirect(loginRequest);
-        return true;
-    } catch (error) {
-        console.error('Login failed:', error);
-        if (browser) {
-            trackEvent('login_failed', { error: error.message });
-        }
-        return false;
-    } finally {
-        isLoading.set(false);
-    }
-}
-
-async function handleRedirect() {
-    try {
         const instance = await getMsalInstance();
         if (!instance) return false;
 
-        const response = await instance.handleRedirectPromise();
-        console.log('Redirect response:', response);
-
-        if (response) {
-            const account = response.account;
-            if (account) {
-                userAccount.set(account);
-                isAuthenticated.set(true);
-
-                if (browser) {
-                    identify(account.username, {
-                        name: account.name,
-                        email: account.username,
-                    });
-                    trackEvent('login_success');
-                }
-                return true;
-            }
-        }
-
         const accounts = instance.getAllAccounts();
-        console.log('Found accounts during init:', accounts.length);
-        if (accounts.length > 0) {
-            userAccount.set(accounts[0]);
-            isAuthenticated.set(true);
-            return true;
-        }
+        return accounts.length > 0;
+    },
 
-        return false;
-    } catch (error) {
-        console.error('Handle redirect failed:', error);
-        if (browser) {
-            trackEvent('login_error', { error: error.message });
-        }
-        return false;
-    }
-}
-
-async function logout() {
-    console.log('Auth store: Starting logout process...');
-    try {
+    async logout() {
         const instance = await getMsalInstance();
         if (!instance) return;
 
-        if (browser) {
-            trackEvent('logout_attempt');
-        }
-
-        const accounts = instance.getAllAccounts();
-        if (accounts.length > 0) {
-            const account = accounts[0];
-            
+        try {
+            await instance.logoutRedirect();
+        } catch (error) {
+            console.error('Logout failed:', error);
+        } finally {
             isAuthenticated.set(false);
             userAccount.set(null);
-
-            if (browser) {
-                trackEvent('logout_success');
-            }
-
-            await instance.logoutRedirect({
-                account,
-                postLogoutRedirectUri: window.location.origin + '/login'
-            });
         }
-    } catch (error) {
-        console.error('Logout failed:', error);
-        if (browser) {
-            trackEvent('logout_failed', { error: error.message });
-        }
-        
-        // Emergency cleanup
-        sessionStorage.clear();
-        isAuthenticated.set(false);
-        userAccount.set(null);
-        window.location.href = '/login';
     }
-}
-
-export const auth = {
-    login,
-    logout,
-    handleRedirect,
-    initialize: handleRedirect
 }; 

@@ -2,62 +2,37 @@
     import { onMount } from 'svelte';
     import { goto } from '$app/navigation';
     import { auth, isAuthenticated, isLoading } from '$lib/stores/authStore';
-    import { getMsalInstance } from '$lib/config/authConfig';
-
-    let loginAttempts = 0;
-
-    async function handleLogin() {
-        console.log('Login button clicked, starting login process...');
-        loginAttempts++;
-        console.log(`Login attempt #${loginAttempts}`);
-
-        if (loginAttempts > 1) {
-            console.log('Multiple login attempts detected, logging out first...');
-            await auth.logout();
-        }
-
-        console.log('Calling auth.login()...');
-        await auth.login();
-    }
 
     onMount(async () => {
-        console.log('Login page mounted');
-        console.log('Initializing auth on login page...');
-        
-        const instance = await getMsalInstance();
-        if (!instance) {
-            console.error('Failed to get MSAL instance');
-            return;
-        }
-
         try {
-            console.log('Handling any pending redirects...');
-            const response = await instance.handleRedirectPromise();
-            
-            if (response) {
-                console.log('Redirect response received:', response);
-                const account = response.account;
-                if (account) {
-                    console.log('Account found in response, redirecting to home');
-                    goto('/');
-                    return;
-                }
-            }
-
-            const accounts = instance.getAllAccounts();
-            if (accounts.length > 0) {
-                console.log('Existing account found, redirecting to home');
-                goto('/');
+            // Check if already authenticated
+            if (await auth.isAuthenticated()) {
+                $isAuthenticated = true;
+                await goto('/');
                 return;
             }
+
+            // Handle any pending redirects
+            const success = await auth.handleRedirect();
+            if (success) {
+                await goto('/');
+            }
         } catch (error) {
-            console.error('Error handling redirect:', error);
+            console.error('Login page error:', error);
         }
     });
 
-    $: if ($isAuthenticated) {
-        console.log('User is authenticated, redirecting to home');
-        goto('/');
+    async function handleLogin() {
+        if ($isLoading) return;
+        
+        $isLoading = true;
+        try {
+            await auth.login();
+        } catch (error) {
+            console.error('Login failed:', error);
+        } finally {
+            $isLoading = false;
+        }
     }
 </script>
 
