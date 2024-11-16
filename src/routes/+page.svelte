@@ -297,23 +297,29 @@
                     if (isSearchMode) {
                         if (data && data.data && data.data.searchDocuments) {
                             searchResults = data.data.searchDocuments;
+                            const foundCollectionsCount = data.foundCollectionsCount;
 
-                            const foundCollectionsCount =
-                                data.foundCollectionsCount;
+                            if (browser) {
+                                const tracker = getTracker();
+                                if (tracker) {
+                                    tracker.event("GraphQL_Operation", {
+                                        operation: "searchDocuments",
+                                        documentKey: documentKey,
+                                        collectionsSearched: selectedCollections.length,
+                                        resultsFound: foundCollectionsCount,
+                                        success: true
+                                    });
+                                }
+                            }
 
                             if (foundCollectionsCount === 0) {
-                                toast.error(
-                                    "No results found for the given document key.",
-                                    {
-                                        duration: Infinity,
-                                    },
-                                );
+                                toast.error("No results found for the given document key.", {
+                                    duration: Infinity,
+                                });
                             } else {
                                 toast.success(
                                     `Search completed successfully. Document found in ${foundCollectionsCount} collection(s).`,
-                                    {
-                                        duration: 3000,
-                                    },
+                                    { duration: 3000 }
                                 );
                             }
                         } else {

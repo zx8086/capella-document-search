@@ -64,24 +64,15 @@
                     isTrackerInitialized = true;
 
                     if ($userAccount) {
-                        console.log("👤 Initial user identification:", {
-                            username: $userAccount.username,
-                            email: $userAccount.username,
-                            name: $userAccount.name,
-                            accountId: $userAccount.localAccountId || $userAccount.homeAccountId
+                        const userId = $userAccount.username || '';
+                        await trackerInstance.start({
+                            userID: userId,
+                            metadata: {
+                                email: userId,
+                                name: $userAccount.name || '',
+                                accountId: $userAccount.localAccountId || $userAccount.homeAccountId || ''
+                            }
                         });
-                        
-                        try {
-                            await trackerInstance.setUserID($userAccount.username || '');
-                            
-                            await trackerInstance.setMetadata('email', $userAccount.username || '');
-                            await trackerInstance.setMetadata('name', $userAccount.name || '');
-                            await trackerInstance.setMetadata('accountId', $userAccount.localAccountId || $userAccount.homeAccountId || '');
-                        } catch (error) {
-                            console.error("Failed to identify user:", error);
-                        }
-                    } else {
-                        console.log("ℹ️ No user account available for initial identification");
                     }
                 }
             } catch (error) {

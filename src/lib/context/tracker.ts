@@ -6,6 +6,7 @@ import type OpenReplayTracker from "@openreplay/tracker";
 import trackerAssist from '@openreplay/tracker-assist';
 import trackerProfiler from '@openreplay/tracker-profiler';
 import { createTrackerLink } from '@openreplay/tracker-graphql';
+import { toast } from 'svelte-sonner';
 
 export const key = Symbol("openreplay tracker symbol");
 
@@ -94,15 +95,39 @@ export async function initTracker() {
             controlConfirm: "Would you like to allow support to control your screen?",
             onCallStart: () => {
                 console.log("🎥 Support call started");
-                return () => console.log("📞 Support call ended");
+                toast.info("Support call started", {
+                    description: "You are now connected to a support session"
+                });
+                return () => {
+                    console.log("📞 Support call ended");
+                    toast.info("Support call ended", {
+                        description: "Your support session has ended"
+                    });
+                };
             },
             onRemoteControlStart: () => {
                 console.log("🖱️ Remote control started");
-                return () => console.log("🔒 Remote control ended");
+                toast.warning("Remote control active", {
+                    description: "Support agent now has control of your screen"
+                });
+                return () => {
+                    console.log("🔒 Remote control ended");
+                    toast.info("Remote control ended", {
+                        description: "Support agent no longer has control of your screen"
+                    });
+                };
             },
             onAgentConnect: ({ email, name, query }) => {
                 console.log("👋 Agent connected:", { email, name, query });
-                return () => console.log("👋 Agent disconnected");
+                toast.success("Support agent connected", {
+                    description: `${name} (${email}) has joined the session`
+                });
+                return () => {
+                    console.log("👋 Agent disconnected");
+                    toast.info("Support agent disconnected", {
+                        description: "The support agent has left the session"
+                    });
+                };
             }
         }));
 
@@ -177,11 +202,11 @@ export async function identifyUser(userId: string, metadata?: Record<string, any
 
   try {
     console.log("👤 Identifying user:", { userId, metadata });
-    await tracker.setUserID(userId);
+    await tracker.setUserID(metadata?.email || userId);
     if (metadata) {
-      for (const [key, value] of Object.entries(metadata)) {
-        await tracker.setMetadata(key, String(value));
-      }
+      await tracker.setMetadata('name', metadata.name || '');
+      await tracker.setMetadata('accountId', userId);
+      await tracker.setMetadata('email', metadata.email || '');
     }
     console.log("✅ User identification complete");
   } catch (error) {

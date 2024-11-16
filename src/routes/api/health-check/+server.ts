@@ -242,13 +242,13 @@ export async function GET({ url, fetch }: { url: URL; fetch: Function }) {
   const simpleChecks = [
     { name: "Internal Collections API", check: () => checkInternalAPI(fetch) },
     { name: "SQLite Database", check: checkDatabase },
+    { name: "GraphQL Endpoint", check: checkGraphQLEndpoint },
   ].sort((a, b) => a.name.localeCompare(b.name));
 
   const detailedChecks = [
     ...simpleChecks,
     { name: "Elastic APM Server", check: checkElasticAPMEndpoint },
     { name: "External Capella Cloud API", check: checkCapellaAPI },
-    { name: "GraphQL Endpoint", check: checkGraphQLEndpoint },
     // { name: "OpenTelemetry Logs Endpoint", check: checkLogsEndpoint },
     // { name: "OpenTelemetry Metrics Endpoint", check: checkMetricsEndpoint },
     // { name: "OpenTelemetry Traces Endpoint", check: checkTracesEndpoint },
