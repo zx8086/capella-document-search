@@ -2,8 +2,11 @@
 
 <script lang="ts">
     import { onMount } from "svelte";
+    import type { PageData } from './$types';
 
-    let healthStatus: {
+    const { data } = $props<{ data: PageData }>();
+
+    type HealthStatus = {
         status: string;
         version: {
             build: string;
@@ -15,10 +18,12 @@
             { status: string; message?: string; responseTime?: number }
         >;
         checkType: "Simple" | "Detailed";
-    } | null = $state(null);
-    let loading = $state(true);
+    };
+
+    let healthStatus: HealthStatus | null = $state(data.healthStatus);
+    let loading = $state(false);
     let error = $state("");
-    let checkType: "Simple" | "Detailed" = $state("Simple");
+    let checkType: "Simple" | "Detailed" = $state(data.checkType);
 
     async function fetchHealthCheck() {
         loading = true;
@@ -42,22 +47,18 @@
         fetchHealthCheck();
     }
 
-    onMount(fetchHealthCheck);
     let transactionName = $derived(
-        `API Health Check Page - ${checkType} Check`,
+        `API Health Check Page - ${checkType} Check`
     );
 </script>
 
 <svelte:head>
-    <title
-        >API Health Check - {checkType.charAt(0).toUpperCase() +
-            checkType.slice(1)}</title
-    >
+    <title>API Health Check - {checkType.charAt(0).toUpperCase() + checkType.slice(1)}</title>
     <meta name="transaction-name" content={transactionName} />
 </svelte:head>
 
 <div class="container mx-auto px-4 py-8">
-    <h1 class="text-3xl font-bold mb-4">API Health Check</h1>
+    <h1 class="text-3xl font-bold mb-4">Status - API Health Check</h1>
 
     <div class="mb-6">
         <button
@@ -76,7 +77,7 @@
 
     {#if loading}
         <div class="flex flex-col items-center justify-center gap-4">
-            <p class="text-gray-600">Loading detailed health check status...</p>
+            <p class="text-gray-600">Loading detailed health check...</p>
             <div class="animate-spin rounded-full h-12 w-12 border-2 border-gray-200 border-b-gray-900">
                 <span class="sr-only">Loading health check status...</span>
             </div>
@@ -146,6 +147,7 @@
         <p class="text-red-600">No health check data available.</p>
     {/if}
 </div>
+
 <!-- Back to Home link -->
 <div class="mt-8 flex justify-center">
     <a

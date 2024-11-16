@@ -186,7 +186,7 @@
                                                     />
                                                 </svg>
                                             {/if}
-                                            <span>View collections ({result.foundIn.length})</span>
+                                            <span>View {result.foundIn.length === 1 ? 'collection' : 'collections'} ({result.foundIn.length})</span>
                                         </button>
                                         {#if expandedStates[result.documentKey]}
                                             <ul class="mt-2 list-disc pl-5">

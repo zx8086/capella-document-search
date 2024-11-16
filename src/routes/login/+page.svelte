@@ -2,6 +2,7 @@
     import { auth, isLoading, isAuthenticated } from '$lib/stores/authStore';
     import { onMount } from 'svelte';
     import { goto } from '$app/navigation';
+    // import { inspect } from 'svelte/internal';
 
     let loginAttempts = 0;
 
@@ -16,7 +17,7 @@
             }
             await auth.login();
         } catch (error) {
-            console.error('Login failed:', error);
+            console.error('Login failed:', error?.message || error);
         } finally {
             $isLoading = false;
         }
@@ -31,7 +32,7 @@
             }
             await auth.handleRedirectPromise();
         } catch (error) {
-            console.error('Redirect handling error:', error);
+            // console.error('Redirect handling error:', inspect(error));
         }
     });
 </script>

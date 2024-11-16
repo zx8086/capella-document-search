@@ -13,7 +13,7 @@
     import { Toaster } from "$lib/components/ui/sonner";
     import { onMount, setContext, onDestroy } from "svelte";
     import { browser } from "$app/environment";
-    import { key, initTracker } from "$lib/context/tracker";
+    import { key, initTracker, debugTrackerStatus, identifyUser, getSessionId } from "$lib/context/tracker";
     import { frontendConfig } from "$frontendConfig";
     import { writable } from "svelte/store";
     import { collections } from "../stores/collectionsStore";
@@ -49,50 +49,45 @@
     });
 
     async function initializeTracker() {
-        if (isTrackerInitialized) return tracker;
+        if (isTrackerInitialized) {
+            console.log("🔄 Tracker already initialized");
+            return tracker;
+        }
+        
         if (browser) {
             try {
-                const TrackerClass = await initTracker();
-                if (TrackerClass && frontendConfig.openreplay.PROJECT_KEY) {
-                    tracker = new TrackerClass({
-                        projectKey: frontendConfig.openreplay.PROJECT_KEY,
-                        ingestPoint: frontendConfig.openreplay.INGEST_POINT,
-                        obscureTextNumbers: false,
-                        obscureTextEmails: false,
-                        __DISABLE_SECURE_MODE: true,
-                        network: {
-                            capturePayload: true,
-                            sessionTokenHeader: false,
-                            failuresOnly: false,
-                            ignoreHeaders: [
-                                "Authorization",
-                                "Cookie",
-                                "Set-Cookie",
-                            ],
-                            captureInIframes: false,
-                        },
-                        capturePerformance: true,
-                        respectDoNotTrack: false,
-                    });
+                console.log("🚀 Starting tracker initialization...");
+                const trackerInstance = await initTracker();
+                
+                if (trackerInstance) {
+                    tracker = trackerInstance;
+                    isTrackerInitialized = true;
 
-                    tracker.start();
-                } else {
-                    console.warn(
-                        "OpenReplay configuration is missing or incomplete.",
-                        {
-                            TrackerClass,
-                            projectKey: frontendConfig.openreplay.PROJECT_KEY,
-                        },
-                    );
+                    if ($userAccount) {
+                        console.log("👤 Initial user identification:", {
+                            username: $userAccount.username,
+                            email: $userAccount.username,
+                            name: $userAccount.name,
+                            accountId: $userAccount.localAccountId || $userAccount.homeAccountId
+                        });
+                        
+                        try {
+                            await trackerInstance.setUserID($userAccount.username || '');
+                            
+                            await trackerInstance.setMetadata('email', $userAccount.username || '');
+                            await trackerInstance.setMetadata('name', $userAccount.name || '');
+                            await trackerInstance.setMetadata('accountId', $userAccount.localAccountId || $userAccount.homeAccountId || '');
+                        } catch (error) {
+                            console.error("Failed to identify user:", error);
+                        }
+                    } else {
+                        console.log("ℹ️ No user account available for initial identification");
+                    }
                 }
             } catch (error) {
-                console.warn(
-                    "OpenReplay initialization failed:",
-                    error instanceof Error ? error.message : String(error),
-                );
+                console.error("❌ Tracker initialization failed:", error);
             }
         }
-        isTrackerInitialized = true;
         return tracker;
     }
 
@@ -132,6 +127,12 @@
         name: ''
     });
 
+    let initializationAttempted = false;
+
+    let trackerInitialized = false;
+
+    let assistWidget: HTMLDivElement;
+
     onMount(async () => {
         startAutoplay();
 
@@ -153,9 +154,30 @@
                     userID: currentUser.name,
                     metadata: {
                         email: currentUser.email,
-                        name: currentUser.id,
+                        name: currentUser.name,
                     }
                 });
+
+                // Add the Assist Widget
+                const widget = document.createElement('div');
+                widget.id = 'openreplay-assist-widget';
+                widget.style.cssText = `
+                    position: fixed;
+                    bottom: 20px;
+                    right: 20px;
+                    z-index: 999999;
+                `;
+                document.body.appendChild(widget);
+                assistWidget = widget;
+
+                // Wait a bit before checking status
+                setTimeout(() => {
+                    debugTrackerStatus();
+                    const sessionId = getSessionId();
+                    if (sessionId) {
+                        console.log("🎯 Active session ID:", sessionId);
+                    }
+                }, 2000);
             }
         } catch (error) {
             console.warn(
@@ -172,6 +194,58 @@
             60 * 60 * 1000,
         ); // Poll every 60 minutes
 
+        if (browser && !initializationAttempted) {
+            initializationAttempted = true;
+            try {
+                const tracker = await initTracker();
+                if (tracker) {
+                    // Add the Assist Widget
+                    const widget = document.createElement('div');
+                    widget.id = 'openreplay-assist-widget';
+                    widget.style.cssText = `
+                        position: fixed;
+                        bottom: 20px;
+                        right: 20px;
+                        z-index: 999999;
+                    `;
+                    document.body.appendChild(widget);
+                    assistWidget = widget;
+
+                    // Wait a bit before checking status
+                    setTimeout(() => {
+                        debugTrackerStatus();
+                        const sessionId = getSessionId();
+                        if (sessionId) {
+                            console.log("🎯 Active session ID:", sessionId);
+                        }
+                    }, 2000);
+                }
+            } catch (error) {
+                console.error("Failed to initialize tracker:", error);
+            }
+        }
+
+        if (browser && !trackerInitialized) {
+            try {
+                const tracker = await initTracker();
+                if (tracker) {
+                    trackerInitialized = true;
+                    
+                    if ($userAccount) {
+                        await identifyUser(
+                            $userAccount.localAccountId || $userAccount.homeAccountId || '',
+                            {
+                                email: $userAccount.username || '',
+                                name: $userAccount.name || ''
+                            }
+                        );
+                    }
+                }
+            } catch (error) {
+                console.error("Failed to initialize tracker:", error);
+            }
+        }
+
         return () => {
             if (pollInterval) clearInterval(pollInterval);
             unsubscribeUser(); // Clean up the subscription
@@ -182,6 +256,11 @@
         if (autoplayInterval) clearInterval(autoplayInterval);
 
         if (pollInterval) clearInterval(pollInterval);
+
+        // Clean up the widget
+        if (assistWidget && browser) {
+            assistWidget.remove();
+        }
     });
 
     function groupCollectionsByScope(collections: Collection[]): Record<string, Collection[]> {
@@ -221,6 +300,18 @@
 
     // Use $derived instead of $:
     const shouldShowContent = $derived(!$isLoading || $page.url.pathname === '/login');
+
+    $effect(() => {
+        if (trackerInitialized && $userAccount) {
+            identifyUser(
+                $userAccount.localAccountId || $userAccount.homeAccountId || '',
+                {
+                    email: $userAccount.username || '',
+                    name: $userAccount.name || ''
+                }
+            );
+        }
+    });
 </script>
 
 {#if !shouldShowContent}
@@ -439,28 +530,31 @@
                         </div>
                     </div>
                     <!-- Health Check Icon and Text -->
-                    <a
-                        href="/api/health-check"
-                        class="ml-4 flex items-center"
-                        aria-label="API Health Check"
-                        data-transaction-name="API Health Check"
-                    >
-                        <svg
-                            xmlns="http://www.w3.org/2000/svg"
-                            fill="none"
-                            viewBox="0 0 24 24"
-                            stroke-width="1.5"
-                            stroke="currentColor"
-                            class="w-6 h-6 mr-2"
+                    <div class="flex items-center space-x-4">
+                        <!-- API Health Check -->
+                        <a
+                            href="/api/health-check"
+                            class="flex items-center hover:opacity-80 transition-opacity"
+                            aria-label="API Health Check"
+                            data-transaction-name="API Health Check"
                         >
-                            <path
-                                stroke-linecap="round"
-                                stroke-linejoin="round"
-                                d="M12 9v3.75m9-.75a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 3.75h.008v.008H12v-.008Z"
-                            />
-                        </svg>
-                        <span class="text-sm">API Health Check</span>
-                    </a>
+                            <svg
+                                xmlns="http://www.w3.org/2000/svg"
+                                fill="none"
+                                viewBox="0 0 24 24"
+                                stroke-width="1.5"
+                                stroke="currentColor"
+                                class="w-6 h-6 mr-2"
+                            >
+                                <path
+                                    stroke-linecap="round"
+                                    stroke-linejoin="round"
+                                    d="M12 9v3.75m9-.75a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 3.75h.008v.008H12v-.008Z"
+                                />
+                            </svg>
+                            <span class="text-sm">Status</span>
+                        </a>
+                    </div>
                 </div>
             </div>
         </footer>

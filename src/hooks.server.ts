@@ -34,11 +34,16 @@ export const handle: Handle = async ({ event, resolve }) => {
             https://*.aws.elastic-cloud.com 
             https://*.cloud.couchbase.com 
             https://*.openreplay.com 
+            wss://*.openreplay.com
+            ws://*.openreplay.com
+            wss://api.openreplay.com
+            ws://api.openreplay.com
             https://*.siobytes.com;
         script-src 'self' 'unsafe-inline' 'unsafe-eval' 
             https://vjs.zencdn.net 
             https://apm.siobytes.com 
-            https://api.openreplay.com;
+            https://api.openreplay.com
+            https://static.openreplay.com;
         style-src 'self' 'unsafe-inline' https://vjs.zencdn.net;
         img-src 'self' data: https: blob:;
         frame-src 'self' 

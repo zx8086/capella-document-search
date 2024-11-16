@@ -25,6 +25,8 @@
 
     import { userAccount } from '$lib/stores/authStore';
 
+    import { debugTrackerStatus, trackEvent } from '$lib/context/tracker';
+
     interface SearchResult {
         collection: string;
         data: any;
@@ -42,24 +44,17 @@
 
     function trackClick(elementName: string, action: string) {
         if (browser) {
-
-            console.log("Current user:", currentUser);
-
-            const tracker = getTracker();
-            if (tracker) {
-                tracker.event("User_Interaction", {
-                    type: "click",
-                    element: elementName,
-                    action: action,
-                    page: "Document Search",
-                    timestamp: new Date().toISOString(),
-                    userId: currentUser.id,
-                    metadata: {
-                        isSearchMode,
-                        buttonState,
-                    }
-                });
-            }
+            trackEvent("User_Interaction", {
+                type: "click",
+                element: elementName,
+                action: action,
+                page: "Document Search",
+                userId: currentUser.name,
+                metadata: {
+                    isSearchMode,
+                    buttonState,
+                }
+            });
         }
     }
 
@@ -111,21 +106,12 @@
 
         if (browser) {
             const tracker = getTracker();
-
             if (tracker) {
-
-                console.log("Tracking page view for user:", currentUser.id);
-                
-                tracker.event("Page_View", {
+                trackEvent("Page_View", {
                     page: "Document Search",
                     category: "Navigation",
                     action: "View",
-                    userId: currentUser.name,
-                    timestamp: new Date().toISOString(),
-                    metadata: {
-                        url: window.location.href,
-                        referrer: document.referrer
-                    }
+                    userId: currentUser.name
                 });
             }
         }
@@ -134,6 +120,10 @@
         const pageData = $page.data;
         if (pageData && pageData.collections) {
             collections.set(pageData.collections);
+        }
+
+        if (browser) {
+            debugTrackerStatus();
         }
 
         return () => {
