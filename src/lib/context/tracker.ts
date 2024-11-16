@@ -4,12 +4,15 @@ import { browser } from '$app/environment';
 import { frontendConfig } from '$frontendConfig';
 import type OpenReplayTracker from "@openreplay/tracker";
 import trackerAssist from '@openreplay/tracker-assist';
+import trackerProfiler from '@openreplay/tracker-profiler';
+import { createTrackerLink } from '@openreplay/tracker-graphql';
 
 export const key = Symbol("openreplay tracker symbol");
 
 let trackerInstance: OpenReplayTracker | null = null;
 let isInitializing = false;
 let isStarted = false;
+let graphqlTracker: any = null;
 
 export async function initTracker() {
     if (trackerInstance && isStarted) {
@@ -50,6 +53,11 @@ export async function initTracker() {
                 sanitizer: (data) => {
                     if (data.url?.includes('/api/auth')) {
                         data.body = undefined;
+                    }
+                    if (data.url?.includes('/graphql')) {
+                        if (data.body?.variables?.password) {
+                            data.body.variables.password = '***';
+                        }
                     }
                     return data;
                 },
@@ -96,6 +104,25 @@ export async function initTracker() {
                 console.log("👋 Agent connected:", { email, name, query });
                 return () => console.log("👋 Agent disconnected");
             }
+        }));
+
+        trackerInstance.use(trackerProfiler({
+            sampleRate: 50,
+            capturePerformance: true,
+            captureMemory: true,
+            captureNetwork: true,
+            networkHeuristics: true,
+            logPerformance: true,
+            logMemory: true,
+            logNetwork: true
+        }));
+
+        graphqlTracker = trackerInstance.use(createTrackerLink((variables) => {
+            const sanitized = { ...variables };
+            if (sanitized.password) sanitized.password = '***';
+            if (sanitized.token) sanitized.token = '***';
+            if (sanitized.apiKey) sanitized.apiKey = '***';
+            return sanitized;
         }));
 
         console.log("▶️ Starting tracker...");
@@ -182,4 +209,8 @@ export function trackEvent(eventName: string, metadata: Record<string, any> = {}
     } catch (error) {
         console.error("❌ Failed to track event:", error);
     }
+}
+
+export function getGraphQLTracker() {
+    return graphqlTracker;
 }

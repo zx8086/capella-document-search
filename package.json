@@ -59,6 +59,7 @@
     "@elastic/ecs-winston-format": "^1.5.3",
     "@openreplay/tracker": "^14.0.6",
     "@openreplay/tracker-assist": "^10.0.1",
+    "@openreplay/tracker-graphql": "^4.1.0",
     "@openreplay/tracker-profiler": "^3.0.1",
     "@opentelemetry/api": "^1.9.0",
     "@opentelemetry/auto-instrumentations-node": "^0.50.0",

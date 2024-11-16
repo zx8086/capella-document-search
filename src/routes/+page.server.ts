@@ -47,6 +47,7 @@ export const actions: Actions = {
   searchDocuments: async ({ request }) => {
     const MAX_RETRIES = 3;
     let retries = 0;
+    const startTime = performance.now();
 
     while (retries < MAX_RETRIES) {
       try {
