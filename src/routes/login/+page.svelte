@@ -36,7 +36,10 @@
         }
     });
 </script>
-
+<svelte:head>
+    <title>Capella Document Search</title>
+    <meta name="Capella Document Search" content="Capella Document Search" />
+</svelte:head>
 {#if !$isLoading}
     <div class="flex min-h-screen items-center justify-center bg-gray-50">
         <div class="w-full max-w-md space-y-8 rounded-lg bg-white p-6 shadow-lg">

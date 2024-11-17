@@ -1,29 +1,40 @@
 # Version control
-.git
-.gitignore
-.github
+.git                                # Git repository
+.gitignore                         # Git ignore file
+.github                            # GitHub specific files
 
 # Dependencies
-node_modules
-.pnpm-store
+node_modules                       # Node.js modules
+.pnpm-store                       # PNPM store
 
 # Build outputs
-build
-.svelte-kit
+build                             # Build directory
+.svelte-kit                       # SvelteKit output
+/.svelte-kit
+/build
 
 # Development files
-.vscode
-.idea
-*.log
-.DS_Store
-coverage
+.vscode                           # VSCode settings
+.idea                             # IntelliJ settings
+*.log                             # Log files
+.DS_Store                         # macOS system files
+coverage                          # Test coverage reports
 
-# Environment (we'll copy the specific one we need)
-.env
-.env.*
-!.env.development
-!.env.production
+# Environment files
+.env                              # Local environment file
+.env.*                            # All environment files
+!.env.development                 # Except development env
+!.env.production                  # Except production env
 
 # Temporary files
-*.tmp
-*.temp
+*.tmp                             # Temporary files
+*.temp                            # Alternative temp files
+
+# Test artifacts
+test-screenshots/                 # Test screenshots
+playwright-report/                # Playwright reports
+auth-failure-*.png               # Auth failure screenshots
+debug*.png                       # Debug screenshots
+redirect*.png                    # Redirect screenshots
+test-failure*.png               # Test failure screenshots
+test-results/                    # Test results directory

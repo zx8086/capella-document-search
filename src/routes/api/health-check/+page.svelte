@@ -27,6 +27,7 @@
     let error = $state("");
     let checkType: "Simple" | "Detailed" = $state(data.checkType);
     let isNavigating = $state(false);
+    let loadingType = $state<"Simple" | "Detailed">(data.checkType);
 
     // Watch navigation state
     $effect(() => {
@@ -40,12 +41,12 @@
         try {
             loading = true;
             error = "";
+            loadingType = checkType; // Set the loading type before navigation
             
-            // Use goto with both invalidateAll and replaceState
             await goto(`/api/health-check?type=${checkType}`, {
                 invalidateAll: true,
                 replaceState: true,
-                noScroll: true // Prevent page jump
+                noScroll: true
             });
         } catch (e) {
             error = e instanceof Error ? e.message : String(e);
@@ -55,6 +56,7 @@
 
     function toggleCheckType() {
         const newType = checkType === "Simple" ? "Detailed" : "Simple";
+        loadingType = newType; // Update loading type when toggling
         checkType = newType;
         fetchHealthCheck();
     }
@@ -64,7 +66,6 @@
         if (data.healthStatus) {
             healthStatus = data.healthStatus;
             checkType = data.healthStatus.checkType;
-            // Only reset loading if we're not in the middle of navigation
             if (!isNavigating) {
                 loading = false;
             }
@@ -77,7 +78,7 @@
 </script>
 
 <svelte:head>
-    <title>Status - API Health Check - {checkType.charAt(0).toUpperCase() + checkType.slice(1)}</title>
+    <title>Capella Document Search - {checkType.charAt(0).toUpperCase() + checkType.slice(1)} Status</title>
     <meta name="transaction-name" content={transactionName} />
 </svelte:head>
 
@@ -102,7 +103,7 @@
     {#if loading}
         <div class="flex flex-col items-center justify-center gap-4">
             <p class="text-gray-600">
-                Loading {checkType === "Simple" ? "simple" : "detailed"} health check...
+                Loading {(checkType === "Simple" ? "detailed" : "simple")} health check...
             </p>
             <div class="animate-spin rounded-full h-12 w-12 border-2 border-gray-200 border-b-gray-900">
                 <span class="sr-only">Loading health check status...</span>
