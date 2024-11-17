@@ -3,7 +3,8 @@
 <script lang="ts">
     import { onMount } from "svelte";
     import type { PageData } from './$types';
-    import { invalidate } from '$app/navigation';
+    import { goto } from '$app/navigation';
+    import { navigating } from '$app/stores';
 
     const { data } = $props<{ data: PageData }>();
 
@@ -25,28 +26,50 @@
     let loading = $state(false);
     let error = $state("");
     let checkType: "Simple" | "Detailed" = $state(data.checkType);
+    let isNavigating = $state(false);
+
+    // Watch navigation state
+    $effect(() => {
+        isNavigating = $navigating !== null;
+        if (isNavigating) {
+            loading = true;
+        }
+    });
 
     async function fetchHealthCheck() {
-        loading = true;
-        error = "";
         try {
-            await invalidate(`/api/health-check?type=${checkType}`);
+            loading = true;
+            error = "";
+            
+            // Use goto with both invalidateAll and replaceState
+            await goto(`/api/health-check?type=${checkType}`, {
+                invalidateAll: true,
+                replaceState: true,
+                noScroll: true // Prevent page jump
+            });
         } catch (e) {
-            console.error("Failed to fetch health check status:", e);
             error = e instanceof Error ? e.message : String(e);
-        } finally {
             loading = false;
         }
     }
 
     function toggleCheckType() {
-        checkType = checkType === "Simple" ? "Detailed" : "Simple";
+        const newType = checkType === "Simple" ? "Detailed" : "Simple";
+        checkType = newType;
         fetchHealthCheck();
     }
 
-    $: if (data.healthStatus) {
-        healthStatus = data.healthStatus;
-    }
+    // Update state when new data arrives
+    $effect(() => {
+        if (data.healthStatus) {
+            healthStatus = data.healthStatus;
+            checkType = data.healthStatus.checkType;
+            // Only reset loading if we're not in the middle of navigation
+            if (!isNavigating) {
+                loading = false;
+            }
+        }
+    });
 
     let transactionName = $derived(
         `API Health Check Page - ${checkType} Check`
@@ -78,7 +101,9 @@
 
     {#if loading}
         <div class="flex flex-col items-center justify-center gap-4">
-            <p class="text-gray-600">Loading detailed health check...</p>
+            <p class="text-gray-600">
+                Loading {checkType === "Simple" ? "simple" : "detailed"} health check...
+            </p>
             <div class="animate-spin rounded-full h-12 w-12 border-2 border-gray-200 border-b-gray-900">
                 <span class="sr-only">Loading health check status...</span>
             </div>
