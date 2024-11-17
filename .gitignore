@@ -26,3 +26,10 @@ logs
 .idea
 
 src/data/*.sqlite
+test-screenshots/
+playwright-report/
+auth-failure-*.png
+debug*.png
+redirect*.png
+test-failure*.png
+test-results/

@@ -3,6 +3,7 @@
 <script lang="ts">
     import { onMount } from "svelte";
     import type { PageData } from './$types';
+    import { invalidate } from '$app/navigation';
 
     const { data } = $props<{ data: PageData }>();
 
@@ -29,11 +30,7 @@
         loading = true;
         error = "";
         try {
-            const response = await fetch(`/api/health-check?type=${checkType}`);
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-            healthStatus = await response.json();
+            await invalidate(`/api/health-check?type=${checkType}`);
         } catch (e) {
             console.error("Failed to fetch health check status:", e);
             error = e instanceof Error ? e.message : String(e);
@@ -47,13 +44,17 @@
         fetchHealthCheck();
     }
 
+    $: if (data.healthStatus) {
+        healthStatus = data.healthStatus;
+    }
+
     let transactionName = $derived(
         `API Health Check Page - ${checkType} Check`
     );
 </script>
 
 <svelte:head>
-    <title>API Health Check - {checkType.charAt(0).toUpperCase() + checkType.slice(1)}</title>
+    <title>Status - API Health Check - {checkType.charAt(0).toUpperCase() + checkType.slice(1)}</title>
     <meta name="transaction-name" content={transactionName} />
 </svelte:head>
 
@@ -63,7 +64,7 @@
     <div class="mb-6">
         <button
             onclick={toggleCheckType}
-            class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded"
+            class="bg-[#00174f] hover:bg-[#00174f]/80 text-white font-bold py-2 px-4 rounded"
             data-transaction-name={`Switch to ${checkType === "Simple" ? "Detailed" : "Simple"} Check`}
         >
             Switch to {checkType === "Simple" ? "Detailed" : "Simple"} Check

@@ -101,14 +101,14 @@ export async function initTracker() {
                 return () => {
                     console.log("📞 Support call ended");
                     toast.info("Support call ended", {
-                        description: "Your support session has ended"
+                        description: "Your support session has ended",
                     });
                 };
             },
             onRemoteControlStart: () => {
                 console.log("🖱️ Remote control started");
                 toast.warning("Remote control active", {
-                    description: "Support agent now has control of your screen"
+                    description: "Support agent now has control of your screen",
                 });
                 return () => {
                     console.log("🔒 Remote control ended");

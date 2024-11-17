@@ -52,10 +52,25 @@ export const auth = {
         return get(isAuthenticated);
     },
 
-    async login() {
+    async login(testMode = false) {
         console.log('Auth store: Starting login process...');
         try {
             isLoading.set(true);
+            
+            if (testMode) {
+                console.log('Auth store: Test mode, bypassing MSAL');
+                isAuthenticated.set(true);
+                userAccount.set({
+                    name: 'Test User',
+                    username: 'test@example.com',
+                    homeAccountId: 'test-account',
+                    environment: 'test',
+                    tenantId: Bun.env.PUBLIC_AZURE_TENANT_ID,
+                });
+                isLoading.set(false);
+                return;
+            }
+
             const instance = await getMsalInstance();
             if (!instance) return;
 

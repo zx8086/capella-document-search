@@ -30,9 +30,12 @@
     "docker:logs:prod": "docker logs -f capella-search-prod",
     "docker:dev:restart": "bun run docker:cleanup:dev && bun run docker:dev && bun run docker:run:dev",
     "docker:cleanup:dev": "docker stop capella-search-dev 2>/dev/null || true && docker rm capella-search-dev 2>/dev/null || true",
-    "docker:cleanup:prod": "docker stop capella-search-prod 2>/dev/null || true && docker rm capella-search-prod 2>/dev/null || true"
+    "docker:cleanup:prod": "docker stop capella-search-prod 2>/dev/null || true && docker rm capella-search-prod 2>/dev/null || true",
+    "test": "bun test",
+    "test:watch": "bun test --watch"
   },
   "devDependencies": {
+    "@playwright/test": "^1.48.2",
     "@sveltejs/adapter-auto": "^3.0.0",
     "@sveltejs/adapter-node": "^5.0.2",
     "@sveltejs/kit": "^2.5.27",
@@ -55,6 +58,7 @@
   "dependencies": {
     "@apollo/client": "^3.11.8",
     "@azure/msal-browser": "^3.23.0",
+    "@azure/msal-node": "^2.16.1",
     "@elastic/apm-rum": "^5.16.0",
     "@elastic/ecs-winston-format": "^1.5.3",
     "@openreplay/tracker": "^14.0.6",
