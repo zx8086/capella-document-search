@@ -7,6 +7,7 @@ import trackerAssist from '@openreplay/tracker-assist';
 import trackerProfiler from '@openreplay/tracker-profiler';
 import { createTrackerLink } from '@openreplay/tracker-graphql';
 import { toast } from 'svelte-sonner';
+import type { IFeatureFlag } from '@openreplay/tracker';
 
 export const key = Symbol("openreplay tracker symbol");
 
@@ -14,6 +15,9 @@ let trackerInstance: OpenReplayTracker | null = null;
 let isInitializing = false;
 let isStarted = false;
 let graphqlTracker: any = null;
+let cachedFlags: Record<string, boolean> = {};
+let flagsInitialized = false;
+let flagsInitializationPromise: Promise<void> | null = null;
 
 export async function initTracker() {
     if (trackerInstance && isStarted) {
@@ -96,36 +100,42 @@ export async function initTracker() {
             onCallStart: () => {
                 console.log("🎥 Support call started");
                 toast.info("Support call started", {
-                    description: "You are now connected to a support session"
+                    description: "You are now connected to a support session",
+                    duration: Infinity
                 });
                 return () => {
                     console.log("📞 Support call ended");
                     toast.info("Support call ended", {
                         description: "Your support session has ended",
+                        duration: Infinity
                     });
                 };
             },
             onRemoteControlStart: () => {
                 console.log("🖱️ Remote control started");
-                toast.warning("Remote control active", {
+                toast.info("Remote control active", {
                     description: "Support agent now has control of your screen",
+                    duration: Infinity
                 });
                 return () => {
                     console.log("🔒 Remote control ended");
                     toast.info("Remote control ended", {
-                        description: "Support agent no longer has control of your screen"
+                        description: "Support agent no longer has control of your screen",
+                        duration: Infinity
                     });
                 };
             },
             onAgentConnect: ({ email, name, query }) => {
                 console.log("👋 Agent connected:", { email, name, query });
-                toast.success("Support agent connected", {
-                    description: `${name} (${email}) has joined the session`
+                toast.info("Support agent connected", {
+                    description: `${name} (${email}) has joined the session`,
+                    duration: Infinity
                 });
                 return () => {
                     console.log("👋 Agent disconnected");
                     toast.info("Support agent disconnected", {
-                        description: "The support agent has left the session"
+                        description: "The support agent has left the session",
+                        duration: Infinity
                     });
                 };
             }
@@ -154,6 +164,9 @@ export async function initTracker() {
         await trackerInstance.start();
         isStarted = true;
         console.log("✅ Tracker started successfully");
+
+        // Initialize feature flags right after tracker starts
+        await initFeatureFlags();
 
         return trackerInstance;
     } catch (error) {
@@ -238,4 +251,114 @@ export function trackEvent(eventName: string, metadata: Record<string, any> = {}
 
 export function getGraphQLTracker() {
     return graphqlTracker;
+}
+
+export async function waitForTracker(timeout = 5000): Promise<boolean> {
+    const startTime = Date.now();
+    
+    while (Date.now() - startTime < timeout) {
+        const tracker = getTracker();
+        if (tracker) {
+            return true;
+        }
+        await new Promise(resolve => setTimeout(resolve, 100));
+    }
+    
+    console.warn('⏱️ Tracker initialization timeout');
+    return false;
+}
+
+export async function initFeatureFlags(): Promise<void> {
+    // If flags are already initialized, return
+    if (flagsInitialized) {
+        console.debug('🚩 Feature flags already initialized');
+        return;
+    }
+
+    // If initialization is in progress, return the existing promise
+    if (flagsInitializationPromise) {
+        console.debug('⏳ Feature flags initialization in progress');
+        return flagsInitializationPromise;
+    }
+
+    const tracker = getTracker();
+    if (!tracker) {
+        console.warn('⚠️ Cannot initialize feature flags: No tracker instance');
+        return;
+    }
+
+    flagsInitializationPromise = new Promise((resolve) => {
+        const timeout = setTimeout(() => {
+            console.warn('⏱️ Feature flags load timeout');
+            flagsInitialized = true;
+            resolve();
+        }, 5000); // 5 second timeout
+
+        tracker.onFlagsLoad((flags: IFeatureFlag[]) => {
+            clearTimeout(timeout);
+            console.debug('🚩 Feature Flags Loaded:', {
+                flags: flags.map(f => ({ key: f.key, enabled: f.value })),
+                timestamp: new Date().toISOString()
+            });
+            flagsInitialized = true;
+            resolve();
+        });
+
+        // Force reload flags
+        tracker.reloadFlags();
+    });
+
+    return flagsInitializationPromise;
+}
+
+export async function getFeatureFlag(key: string): Promise<boolean> {
+    const tracker = getTracker();
+    if (!tracker) {
+        console.debug('🚫 Feature flag check failed: No tracker instance', {
+            key,
+            timestamp: new Date().toISOString()
+        });
+        return false;
+    }
+
+    try {
+        // Ensure flags are initialized
+        if (!flagsInitialized) {
+            console.debug('⏳ Initializing feature flags...');
+            await initFeatureFlags();
+        }
+
+        // Use the direct flag access method
+        const flag = tracker.getFeatureFlag(key);
+        const isEnabled = flag?.value === true;
+        
+        console.debug('🎌 Feature Flag Check:', {
+            key,
+            isEnabled,
+            flag,
+            trackerActive: true,
+            timestamp: new Date().toISOString()
+        });
+
+        return isEnabled;
+    } catch (error) {
+        console.warn('⚠️ Feature flag check error:', {
+            key,
+            error: error instanceof Error ? error.message : String(error),
+            timestamp: new Date().toISOString()
+        });
+        return false;
+    }
+}
+
+export function setupFeatureFlagListener(): void {
+    const tracker = getTracker();
+    if (!tracker) return;
+
+    tracker.onFlagsLoad((flags: IFeatureFlag[]) => {
+        console.debug('🚩 Feature Flags Loaded:', {
+            flags: flags.map(f => ({ key: f.key, enabled: f.value })),
+            timestamp: new Date().toISOString()
+        });
+    });
 }

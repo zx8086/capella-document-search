@@ -59,6 +59,7 @@
                     disabled={$isLoading}
                     class="group relative flex w-full justify-center rounded-md bg-[#00174f] px-3 py-2 text-sm font-semibold text-white hover:bg-[#001140] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#00174f] disabled:opacity-50 disabled:cursor-not-allowed"
                     data-transaction-name="Sign In button"
+                    name="login-button"
                 >
                     {#if $isLoading}
                         <span class="absolute inset-y-0 left-0 flex items-center pl-3">

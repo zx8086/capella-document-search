@@ -5,6 +5,7 @@
     import type { PageData } from './$types';
     import { goto } from '$app/navigation';
     import { navigating } from '$app/stores';
+    import { getFeatureFlag, initFeatureFlags } from '$lib/context/tracker';
 
     const { data } = $props<{ data: PageData }>();
 
@@ -28,8 +29,8 @@
     let checkType: "Simple" | "Detailed" = $state(data.checkType);
     let isNavigating = $state(false);
     let loadingType = $state<"Simple" | "Detailed">(data.checkType);
+    let showBuildInfo = $state(false);
 
-    // Watch navigation state
     $effect(() => {
         isNavigating = $navigating !== null;
         if (isNavigating) {
@@ -41,7 +42,7 @@
         try {
             loading = true;
             error = "";
-            loadingType = checkType; // Set the loading type before navigation
+            loadingType = checkType; 
             
             await goto(`/api/health-check?type=${checkType}`, {
                 invalidateAll: true,
@@ -56,12 +57,12 @@
 
     function toggleCheckType() {
         const newType = checkType === "Simple" ? "Detailed" : "Simple";
-        loadingType = newType; // Update loading type when toggling
+        loadingType = newType; 
         checkType = newType;
         fetchHealthCheck();
     }
 
-    // Update state when new data arrives
+
     $effect(() => {
         if (data.healthStatus) {
             healthStatus = data.healthStatus;
@@ -75,6 +76,26 @@
     let transactionName = $derived(
         `API Health Check Page - ${checkType} Check`
     );
+
+    onMount(async () => {
+        // Add a small delay to ensure tracker is fully initialized
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        showBuildInfo = await getFeatureFlag('build-information');
+        
+        console.debug('🏗️ Build Info Display:', {
+            isVisible: showBuildInfo,
+            flagKey: 'build-information',
+            component: 'health-check'
+        });
+    });
+
+    $effect(() => {
+        console.debug('🔄 Build Info Status Changed:', {
+            isVisible: showBuildInfo,
+            timestamp: new Date().toISOString()
+        });
+    });
 </script>
 
 <svelte:head>
@@ -95,7 +116,7 @@
         </button>
         <p class="text-sm text-gray-600 mt-2">
             {checkType === "Simple"
-                ? "Simple check tests the Database and Internal API."
+                ? "Simple check tests the SQL Database, Internal API & GraphQL endpoint."
                 : "Detailed check including all API endpoints."}
         </p>
     </div>
@@ -124,7 +145,7 @@
                 </span>
             </h2>
 
-            {#if healthStatus?.version}
+            {#if showBuildInfo}
                 <div class="bg-gray-100 p-4 rounded-lg mb-4">
                     <h3 class="text-lg font-semibold mb-2">Version Information</h3>
                     <div class="grid grid-cols-2 gap-2 text-sm">

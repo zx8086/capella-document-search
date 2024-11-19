@@ -46,6 +46,7 @@ export const handle: Handle = async ({ event, resolve }) => {
             https://static.openreplay.com;
         style-src 'self' 'unsafe-inline' https://vjs.zencdn.net;
         img-src 'self' data: https: blob:;
+        media-src 'self' blob: https://*.openreplay.com https://static.openreplay.com;
         frame-src 'self' 
             https://login.microsoftonline.com 
             https://*.microsoftonline.com;
@@ -53,7 +54,6 @@ export const handle: Handle = async ({ event, resolve }) => {
             https://login.microsoftonline.com 
             https://*.microsoftonline.com;
         font-src 'self' data:;
-        media-src 'self' blob:;
         worker-src 'self' blob:;
         frame-ancestors 'self';
         base-uri 'self';
