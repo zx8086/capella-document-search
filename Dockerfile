@@ -34,7 +34,7 @@ COPY . .
 RUN bun run svelte-kit sync && \
     NODE_ENV=${NODE_ENV} \
     DISABLE_OPENTELEMETRY=true \
-    bun run build
+    bun run build:no-telemetry
 
 # Production image
 FROM oven/bun:slim

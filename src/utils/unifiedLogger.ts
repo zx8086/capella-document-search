@@ -1,9 +1,24 @@
 /* src/utils/unifiedLogger.ts */
 
 import { browser } from "$app/environment";
+import type { BackendConfig } from "../models/types";
 
-// Only import serverLogger when not in browser
-const serverLogger = browser ? null : await import("./serverLogger");
+let serverLogger: any = null;
+
+// Initialize the logger
+export async function initializeLogger(config?: BackendConfig) {
+  if (!browser && !serverLogger) {
+    serverLogger = await import("./serverLogger");
+    if (config) {
+      serverLogger.initializeLogger(config);
+    }
+  }
+}
+
+// Initialize immediately in non-browser environments
+if (!browser) {
+  initializeLogger();
+}
 
 export function log(message: string, meta?: any): void {
   if (browser) {

@@ -21,8 +21,9 @@ coverage                          # Test coverage reports
 # Environment files
 .env                              # Local environment file
 .env.*                            # All environment files
-!.env.development                 # Except development env
-!.env.production                  # Except production env
+!.env.example                     # Except example env
+
+
 
 # Temporary files
 *.tmp                             # Temporary files
