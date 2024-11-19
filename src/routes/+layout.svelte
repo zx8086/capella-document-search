@@ -63,17 +63,34 @@
                     tracker = trackerInstance;
                     isTrackerInitialized = true;
 
+                    const widget = document.createElement('div');
+                    widget.id = 'openreplay-assist-widget';
+                    widget.style.cssText = `
+                        position: fixed;
+                        bottom: 20px;
+                        right: 20px;
+                        z-index: 999999;
+                    `;
+                    document.body.appendChild(widget);
+                    assistWidget = widget;
+
                     if ($userAccount) {
-                        const userId = $userAccount.username || '';
-                        await trackerInstance.start({
-                            userID: userId,
-                            metadata: {
-                                email: userId,
-                                name: $userAccount.name || '',
-                                accountId: $userAccount.localAccountId || $userAccount.homeAccountId || ''
+                        await identifyUser(
+                            $userAccount.localAccountId || $userAccount.homeAccountId || '',
+                            {
+                                email: $userAccount.username || '',
+                                name: $userAccount.name || ''
                             }
-                        });
+                        );
                     }
+
+                    setTimeout(() => {
+                        debugTrackerStatus();
+                        const sessionId = getSessionId();
+                        if (sessionId) {
+                            console.log("🎯 Active session ID:", sessionId);
+                        }
+                    }, 2000);
                 }
             } catch (error) {
                 console.error("❌ Tracker initialization failed:", error);
@@ -139,37 +156,7 @@
         });
 
         try {
-            const trackerInstance = await initializeTracker();
-            if (trackerInstance) {
-                await trackerInstance.start({
-                    userID: currentUser.name,
-                    metadata: {
-                        email: currentUser.email,
-                        name: currentUser.name,
-                    }
-                });
-
-                // Add the Assist Widget
-                const widget = document.createElement('div');
-                widget.id = 'openreplay-assist-widget';
-                widget.style.cssText = `
-                    position: fixed;
-                    bottom: 20px;
-                    right: 20px;
-                    z-index: 999999;
-                `;
-                document.body.appendChild(widget);
-                assistWidget = widget;
-
-                // Wait a bit before checking status
-                setTimeout(() => {
-                    debugTrackerStatus();
-                    const sessionId = getSessionId();
-                    if (sessionId) {
-                        console.log("🎯 Active session ID:", sessionId);
-                    }
-                }, 2000);
-            }
+            await initializeTracker();
         } catch (error) {
             console.warn(
                 "Failed to start OpenReplay:",
@@ -184,58 +171,6 @@
             },
             60 * 60 * 1000,
         ); // Poll every 60 minutes
-
-        if (browser && !initializationAttempted) {
-            initializationAttempted = true;
-            try {
-                const tracker = await initTracker();
-                if (tracker) {
-                    // Add the Assist Widget
-                    const widget = document.createElement('div');
-                    widget.id = 'openreplay-assist-widget';
-                    widget.style.cssText = `
-                        position: fixed;
-                        bottom: 20px;
-                        right: 20px;
-                        z-index: 999999;
-                    `;
-                    document.body.appendChild(widget);
-                    assistWidget = widget;
-
-                    // Wait a bit before checking status
-                    setTimeout(() => {
-                        debugTrackerStatus();
-                        const sessionId = getSessionId();
-                        if (sessionId) {
-                            console.log("🎯 Active session ID:", sessionId);
-                        }
-                    }, 2000);
-                }
-            } catch (error) {
-                console.error("Failed to initialize tracker:", error);
-            }
-        }
-
-        if (browser && !trackerInitialized) {
-            try {
-                const tracker = await initTracker();
-                if (tracker) {
-                    trackerInitialized = true;
-                    
-                    if ($userAccount) {
-                        await identifyUser(
-                            $userAccount.localAccountId || $userAccount.homeAccountId || '',
-                            {
-                                email: $userAccount.username || '',
-                                name: $userAccount.name || ''
-                            }
-                        );
-                    }
-                }
-            } catch (error) {
-                console.error("Failed to initialize tracker:", error);
-            }
-        }
 
         return () => {
             if (pollInterval) clearInterval(pollInterval);
@@ -301,6 +236,15 @@
                     name: $userAccount.name || ''
                 }
             );
+        }
+    });
+
+    $effect(() => {
+        if (!shouldShowContent) {
+            console.log("Loading overlay shown", { 
+                path: $page.url.pathname,
+                isLoading: $isLoading
+            });
         }
     });
 </script>
@@ -371,8 +315,7 @@
                         description: "text-sm",
                         actionButton: "bg-[#00174f] text-white",
                         cancelButton: "bg-gray-200 text-gray-900",
-                        closeButton:
-                            "text-gray-400 hover:text-gray-900 dark:hover:text-white",
+                        closeButton:"text-gray-400",
                     },
                 }}
             />

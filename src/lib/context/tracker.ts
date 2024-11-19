@@ -98,13 +98,19 @@ export async function initTracker() {
             callConfirm: "Would you like to start a support call?",
             controlConfirm: "Would you like to allow support to control your screen?",
             onCallStart: () => {
-                console.log("🎥 Support call started");
+                console.log("🎥 Support call started - checking DOM state");
+                const overlays = document.querySelectorAll('.fixed.inset-0');
+                console.log("Current overlay elements:", overlays);
+                
                 toast.info("Support call started", {
                     description: "You are now connected to a support session",
                     duration: Infinity
                 });
                 return () => {
-                    console.log("📞 Support call ended");
+                    console.log("📞 Support call ended - checking DOM state");
+                    const overlays = document.querySelectorAll('.fixed.inset-0');
+                    console.log("Overlay elements at end:", overlays);
+                    
                     toast.info("Support call ended", {
                         description: "Your support session has ended",
                         duration: Infinity
@@ -125,7 +131,8 @@ export async function initTracker() {
                     });
                 };
             },
-            onAgentConnect: ({ email, name, query }) => {
+            onAgentConnect: (agentInfo: any = {}) => {
+                const { email = '', name = '', query = '' } = agentInfo;
                 console.log("👋 Agent connected:", { email, name, query });
                 toast.info("Support agent connected", {
                     description: `${name} (${email}) has joined the session`,
