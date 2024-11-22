@@ -1,7 +1,7 @@
 <script lang="ts">
   import { Button } from "$lib/components/ui/button";
   import { browser } from "$app/environment";
-  import { getContext, onMount, createEventDispatcher } from "svelte";
+  import { getContext, onMount, createEventDispatcher, onDestroy } from "svelte";
   import { key } from "$lib/context/tracker";
   import { getFeatureFlag, trackEvent, waitForTracker } from "$lib/context/tracker";
   import { userAccount } from '$lib/stores/authStore';
@@ -69,7 +69,6 @@
   function toggleChat() {
     dispatch('toggle');
     
-    // Track the chat toggle event
     if (browser) {
       trackEvent("User_Interaction", {
         type: "click",
@@ -81,15 +80,15 @@
         }
       });
     }
-    
-    if (browser) {
-      if (!isOpen) {
-        document.body.style.overflow = 'hidden';
-      } else {
-        document.body.style.overflow = 'auto';
-      }
-    }
   }
+
+  // Add cleanup on component destruction
+  onDestroy(() => {
+    if (browser) {
+        // Ensure body overflow is restored when component is destroyed
+        document.body.style.overflow = '';
+    }
+  });
 
   function handleSubmit() {
     if (newMessage.trim()) {
@@ -143,9 +142,11 @@
   {#if isOpen}
     <button
       type="button"
-      onclick={toggleChat}
       class="fixed inset-0 bg-black/20 backdrop-blur-sm z-[46]"
+      onclick={toggleChat}
+      onkeydown={(e) => e.key === 'Escape' && toggleChat()}
       aria-label="Close chat overlay"
+      role="button"
     ></button>
     <div 
       class="fixed bottom-40 right-6 w-[400px] max-w-[calc(100vw-3rem)] z-[46] rounded-lg border border-gray-200 bg-white shadow-xl dark:border-gray-800 dark:bg-gray-900"
@@ -218,3 +219,11 @@
     </div>
   {/if}
 {/if}
+
+<style>
+  /* Add styles to handle scrolling */
+  :global(body.chat-open) {
+    overflow-y: auto !important;
+    padding-right: 15px; /* Prevent layout shift when scrollbar disappears */
+  }
+</style>

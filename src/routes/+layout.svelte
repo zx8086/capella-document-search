@@ -144,6 +144,16 @@
 
     let chatIsOpen = $state(false);
 
+    $effect(() => {
+        if (browser) {
+            if (chatIsOpen) {
+                document.body.classList.add('chat-open');
+            } else {
+                document.body.classList.remove('chat-open');
+            }
+        }
+    });
+
     onMount(async () => {
         startAutoplay();
 
@@ -189,6 +199,15 @@
         // Clean up the widget
         if (assistWidget && browser) {
             assistWidget.remove();
+        }
+
+        if (browser) {
+            // Ensure body overflow is restored when layout is destroyed
+            document.body.style.overflow = '';
+        }
+
+        if (browser) {
+            document.body.classList.remove('chat-open');
         }
     });
 
