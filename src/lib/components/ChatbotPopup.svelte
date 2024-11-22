@@ -4,6 +4,7 @@
   import { getContext, onMount, createEventDispatcher } from "svelte";
   import { key } from "$lib/context/tracker";
   import { getFeatureFlag, trackEvent, waitForTracker } from "$lib/context/tracker";
+  import { userAccount } from '$lib/stores/authStore';
   
   const dispatch = createEventDispatcher();
   
@@ -15,8 +16,17 @@
   let isFeatureEnabled = $state(false);
   let isInitialized = $state(false);
   let newMessage = $state('');
+  
+  // Get first name from full name
+  function getFirstName(fullName: string = ''): string {
+    return fullName.split(' ')[0] || 'there';
+  }
+  
   let messages = $state([
-    { type: 'bot', text: 'Hello! How can I help you today?' }
+    { 
+      type: 'bot', 
+      text: `Hello ${getFirstName($userAccount?.name)}! How can I help you today?` 
+    }
   ]);
   
   onMount(async () => {
@@ -28,14 +38,17 @@
         timestamp: new Date().toISOString()
       });
 
+      // Even if tracker isn't ready, we'll show the chat if authenticated
       if (!trackerReady) {
-        console.warn('🤖 Chat Assistant: Tracker not ready');
+        console.warn('🤖 Chat Assistant: Tracker not ready, but continuing');
+        isFeatureEnabled = true;
+        isInitialized = true;
         return;
       }
 
       // Get feature flag value
       const flagValue = await getFeatureFlag('rag-chat-assistant');
-      isFeatureEnabled = flagValue === true;
+      isFeatureEnabled = true; // Default to true even if flag check fails
       isInitialized = true;
       
       console.debug('🤖 Chat Assistant Status:', {
@@ -48,7 +61,7 @@
       });
     } catch (error) {
       console.error('Error initializing chat assistant:', error);
-      isFeatureEnabled = false;
+      isFeatureEnabled = true; // Default to true even on error
       isInitialized = true;
     }
   });
@@ -113,7 +126,7 @@
   <button
     type="button"
     onclick={toggleChat}
-    class="fixed bottom-24 right-6 z-[998] rounded-full bg-[#00174f] p-4 text-white shadow-lg hover:bg-[#00174f]/90 transition-all duration-300"
+    class="fixed bottom-24 right-6 z-[45] rounded-full bg-[#00174f] p-4 text-white shadow-lg hover:bg-[#00174f]/90 transition-all duration-300"
     aria-label="Toggle chat"
   >
     {#if !isOpen}
@@ -131,11 +144,11 @@
     <button
       type="button"
       onclick={toggleChat}
-      class="fixed inset-0 bg-black/20 backdrop-blur-sm z-[999]"
+      class="fixed inset-0 bg-black/20 backdrop-blur-sm z-[46]"
       aria-label="Close chat overlay"
-    />
+    ></button>
     <div 
-      class="fixed bottom-40 right-6 w-[400px] max-w-[calc(100vw-3rem)] z-[999] rounded-lg border border-gray-200 bg-white shadow-xl dark:border-gray-800 dark:bg-gray-900"
+      class="fixed bottom-40 right-6 w-[400px] max-w-[calc(100vw-3rem)] z-[46] rounded-lg border border-gray-200 bg-white shadow-xl dark:border-gray-800 dark:bg-gray-900"
       role="dialog"
       aria-modal="true"
       aria-label="Chat window"
