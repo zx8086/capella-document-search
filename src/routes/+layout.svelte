@@ -5,6 +5,7 @@
     import { page } from '$app/stores';
     import { goto } from '$app/navigation';
     import { getMsalInstance } from '$lib/config/authConfig';
+    import ChatbotPopup from "$lib/components/ChatbotPopup.svelte";
 
     import "../app.css";
     import "../apm-config";
@@ -140,6 +141,8 @@
     let trackerInitialized = false;
 
     let assistWidget: HTMLDivElement;
+
+    let chatIsOpen = $state(false);
 
     onMount(async () => {
         startAutoplay();
@@ -321,6 +324,22 @@
             />
             {@render children?.()}
         </main>
+
+        <!-- Chatbot Popup -->
+        {#if $page.url.pathname !== '/login' && $isAuthenticated}
+            <ChatbotPopup 
+                isOpen={chatIsOpen} 
+                on:toggle={() => {
+                    chatIsOpen = !chatIsOpen;
+                    console.debug('🤖 Chat Toggle:', {
+                        newState: !chatIsOpen,
+                        pathname: $page.url.pathname,
+                        isAuthenticated: $isAuthenticated,
+                        timestamp: new Date().toISOString()
+                    });
+                }} 
+            />
+        {/if}
 
         <!-- Footer Section -->
         <footer class="bg-[#00174f] text-white py-4 mt-8">

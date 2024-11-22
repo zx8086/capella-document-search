@@ -61,7 +61,7 @@
     "@azure/msal-node": "^2.16.1",
     "@elastic/apm-rum": "^5.16.0",
     "@elastic/ecs-winston-format": "^1.5.3",
-    "@openreplay/tracker": "^14.0.6",
+    "@openreplay/tracker": "^15.0.0",
     "@openreplay/tracker-assist": "^10.0.1",
     "@openreplay/tracker-graphql": "^4.1.0",
     "@openreplay/tracker-profiler": "^3.0.1",
