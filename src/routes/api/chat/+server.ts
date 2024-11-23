@@ -3,16 +3,21 @@ import { Pinecone } from "@pinecone-database/pinecone";
 import OpenAI from 'openai';
 import type { RequestHandler } from './$types';
 
+console.log('🔑 Environment Variables:', {
+    OPENAI_API_KEY: Bun.env.OPENAI_API_KEY,
+    PINECONE_API_KEY: Bun.env.PINECONE_API_KEY
+});
+
 // Initialize OpenAI
 const openai = new OpenAI({
-    apiKey: import.meta.env.PUBLIC_OPENAI_API_KEY
+    apiKey: Bun.env.OPENAI_API_KEY
 });
 
 // Keep existing GET handler
 export const GET: RequestHandler = async () => {
     try {
         const pc = new Pinecone({
-            apiKey: import.meta.env.PUBLIC_PINECONE_API_KEY,
+            apiKey: Bun.env.PINECONE_API_KEY as string,
         });
 
         const indexes = await pc.listIndexes();
@@ -41,10 +46,14 @@ export const POST: RequestHandler = async ({ request }) => {
         const { message } = await request.json();
         console.log('📨 Received chat request:', { message });
 
-        // Initialize Pinecone
+        // Initialize Pinecone with correct host URL
         const pc = new Pinecone({
-            apiKey: import.meta.env.PUBLIC_PINECONE_API_KEY,
+            apiKey: Bun.env.PINECONE_API_KEY as string,
+            controllerHostUrl: "https://platform-engineering-rag-sdpgq06.svc.aped-4627-b74a.pinecone.io"
         });
+
+        // Get index with specific namespace
+        const index = pc.index("platform-engineering-rag").namespace("capella-document-search");
 
         // Generate embedding
         console.log('🔄 Generating embedding...');
@@ -57,9 +66,12 @@ export const POST: RequestHandler = async ({ request }) => {
             embedding: `${embeddingResponse.data[0].embedding.slice(0, 3)}...`
         });
 
-        // Query Pinecone
-        console.log('🔄 Querying Pinecone...');
-        const index = pc.index("platform-engineering-rag");
+        // Query within that namespace
+        console.log('🔄 Querying Pinecone...', {
+            indexName: "platform-engineering-rag",
+            namespace: "capella-document-search",
+            vectorDimensions: embeddingResponse.data[0].embedding.length
+        });
         const queryResponse = await index.query({
             vector: embeddingResponse.data[0].embedding,
             topK: 3,
@@ -97,6 +109,12 @@ export const POST: RequestHandler = async ({ request }) => {
             contextLength: context.length,
             matchCount: queryResponse.matches.length,
             topMatchScores: queryResponse.matches.map(m => m.score)
+        });
+
+        console.log('🔍 Using RAG Context:', {
+            question: message,
+            retrievedContext: context,
+            similarityScore: queryResponse.matches[0].score
         });
 
         // Generate completion
