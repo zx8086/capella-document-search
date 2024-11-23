@@ -61,11 +61,19 @@ export default defineConfig(({ mode }): UserConfig => {
           origin: [
             'http://localhost:5173',
             'http://localhost:3000',
-            'https://capella-document-search.prd.shared-services.eu.pvh.cloud',
+            'https://*.pinecone.io',
+            'https://*.svc.*.pinecone.io',
             ...ALLOWED_ORIGINS,
           ],
           methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-          allowedHeaders: ['Content-Type', 'Authorization'],
+          allowedHeaders: [
+            'Content-Type', 
+            'Authorization',
+            'user-agent',
+            'Access-Control-Allow-Headers',
+            'Access-Control-Allow-Origin',
+            'Access-Control-Allow-Methods'
+          ],
           credentials: true,
         },
         hmr: {

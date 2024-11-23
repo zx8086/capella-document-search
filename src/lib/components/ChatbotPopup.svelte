@@ -90,25 +90,48 @@
     }
   });
 
-  function handleSubmit() {
-    if (newMessage.trim()) {
-      messages = [...messages, { type: 'user', text: newMessage }];
-      
-      // Track message sent event
-      if (browser) {
+  async function handleSubmit() {
+    if (!newMessage.trim()) return;
+    
+    const userMessage = newMessage.trim();
+    messages = [...messages, { type: 'user', text: userMessage }];
+    
+    // Track message sent event
+    if (browser) {
         trackEvent("User_Interaction", {
-          type: "submit",
-          element: "ChatAssistant",
-          action: "SendMessage",
-          page: "Document Search",
-          metadata: {
-            messageLength: newMessage.length
-          }
+            type: "submit",
+            element: "ChatAssistant",
+            action: "SendMessage",
+            page: "Document Search",
+            metadata: {
+                messageLength: userMessage.length
+            }
         });
-      }
-      
-      // Add your chatbot logic here
-      newMessage = '';
+    }
+    
+    try {
+        const response = await fetch('/api/chat', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ message: userMessage })
+        });
+
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const data = await response.json();
+        messages = [...messages, { type: 'bot', text: data.response }];
+    } catch (error) {
+        console.error('❌ Chat error:', error);
+        messages = [...messages, { 
+            type: 'bot', 
+            text: 'I apologize, but I encountered an error processing your request. Please try again.' 
+        }];
+    } finally {
+        newMessage = '';
     }
   }
 
