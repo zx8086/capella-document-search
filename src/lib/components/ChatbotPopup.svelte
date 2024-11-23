@@ -119,6 +119,24 @@
       timestamp: new Date().toISOString()
     });
   });
+
+  onMount(() => {
+    if (browser) {
+      // Calculate scrollbar width
+      const scrollDiv = document.createElement('div');
+      scrollDiv.style.width = '100px';
+      scrollDiv.style.height = '100px';
+      scrollDiv.style.overflow = 'scroll';
+      scrollDiv.style.position = 'absolute';
+      scrollDiv.style.top = '-9999px';
+      document.body.appendChild(scrollDiv);
+      
+      const scrollbarWidth = scrollDiv.offsetWidth - scrollDiv.clientWidth;
+      document.documentElement.style.setProperty('--scrollbar-width', `${scrollbarWidth}px`);
+      
+      document.body.removeChild(scrollDiv);
+    }
+  });
 </script>
 
 {#if isInitialized && isFeatureEnabled}
@@ -223,7 +241,12 @@
 <style>
   /* Add styles to handle scrolling */
   :global(body.chat-open) {
-    overflow-y: auto !important;
-    padding-right: 15px; /* Prevent layout shift when scrollbar disappears */
+    overflow-y: scroll !important;
+    padding-right: var(--scrollbar-width, 15px) !important;
+  }
+
+  /* Add this script to calculate scrollbar width on mount */
+  :global(:root) {
+    --scrollbar-width: 0px;
   }
 </style>
