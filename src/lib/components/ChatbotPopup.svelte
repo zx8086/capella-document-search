@@ -16,6 +16,7 @@
   let isFeatureEnabled = $state(false);
   let isInitialized = $state(false);
   let newMessage = $state('');
+  let isLoading = $state(false);
   
   // Get first name from full name
   function getFirstName(fullName: string = ''): string {
@@ -28,6 +29,23 @@
       text: `Hello ${getFirstName($userAccount?.name)}! How can I help you today?` 
     }
   ]);
+  
+  // Fix the state warning by properly declaring messagesContainer
+  let messagesContainer = $state<HTMLDivElement | null>(null);
+  
+  // Auto-scroll function
+  function scrollToBottom() {
+    if (messagesContainer) {
+      messagesContainer.scrollTop = messagesContainer.scrollHeight;
+    }
+  }
+  
+  // Watch messages for changes and scroll
+  $effect(() => {
+    if (messages.length) {
+      setTimeout(scrollToBottom, 100); // Small delay to ensure content is rendered
+    }
+  });
   
   onMount(async () => {
     try {
@@ -95,21 +113,18 @@
     
     const userMessage = newMessage.trim();
     messages = [...messages, { type: 'user', text: userMessage }];
-    
-    // Track message sent event
-    if (browser) {
-        trackEvent("User_Interaction", {
-            type: "submit",
-            element: "ChatAssistant",
-            action: "SendMessage",
-            page: "Document Search",
-            metadata: {
-                messageLength: userMessage.length
-            }
-        });
-    }
+    newMessage = '';
+    isLoading = true;
     
     try {
+        // Add initial bot message
+        const botMessageIndex = messages.length;
+        messages = [...messages, { 
+            type: 'bot', 
+            text: 'Thinking...',
+            isStreaming: false 
+        }];
+        
         const response = await fetch('/api/chat', {
             method: 'POST',
             headers: {
@@ -123,15 +138,27 @@
         }
 
         const data = await response.json();
-        messages = [...messages, { type: 'bot', text: data.response }];
+        
+        // Update the bot message with the response
+        messages = messages.map((msg, index) => 
+            index === botMessageIndex 
+                ? { type: 'bot', text: data.response, isStreaming: false }
+                : msg
+        );
+
     } catch (error) {
         console.error('❌ Chat error:', error);
-        messages = [...messages, { 
-            type: 'bot', 
-            text: 'I apologize, but I encountered an error processing your request. Please try again.' 
-        }];
+        messages = messages.map((msg, i) => 
+            i === messages.length - 1 
+                ? { 
+                    type: 'bot', 
+                    text: 'I apologize, but I encountered an error processing your request. Please try again.',
+                    isStreaming: false 
+                  }
+                : msg
+        );
     } finally {
-        newMessage = '';
+        isLoading = false;
     }
   }
 
@@ -214,6 +241,7 @@
 
         <!-- Messages -->
         <div 
+          bind:this={messagesContainer}
           class="flex-1 overflow-y-auto p-4 space-y-4"
           role="log"
           aria-label="Chat messages"
@@ -225,7 +253,12 @@
                 role="article"
                 aria-label={message.type === 'user' ? 'Your message' : 'Assistant message'}
               >
-                {message.text}
+                <div class="whitespace-pre-wrap">
+                  {message.text}
+                  {#if message.type === 'bot' && message.isStreaming}
+                    <span class="animate-pulse">▋</span>
+                  {/if}
+                </div>
               </div>
             </div>
           {/each}
@@ -243,16 +276,22 @@
             <input
               type="text"
               bind:value={newMessage}
-              placeholder="Type your message..."
-              class="flex-1 rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#00174f] dark:border-gray-700 dark:bg-gray-800"
+              placeholder={isLoading ? "Please wait..." : "Type your message..."}
+              disabled={isLoading}
+              class="flex-1 rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#00174f] dark:border-gray-700 dark:bg-gray-800 disabled:opacity-50"
               aria-label="Message input"
             />
             <Button 
               type="submit" 
-              class="bg-[#00174f] hover:bg-[#00174f]/90"
+              class="bg-[#00174f] hover:bg-[#00174f]/90 disabled:opacity-50"
+              disabled={isLoading}
               aria-label="Send message"
             >
-              Send
+              {#if isLoading}
+                <div class="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
+              {:else}
+                Send
+              {/if}
             </Button>
           </div>
         </form>

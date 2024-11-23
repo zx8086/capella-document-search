@@ -42,14 +42,12 @@ export const GET: RequestHandler = async () => {
 
 // Add POST handler for chat
 export const POST: RequestHandler = async ({ request }) => {
+    const { message } = await request.json();
+    
     try {
-        const { message } = await request.json();
-        console.log('📨 Received chat request:', { message });
-
         // Initialize Pinecone with correct host URL
         const pc = new Pinecone({
             apiKey: Bun.env.PINECONE_API_KEY as string,
-            controllerHostUrl: "https://platform-engineering-rag-sdpgq06.svc.aped-4627-b74a.pinecone.io"
         });
 
         // Get index with specific namespace
@@ -72,6 +70,7 @@ export const POST: RequestHandler = async ({ request }) => {
             namespace: "capella-document-search",
             vectorDimensions: embeddingResponse.data[0].embedding.length
         });
+
         const queryResponse = await index.query({
             vector: embeddingResponse.data[0].embedding,
             topK: 3,
@@ -90,12 +89,7 @@ export const POST: RequestHandler = async ({ request }) => {
         if (!queryResponse.matches?.length) {
             console.warn('⚠️ No matches found in Pinecone');
             return json({
-                response: "I couldn't find any relevant information to answer your question.",
-                debug: {
-                    matchCount: 0,
-                    contextLength: 0,
-                    topMatchScores: []
-                }
+                response: "I couldn't find any relevant information to answer your question."
             });
         }
 
@@ -117,8 +111,7 @@ export const POST: RequestHandler = async ({ request }) => {
             similarityScore: queryResponse.matches[0].score
         });
 
-        // Generate completion
-        console.log('🔄 Requesting GPT completion...');
+        // Generate completion without streaming
         const completion = await openai.chat.completions.create({
             model: "gpt-4-turbo-preview",
             messages: [
@@ -132,36 +125,18 @@ export const POST: RequestHandler = async ({ request }) => {
                 }
             ],
             temperature: 0.7,
-            max_tokens: 500
-        });
-
-        console.log('✅ GPT response received:', {
-            tokens: completion.usage,
-            model: completion.model,
-            responsePreview: completion.choices[0].message.content.slice(0, 100) + '...'
+            max_tokens: 500,
+            stream: false
         });
 
         return json({
-            response: completion.choices[0].message.content,
-            debug: {
-                matchCount: queryResponse.matches.length,
-                contextLength: context.length,
-                topMatchScores: queryResponse.matches.map(m => m.score)
-            }
+            response: completion.choices[0].message.content
         });
 
     } catch (error) {
-        console.error('❌ Chat API Error:', {
-            error: error instanceof Error ? {
-                message: error.message,
-                name: error.name,
-                stack: error.stack
-            } : error,
-            timestamp: new Date().toISOString()
-        });
-        return json(
-            { error: 'Failed to process request' },
-            { status: 500 }
-        );
+        console.error('❌ Chat API Error:', error);
+        return json({ 
+            error: 'An error occurred while processing your request.' 
+        }, { status: 500 });
     }
-};
+}; 
