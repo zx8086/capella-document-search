@@ -21,7 +21,7 @@ export const GET: RequestHandler = async () => {
         });
 
         const indexes = await pc.listIndexes();
-        const index = pc.index("platform-engineering-rag");
+        const index = pc.index(Bun.env.PINECONE_INDEX_NAME as string);
         const stats = await index.describeIndexStats();
 
         return json({
@@ -51,7 +51,7 @@ export const POST: RequestHandler = async ({ request }) => {
         });
 
         // Get index with specific namespace
-        const index = pc.index("platform-engineering-rag").namespace("capella-document-search");
+        const index = pc.index(Bun.env.PINECONE_INDEX_NAME as string).namespace(Bun.env.PINECONE_NAMESPACE as string);
 
         // Generate embedding
         console.log('🔄 Generating embedding...');
@@ -139,4 +139,4 @@ export const POST: RequestHandler = async ({ request }) => {
             error: 'An error occurred while processing your request.' 
         }, { status: 500 });
     }
-}; 
+};

@@ -278,7 +278,7 @@
               bind:value={newMessage}
               placeholder={isLoading ? "Please wait..." : "Type your message..."}
               disabled={isLoading}
-              class="flex-1 rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#00174f] dark:border-gray-700 dark:bg-gray-800 disabled:opacity-50"
+              class="flex-1 rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring focus:ring-tommy-red/50 dark:border-gray-700 bg-white text-black dark:bg-white dark:text-black disabled:opacity-50"
               aria-label="Message input"
             />
             <Button 
