@@ -117,12 +117,12 @@
     isLoading = true;
     
     try {
-        // Add initial bot message
+        // Add initial bot message with spinner
         const botMessageIndex = messages.length;
         messages = [...messages, { 
             type: 'bot', 
-            text: 'Thinking...',
-            isStreaming: false 
+            text: '', // Empty text
+            isLoading: true // New property to indicate loading state
         }];
         
         const response = await fetch('/api/chat', {
@@ -139,10 +139,10 @@
 
         const data = await response.json();
         
-        // Update the bot message with the response
+        // Update the message mapping
         messages = messages.map((msg, index) => 
             index === botMessageIndex 
-                ? { type: 'bot', text: data.response, isStreaming: false }
+                ? { type: 'bot', text: data.response, isLoading: false }
                 : msg
         );
 
@@ -153,7 +153,7 @@
                 ? { 
                     type: 'bot', 
                     text: 'I apologize, but I encountered an error processing your request. Please try again.',
-                    isStreaming: false 
+                    isLoading: false 
                   }
                 : msg
         );
@@ -225,12 +225,12 @@
       <div class="flex flex-col h-[600px] max-h-[calc(100vh-8rem)]">
         <!-- Header -->
         <div class="flex items-center justify-between border-b border-gray-200 bg-[#00174f] p-4 dark:border-gray-800">
-          <h2 class="font-semibold text-white">Chat Assistant</h2>
+          <h2 class="font-bold text-white">Chat Assistant</h2>
           <Button 
             variant="ghost" 
             size="icon" 
             onclick={toggleChat} 
-            class="text-white hover:text-gray-200"
+            class="text-white hover:bg-transparent hover:text-red-500 transition-colors duration-200"
             aria-label="Close chat"
           >
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5">
@@ -253,12 +253,15 @@
                 role="article"
                 aria-label={message.type === 'user' ? 'Your message' : 'Assistant message'}
               >
-                <div class="whitespace-pre-wrap">
-                  {message.text}
-                  {#if message.type === 'bot' && message.isStreaming}
-                    <span class="animate-pulse">▋</span>
-                  {/if}
-                </div>
+                {#if message.isLoading}
+                    <div class="flex items-center justify-center p-2">
+                        <div class="animate-spin rounded-full h-5 w-5 border-2 border-gray-500 border-t-transparent"></div>
+                    </div>
+                {:else}
+                    <div class="whitespace-pre-wrap">
+                        {message.text}
+                    </div>
+                {/if}
               </div>
             </div>
           {/each}
