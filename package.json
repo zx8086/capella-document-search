@@ -75,7 +75,7 @@
     "@opentelemetry/instrumentation-fetch": "^0.53.0",
     "@opentelemetry/instrumentation-graphql": "^0.43.0",
     "@opentelemetry/instrumentation-http": "^0.53.0",
-    "@opentelemetry/instrumentation-user-interaction": "^0.40.0",
+    "@opentelemetry/instrumentation-user-interaction": "^0.41.0",
     "@opentelemetry/instrumentation-xml-http-request": "^0.53.0",
     "@opentelemetry/resources": "^1.26.0",
     "@opentelemetry/sdk-logs": "^0.53.0",
