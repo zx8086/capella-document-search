@@ -111,8 +111,7 @@ export const POST: RequestHandler = async ({ request }) => {
             similarityScore: queryResponse.matches[0].score
         });
 
-        // Generate completion without streaming
-        const completion = await openai.chat.completions.create({
+        const stream = await openai.chat.completions.create({
             model: "gpt-4-turbo-preview",
             messages: [
                 {
@@ -126,17 +125,60 @@ export const POST: RequestHandler = async ({ request }) => {
             ],
             temperature: 0.7,
             max_tokens: 500,
-            stream: false
+            stream: true
         });
 
-        return json({
-            response: completion.choices[0].message.content
-        });
+        // Match the working implementation's response structure
+        return new Response(
+            new ReadableStream({
+                async start(controller) {
+                    try {
+                        for await (const chunk of stream) {
+                            const content = chunk.choices[0]?.delta?.content;
+                            if (content) {
+                                // Send each chunk as a JSON string with newline delimiter
+                                controller.enqueue(
+                                    new TextEncoder().encode(
+                                        JSON.stringify({ content }) + '\n'
+                                    )
+                                );
+                            }
+                        }
+                        // Send done signal
+                        controller.enqueue(
+                            new TextEncoder().encode(
+                                JSON.stringify({ done: true }) + '\n'
+                            )
+                        );
+                        controller.close();
+                    } catch (error) {
+                        console.error("❌ Stream processing error:", error);
+                        controller.error(error);
+                    }
+                }
+            }),
+            {
+                headers: {
+                    "Content-Type": "text/event-stream",
+                    "Cache-Control": "no-cache",
+                    "Connection": "keep-alive",
+                    "X-Content-Type-Options": "nosniff"
+                }
+            }
+        );
 
     } catch (error) {
         console.error('❌ Chat API Error:', error);
-        return json({ 
-            error: 'An error occurred while processing your request.' 
-        }, { status: 500 });
+        return new Response(
+            JSON.stringify({ 
+                error: "Internal server error",
+                details: error.message,
+                stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+            }), 
+            { 
+                status: 500,
+                headers: { 'Content-Type': 'application/json' }
+            }
+        );
     }
 };

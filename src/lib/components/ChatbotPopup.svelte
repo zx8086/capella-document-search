@@ -112,19 +112,13 @@
     if (!newMessage.trim()) return;
     
     const userMessage = newMessage.trim();
-    messages = [...messages, { type: 'user', text: userMessage }];
     newMessage = '';
     isLoading = true;
     
     try {
-        // Add initial bot message with spinner
-        const botMessageIndex = messages.length;
-        messages = [...messages, { 
-            type: 'bot', 
-            text: '', // Empty text
-            isLoading: true // New property to indicate loading state
-        }];
-        
+        messages = [...messages, { type: 'user', text: userMessage }];
+        messages = [...messages, { type: 'bot', text: '', isLoading: true }];
+
         const response = await fetch('/api/chat', {
             method: 'POST',
             headers: {
@@ -137,14 +131,111 @@
             throw new Error(`HTTP error! status: ${response.status}`);
         }
 
-        const data = await response.json();
-        
-        // Update the message mapping
-        messages = messages.map((msg, index) => 
-            index === botMessageIndex 
-                ? { type: 'bot', text: data.response, isLoading: false }
-                : msg
-        );
+        const reader = response.body?.getReader();
+        if (!reader) {
+            throw new Error('Response body reader is null');
+        }
+
+        let accumulatedResponse = '';
+        let buffer = '';
+        const decoder = new TextDecoder();
+
+        console.log('🔄 Starting stream processing');
+
+        try {
+            let streamComplete = false;
+            
+            while (!streamComplete) {
+                console.log('📥 Reading next chunk...');
+                const result = await reader.read();
+                console.log('📦 Read result:', { done: result.done, hasValue: !!result.value });
+                
+                // Check for stream completion before processing value
+                if (result.done) {
+                    console.log('✅ Stream completed normally');
+                    streamComplete = true;
+                    break;
+                }
+                
+                // Decode the current chunk and add it to the buffer
+                const newText = decoder.decode(result.value, { stream: true });
+                console.log('📝 Decoded chunk:', newText);
+                buffer += newText;
+                
+                // Process complete lines from the buffer
+                const lines = buffer.split('\n');
+                buffer = lines.pop() || ''; // Keep the last incomplete line in the buffer
+                
+                console.log('📊 Processing lines:', { lineCount: lines.length, remainingBuffer: buffer });
+                
+                for (const line of lines) {
+                    if (line.trim()) {
+                        try {
+                            const data = JSON.parse(line);
+                            console.log('🔍 Parsed data:', data);
+                            
+                            if (data.done) {
+                                console.log('🏁 Received done signal');
+                                streamComplete = true;
+                                break;
+                            }
+                            
+                            if (data.content) {
+                                accumulatedResponse += data.content;
+                                console.log('💬 Updated response:', accumulatedResponse);
+                                messages = messages.map((msg, index) => 
+                                    index === messages.length - 1 
+                                        ? { type: 'bot', text: accumulatedResponse, isLoading: false }
+                                        : msg
+                                );
+                            }
+                        } catch (e) {
+                            console.warn('⚠️ Failed to parse line:', line, e);
+                        }
+                    }
+                }
+                
+                // Break the loop if we received the done signal
+                if (streamComplete) {
+                    console.log('🎯 Breaking loop due to done signal');
+                    break;
+                }
+            }
+            
+            console.log('🎉 Stream processing completed successfully');
+            
+            // Process any remaining buffer content
+            if (buffer.trim()) {
+                console.log('📝 Processing final buffer:', buffer);
+                try {
+                    const data = JSON.parse(buffer);
+                    if (data.content) {
+                        accumulatedResponse += data.content;
+                        messages = messages.map((msg, index) => 
+                            index === messages.length - 1 
+                                ? { type: 'bot', text: accumulatedResponse, isLoading: false }
+                                : msg
+                        );
+                    }
+                } catch (e) {
+                    console.warn('⚠️ Failed to parse final buffer:', buffer, e);
+                }
+            }
+            
+            // Ensure final message state is set
+            messages = messages.map((msg, index) => 
+                index === messages.length - 1 
+                    ? { type: 'bot', text: accumulatedResponse, isLoading: false }
+                    : msg
+            );
+            
+        } catch (error) {
+            console.error('❌ Stream processing error:', error);
+            throw error; // Re-throw to be handled by outer catch block
+        } finally {
+            console.log('🧹 Cleaning up stream resources');
+            reader.releaseLock();
+        }
 
     } catch (error) {
         console.error('❌ Chat error:', error);
