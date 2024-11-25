@@ -308,12 +308,12 @@
       role="button"
     ></button>
     <div 
-      class="fixed bottom-40 right-6 w-[400px] max-w-[calc(100vw-3rem)] z-[46] rounded-lg border border-gray-200 bg-white shadow-xl dark:border-gray-800 dark:bg-gray-900"
+      class="fixed bottom-40 right-6 w-[600px] max-w-[calc(100vw-3rem)] z-[46] rounded-lg border border-gray-200 bg-white shadow-xl dark:border-gray-800 dark:bg-gray-900"
       role="dialog"
       aria-modal="true"
       aria-label="Chat window"
     >
-      <div class="flex flex-col h-[600px] max-h-[calc(100vh-8rem)]">
+      <div class="flex flex-col h-[700px] max-h-[calc(100vh-6rem)]">
         <!-- Header -->
         <div class="flex items-center justify-between border-b border-gray-200 bg-[#00174f] p-4 dark:border-gray-800">
           <h2 class="font-bold text-white">Chat Assistant</h2>
@@ -350,7 +350,21 @@
                     </div>
                 {:else}
                     <div class="whitespace-pre-wrap">
-                        {message.text}
+                        {#if message.type === 'bot'}
+                            {#if message.text.includes('References:')}
+                                {message.text.split('References:')[0]}
+                                <div class="mt-2 text-sm text-gray-600 dark:text-gray-400 border-t border-gray-200 dark:border-gray-700 pt-2">
+                                    References:
+                                    {#each message.text.split('References:')[1].trim().split('\n').filter(ref => ref.trim()) as ref}
+                                        <div>- {ref.trim()}</div>
+                                    {/each}
+                                </div>
+                            {:else}
+                                {message.text}
+                            {/if}
+                        {:else}
+                            {message.text}
+                        {/if}
                     </div>
                 {/if}
               </div>

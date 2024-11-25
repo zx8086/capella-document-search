@@ -95,9 +95,11 @@ export const POST: RequestHandler = async ({ request }) => {
 
         // Extract context
         const context = queryResponse.matches
-            .map(match => match.metadata?.text)
-            .filter(Boolean)
-            .join('\n\n---\n\n');
+            .map(match => ({
+                text: match.metadata?.text,
+                filename: match.metadata?.filename || 'Unknown source'
+            }))
+            .filter(item => item.text);
 
         console.log('📝 Context details:', {
             contextLength: context.length,
@@ -107,7 +109,7 @@ export const POST: RequestHandler = async ({ request }) => {
 
         console.log('🔍 Using RAG Context:', {
             question: message,
-            retrievedContext: context,
+            retrievedContext: context.map(c => c.text).join('\n\n---\n\n'),
             similarityScore: queryResponse.matches[0].score
         });
 
@@ -116,17 +118,20 @@ export const POST: RequestHandler = async ({ request }) => {
             messages: [
                 {
                     role: "system",
-                    content: "You are a helpful assistant. Use the following context to answer the user's question. If you cannot answer the question based on the context, say so."
+                    content: "You are a helpful assistant. Use the following context to answer the user's question. Always end your response with '\n\nReferences:' followed by the source filenames. If you cannot answer the question based on the context, say so."
                 },
                 {
                     role: "user",
-                    content: `Context: ${context}\n\nQuestion: ${message}`
+                    content: `Context: ${context.map(c => c.text).join('\n\n---\n\n')}\n\nSource files: ${context.map(c => c.filename).join(', ')}\n\nQuestion: ${message}`
                 }
             ],
             temperature: 0.7,
-            max_tokens: 500,
+            max_tokens: 2000,
             stream: true
         });
+
+        // After the response, append the references if they're not already included
+        let fullResponse = '';
 
         // Match the working implementation's response structure
         return new Response(
@@ -136,6 +141,7 @@ export const POST: RequestHandler = async ({ request }) => {
                         for await (const chunk of stream) {
                             const content = chunk.choices[0]?.delta?.content;
                             if (content) {
+                                fullResponse += content;
                                 // Send each chunk as a JSON string with newline delimiter
                                 controller.enqueue(
                                     new TextEncoder().encode(
@@ -144,6 +150,17 @@ export const POST: RequestHandler = async ({ request }) => {
                                 );
                             }
                         }
+
+                        // If response doesn't include references, append them
+                        if (!fullResponse.includes('References:')) {
+                            const references = `\n\nReferences:\n${context.map(c => c.filename).join('\n- ')}`;
+                            controller.enqueue(
+                                new TextEncoder().encode(
+                                    JSON.stringify({ content: references }) + '\n'
+                                )
+                            );
+                        }
+
                         // Send done signal
                         controller.enqueue(
                             new TextEncoder().encode(
