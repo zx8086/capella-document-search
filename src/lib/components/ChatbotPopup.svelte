@@ -305,7 +305,6 @@
       onclick={toggleChat}
       onkeydown={(e) => e.key === 'Escape' && toggleChat()}
       aria-label="Close chat overlay"
-      role="button"
     ></button>
     <div 
       class="fixed bottom-40 right-6 w-[600px] max-w-[calc(100vw-3rem)] z-[46] rounded-lg border border-gray-200 bg-white shadow-xl dark:border-gray-800 dark:bg-gray-900"

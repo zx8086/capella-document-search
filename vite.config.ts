@@ -82,17 +82,21 @@ export default defineConfig(({ mode }): UserConfig => {
       },
       ssr: {
         noExternal: ["@apollo/client", "@openreplay/tracker"],
+        external: ['bun:sqlite']
       },
       build: {
         rollupOptions: {
-          external: enableOpenTelemetry
-            ? [
-                "winston",
-                "winston-daily-rotate-file",
-                "@elastic/ecs-winston-format",
-                "@opentelemetry/winston-transport",
-              ]
-            : [],
+          external: [
+            'bun:sqlite',
+            ...(enableOpenTelemetry
+              ? [
+                  "winston",
+                  "winston-daily-rotate-file",
+                  "@elastic/ecs-winston-format",
+                  "@opentelemetry/winston-transport",
+                ]
+              : [])
+          ]
         },
         target: "esnext",
         sourcemap: false,
