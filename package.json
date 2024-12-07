@@ -21,7 +21,7 @@
     "docker:dev:run": "bun run docker:cleanup:dev && VERSION='0.0.1-dev' && docker run --name capella-search-dev -p 3000:3000 -e NODE_ENV=development -e BUILD_VERSION=$VERSION -e COMMIT_HASH=$(git rev-parse --short HEAD || echo 'local') -e BUILD_DATE=$(date -u +'%Y-%m-%dT%H:%M:%SZ') capella-document-search:dev",
     "docker:prod:env": "cp .env.production .env 2>/dev/null || true",
     "docker:prod:build": "bun run docker:cleanup:prod && docker rmi capella-document-search:prod 2>/dev/null || true && docker build --build-arg NODE_ENV=production --build-arg BUILD_VERSION=0.0.1 --build-arg COMMIT_HASH=$(git rev-parse --short HEAD || echo 'production') --build-arg BUILD_DATE=$(date -u +'%Y-%m-%dT%H:%M:%SZ') -t capella-document-search:prod .",
-    "docker:prod:run": "bun run docker:cleanup:prod && docker run --name capella-search-prod -p 3000:3000 -e NODE_ENV=production -e BUILD_VERSION=0.0.1 -e COMMIT_HASH=$(git rev-parse --short HEAD || echo 'production') -e BUILD_DATE=$(date -u +'%Y-%m-%dT%H:%M:%SZ') capella-document-search:prod",
+    "docker:prod:run": "bun run docker:cleanup:prod && docker run --name capella-search-prod -p 5173:3000 -e NODE_ENV=production -e BUILD_VERSION=2.1.0 -e COMMIT_HASH=$(git rev-parse --short HEAD || echo 'production') -e BUILD_DATE=$(date -u +'%Y-%m-%dT%H:%M:%SZ') capella-document-search:prod",
     "docker:prod": "bun run docker:prod:env && bun run docker:prod:build",
     "docker:prod:restart": "bun run docker:cleanup:prod && bun run docker:prod && bun run docker:run:prod",
     "docker:clean": "bun run docker:cleanup:dev && bun run docker:cleanup:prod && docker system prune -af && docker volume prune -f",

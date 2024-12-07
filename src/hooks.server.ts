@@ -38,7 +38,8 @@ export const handle: Handle = async ({ event, resolve }) => {
             https://*.cloud.couchbase.com 
             https://*.openreplay.com 
             https://*.siobytes.com
-            wss://*.openreplay.com
+            ws://*.openreplay.prd.shared-services.eu.pvh.cloud
+            wss://*.openreplay.prd.shared-services.eu.pvh.cloud
             ws://*.openreplay.com
             wss://api.openreplay.com
             ws://api.openreplay.com;
