@@ -80,18 +80,10 @@ export async function initTracker() {
         if (tracker.setGlobalContext) {
             console.log("🔗 Setting up APM context linking...");
             const context = {
-                apmTraceId: () => {
-                    const transaction = getCurrentApmTransaction();
-                    return transaction?.traceId || null;
-                },
-                apmTransactionId: () => {
-                    const transaction = getCurrentApmTransaction();
-                    return transaction?.id || null;
-                },
-                apmSpanId: () => {
-                    const transaction = getCurrentApmTransaction();
-                    return transaction?.ensureParentId() || null;
-                }
+                ...tracker.getGlobalContext(),
+                apmTraceId: () => getCurrentApmTransaction()?.traceId || null,
+                apmTransactionId: () => getCurrentApmTransaction()?.id || null,
+                apmSpanId: () => getCurrentApmTransaction()?.ensureParentId() || null
             };
             
             tracker.setGlobalContext(context);
