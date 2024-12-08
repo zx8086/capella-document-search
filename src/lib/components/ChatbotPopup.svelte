@@ -315,7 +315,7 @@
       <div class="flex flex-col h-[700px] max-h-[calc(100vh-6rem)]">
         <!-- Header -->
         <div class="flex items-center justify-between border-b border-gray-200 bg-[#00174f] p-4 dark:border-gray-800">
-          <h2 class="font-bold text-white">Capella Document Search - Chat Assistant</h2>
+          <h2 class="font-bold text-white">Chat Assistant</h2>
           <Button 
             variant="ghost" 
             size="icon" 

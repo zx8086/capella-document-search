@@ -707,8 +707,7 @@
                                             />
                                         </label>
                                         <span class="mt-1 flex items-center">
-                                            a file with Document keys to check
-                                            here
+                                            a file with multiple Document keys to check in bulk here
                                             <button
                                                 onclick={preventDefault(() =>
                                                     openTooltipModal(
@@ -740,7 +739,7 @@
                                             id="validFileFormats"
                                             class="text-xs mt-1"
                                         >
-                                            CSV files only (Document Keys Limit:
+                                            CSV file only (Document Keys Limit:
                                             {frontendConfig.csv
                                                 .FILE_UPLOAD_LIMIT})
                                         </small>
@@ -832,7 +831,7 @@
                                                 class="text-sm pr-2 flex items-center"
                                             >
                                                 {collection.collection_name}
-                                                {#if collection.tooltip_content}
+                                                <!-- {#if collection.tooltip_content}
                                                     <button
                                                         onclick={() => openTooltipModal(collection.tooltip_content)}
                                                         class="ml-2 text-gray-500 hover:text-gray-700 focus:outline-none"
@@ -855,7 +854,7 @@
                                                         </svg>
                                                         <span class="sr-only">Show information about {collection.collection_name}</span>
                                                     </button>
-                                                {/if}
+                                                {/if} -->
                                             </span>
                                             <div
                                                 class="relative inline-flex items-center"
@@ -1112,29 +1111,6 @@ IMAGE_70_C51_LV04F1003GPDE</pre>
                 >
                     Tool Tip
                 </h3>
-                <button
-                    onclick={() => (modalIsOpen = false)}
-                    data-transaction-name="Tooltip Modal"
-                    aria-label="Close tooltip modal"
-                    class="cursor-pointer whitespace-nowrap rounded-xl bg-blue-700 px-4 py-2 text-center text-sm font-medium tracking-wide text-slate-100 transition hover:opacity-75 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-700 active:opacity-100 active:outline-offset-0 dark:bg-blue-600 dark:text-slate-100 dark:focus-visible:outline-blue-600"
-                >
-                    <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        viewBox="0 0 24 24"
-                        aria-hidden="true"
-                        stroke="currentColor"
-                        fill="none"
-                        stroke-width="1.4"
-                        class="w-5 h-5"
-                    >
-                        <path
-                            stroke-linecap="round"
-                            stroke-linejoin="round"
-                            d="M6 18L18 6M6 6l12 12"
-                        />
-                    </svg>
-                    <span class="sr-only">Close tooltip modal</span>
-                </button>
             </div>
             <div class="px-4 py-8">
                 <p>{currentTooltip}</p>
@@ -1146,7 +1122,7 @@ IMAGE_70_C51_LV04F1003GPDE</pre>
                     onclick={() => (modalIsOpen = false)}
                     type="button"
                     data-transaction-name="Tooltip Modal"
-                    class="cursor-pointer whitespace-nowrap rounded-xl bg-blue-700 px-4 py-2 text-center text-sm font-medium tracking-wide text-slate-100 transition hover:opacity-75 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-700 active:opacity-100 active:outline-offset-0 dark:bg-blue-600 dark:text-slate-100 dark:focus-visible:outline-blue-600"
+                    class="cursor-pointer whitespace-nowrap rounded-xl bg-blue-700 px-4 py-2 text-center text-sm font-medium tracking-wide text-slate-100 transition hover:text-red-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-700 active:opacity-100 active:outline-offset-0 dark:bg-blue-600 dark:text-slate-100 dark:focus-visible:outline-blue-600"
                     aria-label="Close tooltip modal"
                 >
                     Close
