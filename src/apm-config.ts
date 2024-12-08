@@ -10,6 +10,8 @@ const apm = initApm({
   serverUrl: env[envSchema.elastic.serverUrl],
   serviceVersion: env[envSchema.elastic.serviceVersion],
   environment: env[envSchema.elastic.environment],
+  active: true,
+  logLevel: 'debug'
 });
 
 console.log("APM Config:", {
@@ -18,5 +20,14 @@ console.log("APM Config:", {
   serviceVersion: env[envSchema.elastic.serviceVersion],
   environment: env[envSchema.elastic.environment],
 });
+
+if (import.meta.env.DEV) {
+    console.group('🔍 APM Initialization Check');
+    console.log('APM Instance:', !!apm);
+    console.log('APM Active:', apm.isActive());
+    console.log('Service Name:', env[envSchema.elastic.serviceName]);
+    console.log('Server URL:', env[envSchema.elastic.serverUrl]);
+    console.groupEnd();
+}
 
 export default apm;

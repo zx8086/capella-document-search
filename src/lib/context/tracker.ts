@@ -89,25 +89,15 @@ export async function initTracker() {
             tracker.setGlobalContext(context);
             console.log("✅ APM context linked successfully");
 
-            // Create a test transaction with proper spans
-            const testTransaction = elasticApm.apm?.startTransaction('openreplay-init', 'test');
-            if (testTransaction) {
-                // Add a span to test the context
-                const span = testTransaction.startSpan('context-test');
-                if (span) {
-                    span.end();
-                }
-
-                // Log the context values for verification
-                console.log('APM Context Test:', {
-                    traceId: context.apmTraceId(),
-                    transactionId: context.apmTransactionId(),
-                    spanId: context.apmSpanId(),
-                    testTransactionId: testTransaction.id
-                });
-
-                testTransaction.end();
-            }
+            console.group('🔍 Headers Verification');
+            const headers = getAPIHeaders();
+            console.log('Current Headers:', {
+                'x-openreplay-session-id': headers['x-openreplay-session-id'],
+                'traceparent': headers['traceparent'],
+                'sessionId': tracker.getSessionID(),
+                'currentTransaction': getCurrentApmTransaction()?.id
+            });
+            console.groupEnd();
         }
 
         if (!isStarted) {
