@@ -2,7 +2,7 @@
 
 import { browser } from '$app/environment';
 import { frontendConfig } from '$frontendConfig';
-import type OpenReplayTracker from "@openreplay/tracker";
+import Tracker from '@openreplay/tracker';
 import trackerAssist from '@openreplay/tracker-assist';
 import trackerProfiler from '@openreplay/tracker-profiler';
 import { createTrackerLink } from '@openreplay/tracker-graphql';
@@ -11,7 +11,7 @@ import type { IFeatureFlag } from '@openreplay/tracker';
 
 export const key = Symbol("openreplay tracker symbol");
 
-let trackerInstance: OpenReplayTracker | null = null;
+let trackerInstance: Tracker | null = null;
 let isInitializing = false;
 let isStarted = false;
 let graphqlTracker: any = null;
@@ -39,60 +39,39 @@ export async function initTracker() {
         isInitializing = true;
         console.log("🔍 Initializing OpenReplay tracker...");
         
-        const { default: Tracker } = await import("@openreplay/tracker");
-        
-        trackerInstance = new Tracker({
+        const tracker = new Tracker({
             projectKey: frontendConfig.openreplay.PROJECT_KEY,
             ingestPoint: frontendConfig.openreplay.INGEST_POINT,
-            __DISABLE_SECURE_MODE: true,
+            __DISABLE_SECURE_MODE: import.meta.env.DEV,
             network: {
+                enabled: true,
                 capturePayload: true,
-                sessionTokenHeader: false,
                 failuresOnly: false,
-                ignoreHeaders: [
-                    "Authorization",
-                    "Cookie",
-                    "Set-Cookie",
-                    "x-csrf-token"
-                ],
-                sanitizer: (data) => {
-                    if (data.url?.includes('/api/auth')) {
-                        data.body = undefined;
-                    }
-                    if (data.url?.includes('/graphql')) {
-                        if (data.body?.variables?.password) {
-                            data.body.variables.password = '***';
-                        }
-                    }
-                    return data;
-                },
-                captureInIframes: false,
-                defaultFetchOptions: {
-                    credentials: 'include',
-                },
-                ignoreUrls: [
-                    '/health-check',
-                    '/metrics',
-                    'googleapis.com',
-                    'analytics'
-                ],
-                maxPayloadLength: 2000,
-                watchNetworkIdle: true,
-                recordHeaders: true,
-                recordQueryParameters: true,
-                recordBody: true
+                ignoreHeaders: ['Cookie', 'Set-Cookie'],
+                sessionTokenHeader: false
             },
             console: {
                 enabled: true,
                 recordConsoleLog: true,
                 recordConsoleWarn: true,
-                recordConsoleError: true
+                recordConsoleError: true,
             },
             capturePerformance: true,
             obscureTextNumbers: false,
             obscureTextEmails: false,
-            respectDoNotTrack: false
+            respectDoNotTrack: false,
+            assist: {
+                forceSecure: true,
+                endpointURL: frontendConfig.openreplay.INGEST_POINT.replace('http:', 'https:')
+                    .replace('/ingest', '')
+            }
         });
+
+        if (import.meta.env.DEV) {
+            console.log('Development mode: Secure mode disabled for localhost testing');
+        }
+
+        trackerInstance = tracker;
 
         trackerInstance.use(trackerAssist({
             callConfirm: "Would you like to start a support call?",

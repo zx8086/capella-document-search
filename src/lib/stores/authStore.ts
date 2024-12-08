@@ -1,6 +1,7 @@
 import { browser } from '$app/environment';
 import { writable, get } from 'svelte/store';
 import { getMsalInstance } from '$lib/config/authConfig';
+import { goto } from '$app/navigation';
 
 export const isAuthenticated = writable(false);
 export const isLoading = writable(true);
@@ -87,17 +88,18 @@ export const auth = {
     },
 
     async logout() {
+        if (!browser) return;
+        
         try {
             isLoading.set(true);
             const instance = await getMsalInstance();
-            if (!instance) return;
-
             await instance.logoutRedirect();
-        } catch (error) {
-            console.error('Logout failed:', error);
-        } finally {
             isAuthenticated.set(false);
             userAccount.set(null);
+        } catch (error) {
+            console.error('Logout error:', error);
+            window.location.href = '/login';
+        } finally {
             isLoading.set(false);
         }
     }

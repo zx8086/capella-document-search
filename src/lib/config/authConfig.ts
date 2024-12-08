@@ -10,9 +10,13 @@ export const msalConfig = {
         authority: `https://login.microsoftonline.com/${frontendConfig.azure.TENANT_ID}`,
         redirectUri: frontendConfig.azure.REDIRECT_URI,
         navigateToLoginRequestUrl: true,
+        cookieOptions: {
+            secure: true,
+            sameSite: "lax"
+        }
     },
     cache: {
-        cacheLocation: "sessionStorage",
+        cacheLocation: "localStorage",
         storeAuthStateInCookie: true,
         secureCookies: true
     },

@@ -248,7 +248,11 @@
     }
 
     // Use $derived instead of $:
-    const shouldShowContent = $derived(!$isLoading || $page.url.pathname === '/login');
+    const shouldShowContent = $derived(
+        !$isLoading || 
+        $page.url.pathname === '/login' ||
+        $page.url.pathname.startsWith('/_app')
+    );
 
     $effect(() => {
         if (trackerInitialized && $userAccount) {
