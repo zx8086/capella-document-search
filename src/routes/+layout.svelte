@@ -14,7 +14,7 @@
     import { Toaster } from "$lib/components/ui/sonner";
     import { onMount, setContext, onDestroy } from "svelte";
     import { browser } from "$app/environment";
-    import { key, initTracker, debugTrackerStatus, identifyUser, getSessionId } from "$lib/context/tracker";
+    import { key, initTracker, debugTrackerStatus, identifyUser, getSessionId, debugElasticIntegration } from "$lib/context/tracker";
     import { frontendConfig } from "$frontendConfig";
     import { writable } from "svelte/store";
     import { collections } from "../stores/collectionsStore";
@@ -170,6 +170,8 @@
 
         try {
             await initializeTracker();
+            debugTrackerStatus();
+            debugElasticIntegration();
         } catch (error) {
             console.warn(
                 "Failed to start OpenReplay:",

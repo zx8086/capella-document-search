@@ -8,6 +8,7 @@ import trackerProfiler from '@openreplay/tracker-profiler';
 import { createTrackerLink } from '@openreplay/tracker-graphql';
 import { toast } from 'svelte-sonner';
 import type { IFeatureFlag } from '@openreplay/tracker';
+import * as elasticApm from '@elastic/apm-rum';
 
 export const key = Symbol("openreplay tracker symbol");
 
@@ -18,6 +19,15 @@ let graphqlTracker: any = null;
 let cachedFlags: Record<string, boolean> = {};
 let flagsInitialized = false;
 let flagsInitializationPromise: Promise<void> | null = null;
+
+function getCurrentApmTransaction() {
+    try {
+        return elasticApm.apm?.getCurrentTransaction() || null;
+    } catch (error) {
+        console.warn('Failed to get current APM transaction:', error);
+        return null;
+    }
+}
 
 export async function initTracker() {
     if (trackerInstance && isStarted) {
@@ -67,8 +77,52 @@ export async function initTracker() {
             }
         });
 
-        if (import.meta.env.DEV) {
-            console.log('Development mode: Secure mode disabled for localhost testing');
+        if (tracker.setGlobalContext) {
+            console.log("🔗 Setting up APM context linking...");
+            const context = {
+                apmTraceId: () => {
+                    const transaction = getCurrentApmTransaction();
+                    return transaction?.traceId || null;
+                },
+                apmTransactionId: () => {
+                    const transaction = getCurrentApmTransaction();
+                    return transaction?.id || null;
+                },
+                apmSpanId: () => {
+                    const transaction = getCurrentApmTransaction();
+                    return transaction?.ensureParentId() || null;
+                }
+            };
+            
+            tracker.setGlobalContext(context);
+            console.log("✅ APM context linked successfully");
+
+            // Create a test transaction with proper spans
+            const testTransaction = elasticApm.apm?.startTransaction('openreplay-init', 'test');
+            if (testTransaction) {
+                // Add a span to test the context
+                const span = testTransaction.startSpan('context-test');
+                if (span) {
+                    span.end();
+                }
+
+                // Log the context values for verification
+                console.log('APM Context Test:', {
+                    traceId: context.apmTraceId(),
+                    transactionId: context.apmTransactionId(),
+                    spanId: context.apmSpanId(),
+                    testTransactionId: testTransaction.id
+                });
+
+                testTransaction.end();
+            }
+        }
+
+        if (!isStarted) {
+            console.log("▶️ Starting tracker...");
+            await tracker.start();
+            isStarted = true;
+            console.log("✅ Tracker started successfully");
         }
 
         trackerInstance = tracker;
@@ -118,7 +172,7 @@ export async function initTracker() {
                     duration: Infinity
                 });
                 return () => {
-                    console.log("👋 Agent disconnected");
+                    console.log("�� Agent disconnected");
                     toast.info("Support agent disconnected", {
                         description: "The support agent has left the session",
                         duration: Infinity
@@ -146,12 +200,6 @@ export async function initTracker() {
             return sanitized;
         }));
 
-        console.log("▶️ Starting tracker...");
-        await trackerInstance.start();
-        isStarted = true;
-        console.log("✅ Tracker started successfully");
-
-        // Initialize feature flags right after tracker starts
         await initFeatureFlags();
 
         return trackerInstance;
@@ -162,6 +210,7 @@ export async function initTracker() {
         return null;
     } finally {
         isInitializing = false;
+        console.groupEnd();
     }
 }
 
@@ -250,7 +299,7 @@ export async function waitForTracker(timeout = 5000): Promise<boolean> {
         await new Promise(resolve => setTimeout(resolve, 100));
     }
     
-    console.warn('⏱️ Tracker initialization timeout');
+    console.warn('⏱��� Tracker initialization timeout');
     return false;
 }
 
@@ -347,4 +396,44 @@ export function setupFeatureFlagListener(): void {
             timestamp: new Date().toISOString()
         });
     });
+}
+
+export function debugElasticIntegration() {
+    const tracker = getTracker();
+    if (!tracker) {
+        console.warn("⚠️ Tracker not available for Elastic debug");
+        return;
+    }
+
+    console.group('🔍 Elastic APM Integration Status');
+    try {
+        // Create a new test transaction
+        const testTransaction = elasticApm.apm?.startTransaction('debug-test', 'test');
+        const currentTransaction = elasticApm.apm?.getCurrentTransaction();
+        
+        // Create a span for getting the span ID
+        const span = testTransaction?.startSpan('debug-operation');
+
+        const contextValues = {
+            traceId: testTransaction?.traceId,
+            transactionId: testTransaction?.id,
+            spanId: span?.id, 
+            hasAPM: !!elasticApm.apm,
+            hasTransaction: !!testTransaction,
+            currentTransaction: currentTransaction?.id,
+            testTransactionId: testTransaction?.id,
+            currentTraceId: currentTransaction?.traceId,
+            testTraceId: testTransaction?.traceId
+        };
+
+        console.log('APM Transaction Details:', contextValues);
+        
+        // Clean up
+        span?.end();
+        testTransaction?.end();
+    } catch (error) {
+        console.error('Failed to debug APM:', error);
+    } finally {
+        console.groupEnd();
+    }
 }
