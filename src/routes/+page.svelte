@@ -318,7 +318,7 @@
                                 });
                             } else {
                                 toast.success(
-                                    `Search completed successfully. Document found in ${foundCollectionsCount} collection(s).`,
+                                    `Search completed successfully. Document found in ${foundCollectionsCount} ${foundCollectionsCount === 1 ? 'collection' : 'collections'}.`,
                                     { duration: 3000 }
                                 );
                             }
@@ -797,7 +797,7 @@
                     <div class="mb-4">
                         <div class="flex justify-between items-center mb-2">
                             <h3 class="text-lg font-semibold">
-                                Select Data Scopes & Collections:
+                                Select <span class="text-tommy-red">Scopes</span> & Collections
                             </h3>
                             <div>
                                 <button
@@ -821,7 +821,7 @@
                         >
                             {#each Object.entries(groupedCollections) as [scope, collections]}
                                 <div class="border rounded p-3">
-                                    <h4 class="font-semibold mb-2">{scope}</h4>
+                                    <h4 class="font-semibold text-tommy-red mb-2">{scope}</h4>
                                     {#each collections as collection}
                                         <label
                                             for={`toggle-${collection.bucket}-${collection.scope_name}-${collection.collection_name}`}

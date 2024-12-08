@@ -10,7 +10,6 @@ import { getAllScopes } from "$lib/api";
 import type { CheckResult } from "../../../models";
 import fetch from "cross-fetch";
 import { frontendConfig } from "../../../frontend-config";
-// console.log("Imported frontendConfig:", frontendConfig); // Debug log
 import { backendConfig } from "$backendConfig";
 import {
   ApolloClient,
@@ -80,9 +79,6 @@ async function checkLogsEndpoint(): Promise<CheckResult> {
 async function checkElasticAPMEndpoint(): Promise<CheckResult> {
   const startTime = Date.now();
   const apmServerUrl = frontendConfig.elasticApm.SERVER_URL;
-
-  // console.log("APM Server URL:", apmServerUrl); // Debug log
-  // console.log("Frontend Config:", frontendConfig); // Debug entire config
 
   if (!apmServerUrl) {
     return {
@@ -188,7 +184,7 @@ async function checkDatabase(): Promise<CheckResult> {
     const duration = Date.now() - startTime;
     return {
       status: "OK",
-      message: `Retrieved ${collections.length} collections with tooltips.`,
+      message: `Retrieved ${collections.length} collections from local database.`,
       responseTime: duration,
     };
   } catch (error) {

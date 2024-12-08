@@ -29,7 +29,7 @@ export const handle: Handle = async ({ event, resolve }) => {
             http://localhost:* 
             https://api.openai.com
             https://*.pinecone.io
-            https://*.svc.*.pinecone.io
+            https://*.svc.pinecone.io
             https://*.shared-services.eu.pvh.cloud 
             https://*.prd.shared-services.eu.pvh.cloud 
             https://*.cloudfront.net 

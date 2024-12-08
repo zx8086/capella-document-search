@@ -332,18 +332,18 @@
                 closeButton
                 position="bottom-left"
                 offset="60px"
-                gap="100px"
+                gap="1.5rem"
                 toastOptions={{
                     unstyled: true,
                     classes: {
-                        toast: "bg-white dark:bg-gray-800 text-gray-900 dark:text-white !p-4 !min-w-[300px] !rounded-lg !shadow-lg !font-sans !ml-8 !-translate-x-6 relative",
+                        toast: "bg-white dark:bg-gray-800 text-gray-900 dark:text-white !p-4 !min-w-[300px] !rounded-lg !shadow-lg !font-sans !ml-8 !-translate-x-6 relative !mb-4",
                         title: "font-medium text-base",
                         description: "text-sm",
                         actionButton: "bg-[#00174f] text-white",
                         cancelButton: "bg-gray-200 text-gray-900",
                         closeButton: "text-gray-400",
                     },
-                    className: "!mb-4",
+                    className: "!mb-6",
                 }}
             />
             {@render children?.()}
