@@ -30,11 +30,7 @@ function getCurrentApmTransaction() {
 }
 
 const getIngestPoint = () => {
-    if (import.meta.env.DEV) {
-        // In development, use the proxy
-        return `${window.location.origin}/openreplay`;
-    }
-    // In production, use the direct URL
+    // Always use the direct URL from config
     return frontendConfig.openreplay.INGEST_POINT;
 };
 
@@ -66,7 +62,12 @@ export async function initTracker() {
                 enabled: true,
                 capturePayload: true,
                 failuresOnly: false,
-                ignoreHeaders: ['Cookie', 'Set-Cookie'],
+                ignoreHeaders: [
+                    'Cookie', 
+                    'Set-Cookie',
+                    'traceparent',  // Ignore APM trace headers
+                    'elastic-apm-traceparent' // Ignore APM trace headers
+                ],
                 sessionTokenHeader: false
             },
             console: {
@@ -195,7 +196,7 @@ export async function initTracker() {
 
         return trackerInstance;
     } catch (error) {
-        console.error("❌ Failed to initialize tracker:", error);
+        console.error("��� Failed to initialize tracker:", error);
         trackerInstance = null;
         isStarted = false;
         return null;

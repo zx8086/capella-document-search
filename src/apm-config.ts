@@ -12,6 +12,7 @@ const apm = initApm({
   environment: env[envSchema.elastic.environment],
   active: true,
   logLevel: 'debug'
+  
 });
 
 console.log("APM Config:", {
