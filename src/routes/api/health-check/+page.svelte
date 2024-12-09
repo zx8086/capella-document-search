@@ -109,7 +109,7 @@
     <div class="mb-6">
         <button
             onclick={toggleCheckType}
-            class="bg-[#00174f] hover:bg-[#00174f]/80 text-white font-bold py-2 px-4 rounded"
+            class="bg-[#00174f] hover:bg-[#00174f]/80 text-white font-bold py-2 px-4 rounded hover:ring-2 hover:ring-red-500 hover:ring-offset-2 transition-all duration-300"
             data-transaction-name={`Switch to ${checkType === "Simple" ? "Detailed" : "Simple"} Check`}
         >
             Switch to {checkType === "Simple" ? "Detailed" : "Simple"} Check
@@ -200,7 +200,7 @@
 <div class="mt-8 flex justify-center">
     <a
         href="/"
-        class="flex items-center text-blue-600 hover:text-blue-800"
+        class="flex items-center text-blue-600 hover:text-blue-800 hover:ring-2 hover:ring-red-500 hover:ring-offset-2 transition-all duration-300 p-2 rounded-lg"
         data-transaction-name="Back to Home"
     >
         <svg

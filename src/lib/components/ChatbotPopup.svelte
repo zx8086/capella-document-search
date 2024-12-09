@@ -284,8 +284,9 @@
   <button
     type="button"
     onclick={toggleChat}
-    class="fixed bottom-24 right-6 z-[45] rounded-full bg-[#00174f] p-4 text-white shadow-lg hover:bg-[#00174f]/90 transition-all duration-300"
+    class="fixed bottom-24 right-6 z-[45] rounded-full bg-[#00174f] p-4 text-white shadow-lg hover:bg-[#00174f]/90 hover:ring-2 hover:ring-red-500 hover:ring-offset-2 transition-all duration-300"
     aria-label="Toggle chat"
+    data-transaction-name="Chat Assistant Toggle"
   >
     {#if !isOpen}
       <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6">
@@ -305,6 +306,7 @@
       onclick={toggleChat}
       onkeydown={(e) => e.key === 'Escape' && toggleChat()}
       aria-label="Close chat overlay"
+      data-transaction-name="Chat Assistant Close"
     ></button>
     <div 
       class="fixed bottom-40 right-6 w-[600px] max-w-[calc(100vw-3rem)] z-[46] rounded-lg border border-gray-200 bg-white shadow-xl dark:border-gray-800 dark:bg-gray-900"
@@ -322,6 +324,7 @@
             onclick={toggleChat} 
             class="text-white hover:bg-transparent hover:text-red-500 transition-colors duration-200"
             aria-label="Close chat"
+            data-transaction-name="Chat Assistant Close"
           >
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5">
               <path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" />
@@ -390,9 +393,10 @@
             />
             <Button 
               type="submit" 
-              class="bg-[#00174f] hover:bg-[#00174f]/90 disabled:opacity-50"
+              class="bg-[#00174f] hover:bg-[#00174f]/90 hover:ring-2 hover:ring-red-500 hover:ring-offset-2 transition-all duration-300 disabled:opacity-50"
               disabled={isLoading}
               aria-label="Send message"
+              data-transaction-name="Send Chat Query"
             >
               {#if isLoading}
                 <div class="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>

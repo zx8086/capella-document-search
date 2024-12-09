@@ -302,7 +302,7 @@
                     <button
                         type="button"
                         onclick={() => signOut()}
-                        class="flex items-center space-x-2 px-4 py-2 text-sm text-white hover:text-gray-200 transition-colors"
+                        class="flex items-center space-x-2 px-4 py-2 text-sm text-white hover:text-red-500 transition-colors group"
                         data-transaction-name="Sign Out button"
                     >
                         <span>Sign Out</span>
@@ -312,7 +312,7 @@
                             viewBox="0 0 24 24" 
                             stroke-width="1.5" 
                             stroke="currentColor" 
-                            class="w-5 h-5"
+                            class="w-5 h-5 group-hover:stroke-red-500 transition-colors"
                         >
                             <path 
                                 stroke-linecap="round" 

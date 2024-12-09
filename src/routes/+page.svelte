@@ -631,6 +631,7 @@
                                 >
                                     <button
                                         type="button"
+                                        data-transaction-name="Search Click"
                                         class="p-1 focus:outline-none focus:ring focus:ring-tommy-red/50 rounded-full"
                                         aria-label="Search documents"
                                         title="Search documents"
@@ -659,8 +660,8 @@
                                         searchPerformed = false;
                                     }}
                                     onclick={handleInputClick}
-                                    placeholder="Search for a single Document by typing in the key here and click the Search button below..."
-                                    class="w-full py-2 pl-10 pr-4 text-sm rounded-md focus:outline-none bg-white border border-gray-300 text-gray-700 focus:ring-2 focus:ring-tommy-red focus:border-tommy-red transition duration-150 ease-in-out"
+                                    placeholder="Search for a single Document by typing in the Key here and click the Search button below..."
+                                    class="w-full py-2 pl-10 pr-4 text-sm rounded-md focus:outline-none bg-white border border-gray-300 text-black focus:ring-2 focus:ring-tommy-red focus:border-tommy-red transition duration-150 ease-in-out"
                                 />
                             </div>
                         {:else}
@@ -682,15 +683,18 @@
                                                 aria-hidden="true"
                                                 fill="currentColor"
                                                 class="w-12 h-12 opacity-75 mb-2 group-hover:opacity-100 transition-opacity animate-bounce"
+                                                data-transaction-name="Upload File Icon"
                                             >
                                                 <path
                                                     fill-rule="evenodd"
                                                     d="M10.5 3.75a6 6 0 0 0-5.98 6.496A5.25 5.25 0 0 0 6.75 20.25H18a4.5 4.5 0 0 0 2.206-8.423 3.75 3.75 0 0 0-4.133-4.303A6.001 6.001 0 0 0 10.5 3.75Zm2.03 5.47a.75.75 0 0 0-1.06 0l-3 3a.75.75 0 1 0 1.06 1.06l1.72-1.72v4.94a.75.75 0 0 0 1.5 0v-4.94l1.72 1.72a.75.75 0 1 0 1.06-1.06l-3-3Z"
                                                     clip-rule="evenodd"
+                                                    data-transaction-name="Upload File Icon"
                                                 />
                                             </svg>
                                             <span
                                                 class="font-medium text-blue-700 group-hover:underline dark:text-blue-600"
+                                                data-transaction-name="Upload File Click"
                                             >
                                                 Upload
                                             </span>
@@ -716,6 +720,7 @@
                                                 )}
                                                 class="ml-2 text-gray-500 hover:text-gray-700 focus:outline-none"
                                                 aria-label="Show file upload information"
+                                                data-transaction-name="Show File Upload Information"
                                             >
                                                 <svg
                                                     xmlns="http://www.w3.org/2000/svg"
@@ -724,12 +729,14 @@
                                                     stroke="currentColor"
                                                     class="w-4 h-4"
                                                     aria-hidden="true"
+                                                    data-transaction-name="Show File Upload Information"
                                                 >
                                                     <path
                                                         stroke-linecap="round"
                                                         stroke-linejoin="round"
                                                         stroke-width="2"
                                                         d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                                                        data-transaction-name="Show File Upload Information"
                                                     />
                                                 </svg>
                                                 <span class="sr-only">Show file upload information</span>
@@ -768,7 +775,7 @@
                             type="button"
                             onclick={toggleMode}
                             data-transaction-name="Toggle Search Mode"
-                            class="p-2 bg-gray-200 rounded-full hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-tommy-red animate-pulse"
+                            class="p-2 bg-[#00174f] rounded-full hover:bg-[#00174f]/90 hover:ring-2 hover:ring-red-500 hover:ring-offset-2 focus:outline-none transition-all duration-300 animate-pulse"
                             title={isSearchMode ? "Switch to Upload Mode" : "Switch to Search Mode"}
                             aria-label={isSearchMode ? "Switch to Upload Mode" : "Switch to Search Mode"}
                         >
@@ -778,7 +785,7 @@
                                 viewBox="0 0 24 24"
                                 stroke-width="1.5"
                                 stroke="currentColor"
-                                class="w-6 h-6"
+                                class="w-6 h-6 text-white"
                                 aria-hidden="true"
                             >
                                 <path
@@ -804,16 +811,18 @@
                                     type="button"
                                     onclick={selectAllCollections}
                                     data-transaction-name="Select All Collections"
-                                    class="px-3 py-1 bg-[#00174f] text-white rounded hover:bg-[#00174f]/80 mr-2"
-                                    >Select All</button
+                                    class="px-3 py-1 bg-[#00174f] text-white rounded hover:bg-[#00174f]/90 hover:ring-2 hover:ring-red-500 hover:ring-offset-2 transition-all duration-300 mr-2"
                                 >
+                                    Select All
+                                </button>
                                 <button
                                     type="button"
                                     onclick={deselectAllCollections}
                                     data-transaction-name="Deselect All Collections"
-                                    class="px-3 py-1 bg-[#00174f] text-white rounded hover:bg-[#00174f]/80"
-                                    >Deselect All</button
+                                    class="px-3 py-1 bg-[#00174f] text-white rounded hover:bg-[#00174f]/90 hover:ring-2 hover:ring-red-500 hover:ring-offset-2 transition-all duration-300"
                                 >
+                                    Deselect All
+                                </button>
                             </div>
                         </div>
                         <div
