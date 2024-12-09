@@ -63,6 +63,8 @@ export default defineConfig(({ mode }): UserConfig => {
             'http://localhost:3000',
             'https://*.pinecone.io',
             'https://*.svc.*.pinecone.io',
+            'https://api.openreplay.com',
+            'https://openreplay.prd.shared-services.eu.pvh.cloud',
             ...ALLOWED_ORIGINS,
           ],
           methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
@@ -72,12 +74,52 @@ export default defineConfig(({ mode }): UserConfig => {
             'user-agent',
             'Access-Control-Allow-Headers',
             'Access-Control-Allow-Origin',
-            'Access-Control-Allow-Methods'
+            'Access-Control-Allow-Methods',
+            'traceparent',
+            'elastic-apm-traceparent',
+            'x-openreplay-session-id',
+            'baggage',
+            'sentry-trace'
           ],
           credentials: true,
+          exposedHeaders: [
+            'traceparent',
+            'elastic-apm-traceparent'
+          ]
         },
         hmr: {
           timeout: 5000
+        },
+        proxy: {
+          '/openreplay': {
+            target: env.PUBLIC_OPENREPLAY_INGEST_POINT || 'https://api.openreplay.com',
+            changeOrigin: true,
+            secure: true,
+            rewrite: (path) => {
+              // Keep the original path structure but remove the /openreplay prefix
+              return path.replace(/^\/openreplay/, '');
+            },
+            configure: (proxy, _options) => {
+              proxy.on('proxyReq', (proxyReq, req, _res) => {
+                // Preserve all original headers
+                if (req.headers.traceparent) {
+                  proxyReq.setHeader('traceparent', req.headers.traceparent);
+                }
+                if (req.headers['elastic-apm-traceparent']) {
+                  proxyReq.setHeader('elastic-apm-traceparent', req.headers['elastic-apm-traceparent']);
+                }
+                
+                // Debug logging in development
+                if (process.env.NODE_ENV === 'development') {
+                  console.debug('OpenReplay Proxy Request:', {
+                    from: req.url,
+                    to: proxyReq.path,
+                    target: env.PUBLIC_OPENREPLAY_INGEST_POINT
+                  });
+                }
+              });
+            }
+          }
         }
       },
       ssr: {

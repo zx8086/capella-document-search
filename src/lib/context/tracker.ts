@@ -29,6 +29,15 @@ function getCurrentApmTransaction() {
     }
 }
 
+const getIngestPoint = () => {
+    if (import.meta.env.DEV) {
+        // In development, use the proxy
+        return `${window.location.origin}/openreplay`;
+    }
+    // In production, use the direct URL
+    return frontendConfig.openreplay.INGEST_POINT;
+};
+
 export async function initTracker() {
     if (trackerInstance && isStarted) {
         console.log("📝 Tracker already initialized and started");
@@ -51,7 +60,7 @@ export async function initTracker() {
         
         const tracker = new Tracker({
             projectKey: frontendConfig.openreplay.PROJECT_KEY,
-            ingestPoint: frontendConfig.openreplay.INGEST_POINT,
+            ingestPoint: getIngestPoint(),
             __DISABLE_SECURE_MODE: import.meta.env.DEV,
             network: {
                 enabled: true,
@@ -72,7 +81,7 @@ export async function initTracker() {
             respectDoNotTrack: false,
             assist: {
                 forceSecure: true,
-                endpointURL: frontendConfig.openreplay.INGEST_POINT.replace('http:', 'https:')
+                endpointURL: getIngestPoint().replace('http:', 'https:')
                     .replace('/ingest', '')
             }
         });
@@ -217,7 +226,7 @@ export function debugTrackerStatus() {
   if (trackerInstance) {
     console.log('Tracker configuration:', {
       projectKey: frontendConfig.openreplay.PROJECT_KEY,
-      ingestPoint: frontendConfig.openreplay.INGEST_POINT,
+      ingestPoint: getIngestPoint(),
     });
   }
   console.groupEnd();
