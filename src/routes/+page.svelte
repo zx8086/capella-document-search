@@ -691,7 +691,7 @@
                                     >
                                         <label
                                             for="fileInput"
-                                            class="cursor-pointer flex flex-col items-center group"
+                                            class="cursor-pointer flex flex-col items-center"
                                         >
                                             <svg
                                                 xmlns="http://www.w3.org/2000/svg"
@@ -709,7 +709,7 @@
                                                 />
                                             </svg>
                                             <span
-                                                class="font-medium text-blue-700 group-hover:underline dark:text-blue-600"
+                                                class="font-medium text-blue-700 dark:text-blue-600 p-2 rounded-full focus-within:outline-none focus-within:ring focus-within:ring-tommy-red/50 hover:ring hover:ring-tommy-red/50 transition-all duration-300"
                                                 data-transaction-name="Upload File Click"
                                             >
                                                 Upload
@@ -734,7 +734,7 @@
                                                         fileUploadTooltipContent,
                                                     ),
                                                 )}
-                                                class="ml-2 text-gray-500 hover:text-gray-700 focus:outline-none"
+                                                class="ml-2 text-gray-500 hover:text-gray-700 p-2 rounded-full focus:outline-none focus:ring focus:ring-tommy-red/50 hover:ring hover:ring-tommy-red/50 transition-all duration-300"
                                                 aria-label="Show file upload information"
                                                 data-transaction-name="Show File Upload Information"
                                             >
@@ -901,7 +901,7 @@
                                                         )}
                                                 />
                                                 <div
-                                                    class="w-11 h-6 bg-gray-200 rounded-full peer peer-focus:ring-4 peer-focus:ring-[#551a8b]/50 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-light-blue"
+                                                    class="w-11 h-6 bg-gray-200 rounded-full peer peer-focus:ring-4 peer-focus:ring-tommy-red/50 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-light-blue hover:ring hover:ring-tommy-red/50 transition-all duration-300"
                                                 ></div>
                                             </div>
                                         </label>

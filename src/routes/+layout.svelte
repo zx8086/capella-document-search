@@ -491,8 +491,9 @@
                     <!-- Health Check Icon and Text -->
                     <div class="flex items-center space-x-4">
                         <!-- API Health Check -->
-                        <a
-                            href="/api/health-check"
+                        <button
+                            type="button"
+                            onclick={() => handleNavigation('/api/health-check')}
                             class="flex items-center hover:opacity-80 transition-opacity"
                             aria-label="API Health Check"
                             data-transaction-name="API Health Check"
@@ -512,7 +513,7 @@
                                 />
                             </svg>
                             <span class="text-sm">Status</span>
-                        </a>
+                        </button>
                     </div>
                 </div>
             </div>
