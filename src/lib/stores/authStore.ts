@@ -30,6 +30,7 @@ export const auth = {
                     isAuthenticated.set(true);
                     userAccount.set(account);
                     debugUserClaims(account);
+                    
                     console.log('🔐 User authenticated:', {
                         id: account.localAccountId || account.homeAccountId,
                         name: account.name,
@@ -46,6 +47,7 @@ export const auth = {
                 instance.setActiveAccount(accounts[0]);
                 isAuthenticated.set(true);
                 userAccount.set(accounts[0]);
+                
                 return true;
             }
 

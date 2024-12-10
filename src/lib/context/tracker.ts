@@ -9,6 +9,8 @@ import { createTrackerLink } from '@openreplay/tracker-graphql';
 import { toast } from 'svelte-sonner';
 import type { IFeatureFlag } from '@openreplay/tracker';
 import apm from '../../apm-config';
+import { get } from 'svelte/store';
+import { userAccount } from '$lib/stores/authStore';
 
 export const key = Symbol("openreplay tracker symbol");
 
@@ -84,6 +86,14 @@ export async function initTracker() {
             trackerInstance = tracker;
             isStarted = true;
             console.log("✅ Tracker started successfully");
+
+            // Set user ID after tracker starts
+            const user = get(userAccount);
+            if (user?.username) {
+                tracker.setUserID(user.username);
+                console.log("👤 User ID set for tracker:", user.username);
+            }
+
             return tracker;
         })();
 
@@ -260,7 +270,7 @@ export async function getFeatureFlag(key: string): Promise<boolean> {
 
         return isEnabled;
     } catch (error) {
-        console.warn('⚠️ Feature flag check error:', {
+        console.warn('⚠�� Feature flag check error:', {
             key,
             error: error instanceof Error ? error.message : String(error),
             timestamp: new Date().toISOString()
