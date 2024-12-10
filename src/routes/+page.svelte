@@ -601,8 +601,8 @@
 <IdleVideoCarousel
     videos={$videos}
     idleTime={120000}
-    on:carouselStart={handleCarouselStart}
-    on:carouselEnd={handleCarouselEnd}
+    onCarouselStart={handleCarouselStart}
+    onCarouselEnd={handleCarouselEnd}
 />
 <div class="min-h-screen flex flex-col bg-white dark:bg-[#2C2C2C] mb-20 mt-5">
     <!-- Logo Section -->

@@ -10,6 +10,22 @@ import { toast } from 'svelte-sonner';
 import type { IFeatureFlag } from '@openreplay/tracker';
 import * as elasticApm from '@elastic/apm-rum';
 
+const IGNORED_URLS = [
+  '/api/health-check'
+];
+
+const apmConfig = {
+  serviceName: frontendConfig.elasticApm.SERVICE_NAME,
+  serverUrl: frontendConfig.elasticApm.SERVER_URL,
+  serviceVersion: frontendConfig.elasticApm.SERVICE_VERSION,
+  active: browser,
+  instrumentationSettings: {
+    ignoreUrls: IGNORED_URLS
+  }
+};
+
+elasticApm.init(apmConfig);
+
 export const key = Symbol("openreplay tracker symbol");
 
 let trackerInstance: Tracker | null = null;

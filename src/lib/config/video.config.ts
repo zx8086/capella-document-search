@@ -1,10 +1,13 @@
-// Create a new config file for video settings
+import { get } from 'svelte/store';
+import { videos as videoStore } from '../../stores/videoStore';
+
 export const videoConfig = {
-    baseUrl: import.meta.env.PUBLIC_VIDEO_BASE_URL || '/idle-videos/',
-    defaultVideos: [
+    // Use the full list from store for production
+    defaultVideos: get(videoStore),
+    // Keep only the videos we have locally for development
+    devVideos: [
+        'X1_DUO_GR_LH-GENERIC_1280x730.mp4',
         'ECOM_TOMMY_STRAY_KIDS_6sec_002_3412x1892_MP4_Audio_NoLogo.mp4',
-        'FA24_TH_T1_OCTOBER_DUO_6_A_ECOM_ NO LOGO_SOUND_3412_1892.mp4',
-        'X1_DUO_GR_LH-GENERIC_1280x730.mp4'
-    ],
-    fallbackBaseUrl: '/idle-videos/'
+        'FA24_TH_T1_OCTOBER_DUO_6_A_ECOM_ NO LOGO_SOUND_3412_1892.mp4'
+    ]
 }; 

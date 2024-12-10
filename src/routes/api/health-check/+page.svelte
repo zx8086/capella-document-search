@@ -3,27 +3,13 @@
 <script lang="ts">
     import { onMount } from "svelte";
     import type { PageData } from './$types';
-    import { goto } from '$app/navigation';
+    import { goto, pushState, replaceState } from '$app/navigation';
     import { navigating } from '$app/stores';
-    import { getFeatureFlag, initFeatureFlags } from '$lib/context/tracker';
+    import { getFeatureFlag } from '$lib/context/tracker';
 
     const { data } = $props<{ data: PageData }>();
-
-    type HealthStatus = {
-        status: string;
-        version: {
-            build: string;
-            commit: string;
-            buildDate: string;
-        };
-        checks: Record<
-            string,
-            { status: string; message?: string; responseTime?: number }
-        >;
-        checkType: "Simple" | "Detailed";
-    };
-
-    let healthStatus: HealthStatus | null = $state(data.healthStatus);
+    
+    let healthStatus = $state(data.healthStatus);
     let loading = $state(false);
     let error = $state("");
     let checkType: "Simple" | "Detailed" = $state(data.checkType);
@@ -32,36 +18,39 @@
     let showBuildInfo = $state(false);
 
     $effect(() => {
-        isNavigating = $navigating !== null;
+        isNavigating = Boolean($navigating);
         if (isNavigating) {
             loading = true;
         }
     });
 
-    async function fetchHealthCheck() {
+    async function toggleCheckType() {
         try {
             loading = true;
             error = "";
-            loadingType = checkType; 
+            const newType = checkType === "Simple" ? "Detailed" : "Simple";
+            loadingType = newType;
             
-            await goto(`/api/health-check?type=${checkType}`, {
-                invalidateAll: true,
-                replaceState: true,
-                noScroll: true
+            // Use replaceState instead of goto for a more efficient shallow route update
+            replaceState('', {
+                type: newType,
+                timestamp: Date.now()
             });
+            
+            // Invalidate the data to trigger a reload
+            await goto(`?type=${newType}`, {
+                replaceState: true,
+                noScroll: true,
+                invalidateAll: true
+            });
+            
+            checkType = newType;
         } catch (e) {
             error = e instanceof Error ? e.message : String(e);
+        } finally {
             loading = false;
         }
     }
-
-    function toggleCheckType() {
-        const newType = checkType === "Simple" ? "Detailed" : "Simple";
-        loadingType = newType; 
-        checkType = newType;
-        fetchHealthCheck();
-    }
-
 
     $effect(() => {
         if (data.healthStatus) {

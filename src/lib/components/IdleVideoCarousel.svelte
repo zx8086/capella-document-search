@@ -1,7 +1,7 @@
 <!-- src/lib/components/IdleVideoCarousel.svelte -->
 
 <script lang="ts">
-    import { onMount, onDestroy, createEventDispatcher } from "svelte";
+    import { onMount, onDestroy } from "svelte";
     import { browser } from "$app/environment";
     import { dev } from "$app/environment";
     import { videoConfig } from "$lib/config/video.config";
@@ -10,14 +10,19 @@
     interface Props {
         videos?: string[];
         idleTime?: number;
+        onCarouselStart?: () => void;
+        onCarouselEnd?: () => void;
     }
 
-    let { videos = [], idleTime = 120000 }: Props = $props();
+    let { 
+        videos = [], 
+        idleTime = 120000,
+        onCarouselStart = () => {},
+        onCarouselEnd = () => {}
+    }: Props = $props();
 
     // Use development videos if in dev mode
-    const effectiveVideos = dev ? videoConfig.defaultVideos : videos;
-
-    const dispatch = createEventDispatcher();
+    const effectiveVideos = dev ? videoConfig.devVideos : videos;
 
     let showVideoCarousel = $state(false);
     let idleTimer: ReturnType<typeof setTimeout> | null = null;
@@ -28,7 +33,7 @@
         idleTimer = setTimeout(() => {
             console.debug("Idle time reached, showing video carousel");
             showVideoCarousel = true;
-            dispatch("carouselStart");
+            onCarouselStart();
         }, idleTime);
     }
 
@@ -36,7 +41,7 @@
         if (showVideoCarousel) {
             console.debug("Hiding video carousel due to user activity");
             showVideoCarousel = false;
-            dispatch("carouselEnd");
+            onCarouselEnd();
         }
         resetIdleTimer();
     }
@@ -45,11 +50,10 @@
         console.debug("Exiting full screen");
         showVideoCarousel = false;
         resetIdleTimer();
-        dispatch("carouselEnd");
+        onCarouselEnd();
     }
 
     onMount(() => {
-        console.debug("IdleVideoCarousel mounted");
         if (browser) {
             window.addEventListener("mousemove", handleUserActivity);
             window.addEventListener("keydown", handleUserActivity);
@@ -60,7 +64,6 @@
     });
 
     onDestroy(() => {
-        console.debug("IdleVideoCarousel destroyed");
         if (idleTimer) clearTimeout(idleTimer);
         if (browser) {
             window.removeEventListener("mousemove", handleUserActivity);
@@ -74,5 +77,5 @@
 <VideoPlayerCarousel
     videos={effectiveVideos}
     isVisible={showVideoCarousel}
-    on:exit={handleExitFullScreen}
+    onExit={handleExitFullScreen}
 />

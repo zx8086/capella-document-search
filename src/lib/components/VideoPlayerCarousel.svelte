@@ -1,164 +1,94 @@
 <!-- src/lib/components/VideoPlayerCarousel.svelte -->
 
 <script lang="ts">
-    import { run } from "svelte/legacy";
-
-    import { onMount, onDestroy, createEventDispatcher } from "svelte";
+    import { onMount, onDestroy } from "svelte";
     import { browser, dev } from "$app/environment";
     import { fade } from "svelte/transition";
-    import { videoConfig } from "$lib/config/video.config";
 
     interface Props {
         videos?: string[];
         isVisible?: boolean;
+        onExit?: () => void;
     }
 
-    let { videos = [], isVisible = false }: Props = $props();
-
-    const dispatch = createEventDispatcher();
+    let { 
+        videos = [], 
+        isVisible = false,
+        onExit = () => {}
+    }: Props = $props();
 
     let videoElement: HTMLVideoElement = $state();
     let currentVideoIndex = $state(0);
     let isExiting = $state(false);
-    let isInitialized = $state(false);
     let isPlaying = $state(false);
+    let currentVideoUrl = $state('');
 
     const videoBasePath = dev ? '/idle-videos/' : 'https://d2bgp0ri487o97.cloudfront.net/';
-    const effectiveVideoBasePath =
-        videoBasePath.trim() === "" ? "/idle-videos/" : videoBasePath;
-
-    let failedVideos = $state(new Set<string>());
-
-    let fallbackVideo = '/idle-videos/X1_DUO_GR_LH-GENERIC_1280x730.mp4';
-
-    function getVideoPath(filename: string): string {
-        return `${effectiveVideoBasePath}${filename}`;
-    }
-
-    function initializeVideo(element: HTMLVideoElement) {
-        if (!isInitialized) {
-            console.debug("Initializing video");
-            videoElement = element;
-            videoElement.muted = true;
-            videoElement.addEventListener("ended", handleVideoEnded);
-            isInitialized = true;
-        }
-    }
-
-    function handleVideoEnded() {
-        console.debug("Video ended, moving to next");
-        currentVideoIndex = (currentVideoIndex + 1) % videos.length;
-        console.debug("New index:", currentVideoIndex);
-        isPlaying = false;
-        loadAndPlayVideo();
-    }
 
     function loadVideo(filename: string): string {
-        if (dev) {
-            return `/idle-videos/${filename}`;
-        }
-        
-        return `${videoBasePath}${filename}`;
+        if (!filename) return '';
+        const cleanFilename = filename.replace(/^\/+/, '');
+        return `${videoBasePath}${cleanFilename}`;
     }
 
-    let preloadedVideos: { [key: string]: string } = {};
-    let preloadIndex = 0;
-
-    async function preloadNextVideo() {
-        if (videos.length > 0 && preloadIndex < videos.length) {
-            const videoToPreload = videos[preloadIndex];
-            if (!preloadedVideos[videoToPreload]) {
-                try {
-                    const videoUrl = loadVideo(videoToPreload);
-                    preloadedVideos[videoToPreload] = videoUrl;
-                    console.debug(`Preloaded video: ${videoToPreload}`);
-                } catch (error) {
-                    console.error(
-                        `Error preloading video ${videoToPreload}:`,
-                        error,
-                    );
-                }
-            }
-            preloadIndex = (preloadIndex + 1) % videos.length;
-        }
+    async function handleVideoEnded() {
+        console.debug("Video ended, moving to next");
+        currentVideoIndex = (currentVideoIndex + 1) % videos.length;
+        isPlaying = false;
+        await loadAndPlayVideo();
     }
 
-    // Modify loadAndPlayVideo to use preloaded videos
     async function loadAndPlayVideo() {
-        if (videoElement && videos[currentVideoIndex] && !isPlaying) {
-            try {
-                let videoUrl =
-                    preloadedVideos[videos[currentVideoIndex]] ||
-                    loadVideo(videos[currentVideoIndex]);
-                videoElement.src = videoUrl;
-                await playVideo();
-                // Preload the next video after starting playback
-                preloadNextVideo();
-            } catch (error) {
-                console.error("Error loading video:", error);
-            }
-        }
-    }
-
-    function playVideo() {
-        if (videoElement && !isPlaying) {
-            console.debug("Attempting to play video");
+        if (!videoElement || !videos[currentVideoIndex]) return;
+        
+        try {
+            console.debug(`Attempting to play video ${currentVideoIndex + 1}`);
+            currentVideoUrl = loadVideo(videos[currentVideoIndex]);
+            isPlaying = false;
+            
+            // Reset the video element
+            videoElement.load();
+            
+            // Wait for metadata to load
+            await new Promise((resolve) => {
+                videoElement.onloadedmetadata = resolve;
+            });
+            
+            // Play the video
+            await videoElement.play();
+            console.debug("Video started playing");
             isPlaying = true;
-            videoElement
-                .play()
-                .then(() => {
-                    console.debug("Video started playing");
-                    isPlaying = true;
-                })
-                .catch((error) => {
-                    if (error.name !== "AbortError") {
-                        console.error("Error playing video:", error);
-                    }
-                    isPlaying = false;
-                    setTimeout(playVideo, 1000);
-                });
+            
+            // Preload next video
+            const nextIndex = (currentVideoIndex + 1) % videos.length;
+            console.debug(`Preloaded video: ${videos[nextIndex]}`);
+        } catch (error) {
+            console.error("Error playing video:", error);
+            isPlaying = false;
+            // Try next video if current one fails
+            currentVideoIndex = (currentVideoIndex + 1) % videos.length;
+            await loadAndPlayVideo();
         }
     }
 
     function handleUserActivity(event: MouseEvent | KeyboardEvent) {
-        event.stopPropagation();
-        startFadeOut();
-    }
-
-    function handleVideoError(error: Event): void {
-        console.error("Video playback error:", error);
-        
-        const currentVideo = videos[currentVideoIndex];
-        failedVideos.add(currentVideo);
-        
-        currentVideoIndex = (currentVideoIndex + 1) % videos.length;
-        
-        if (failedVideos.size === videos.length) {
-            console.debug("All videos failed to load, using fallback video");
-            videoElement.src = fallbackVideo;
-            videoElement.play().catch(err => {
-                console.error("Error playing fallback video:", err);
-                dispatch("exit");
-            });
-            return;
+        if (!isExiting) {
+            event.stopPropagation();
+            isExiting = true;
+            onExit();
         }
-        
-        loadAndPlayVideo();
     }
 
-    function startFadeOut() {
-        isExiting = true;
-        setTimeout(() => {
-            dispatch("exit");
-        }, 2000);
-    }
+    $effect(() => {
+        if (isVisible && videos.length > 0 && !isPlaying) {
+            loadAndPlayVideo();
+        }
+    });
 
     onMount(() => {
-        console.log("Component mounted, isVisible:", isVisible);
         if (browser && isVisible) {
             window.addEventListener("mousemove", handleUserActivity);
             window.addEventListener("keydown", handleUserActivity);
-            preloadNextVideo();
         }
     });
 
@@ -166,20 +96,6 @@
         if (browser) {
             window.removeEventListener("mousemove", handleUserActivity);
             window.removeEventListener("keydown", handleUserActivity);
-        }
-        if (videoElement) {
-            videoElement.removeEventListener("ended", handleVideoEnded);
-        }
-    });
-
-    run(() => {
-        if (
-            isVisible &&
-            videos[currentVideoIndex] &&
-            isInitialized &&
-            !isPlaying
-        ) {
-            loadAndPlayVideo();
         }
     });
 </script>
@@ -200,13 +116,9 @@
                 preload="auto"
                 playsinline
                 muted
-                use:initializeVideo
-                onerror={handleVideoError}
+                on:ended={handleVideoEnded}
             >
-                <source
-                    src={loadVideo(videos[currentVideoIndex])}
-                    type="video/mp4"
-                />
+                <source src={currentVideoUrl} type="video/mp4" />
                 Your browser does not support the video tag.
             </video>
         </div>

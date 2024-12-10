@@ -8,7 +8,6 @@ import {
 } from "$lib/db/dbOperations";
 import { getAllScopes } from "$lib/api";
 import type { CheckResult } from "../../../models";
-import fetch from "cross-fetch";
 import { frontendConfig } from "../../../frontend-config";
 import { backendConfig } from "$backendConfig";
 import {
@@ -17,6 +16,7 @@ import {
   createHttpLink,
   gql,
 } from "@apollo/client/core";
+import type { RequestEvent } from '@sveltejs/kit';
 
 const INDIVIDUAL_CHECK_TIMEOUT = 15000; // 15 seconds timeout for most checks
 const CAPELLA_API_TIMEOUT = 30000; // 30 seconds timeout for Capella API
@@ -228,7 +228,7 @@ async function checkInternalAPI(fetch: Function): Promise<CheckResult> {
   }
 }
 
-export async function GET({ url, fetch }: { url: URL; fetch: Function }) {
+export async function GET({ fetch, url }: RequestEvent) {
   log("GET request received for health check");
   const checkType = url.searchParams.get("type") || "Simple";
   const isSimpleCheck = checkType === "Simple";
