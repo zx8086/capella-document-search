@@ -21,7 +21,7 @@
     import { collections } from "../stores/collectionsStore";
     import type { Collection } from "../models";
 
-    import { goto } from '$app/navigation';
+    import { goto, pushState, replaceState } from '$app/navigation';
 
     import { userAccount } from '$lib/stores/authStore';
 
@@ -147,8 +147,8 @@
 
     let searchResults: SearchResult[] = $state([]);
 
-    let modalIsOpen: boolean = $state(false);
-    let currentTooltip: string = $state("");
+    let currentTooltip = $state('');
+    let modalIsOpen = $derived(Boolean($page.state.modalIsOpen));
 
     let buttonState = $state("ready");
     let isSearchMode = $state(true);
@@ -407,8 +407,13 @@
 
     function openTooltipModal(tooltipContent: string): void {
         currentTooltip = tooltipContent;
-        modalIsOpen = true;
+        pushState('', { modalIsOpen: true });
         trackClick("TooltipModal", "Open");
+    }
+
+    function closeModal(): void {
+        replaceState('', { modalIsOpen: false });
+        trackClick("TooltipModal", "Close");
     }
 
     let buttonClass = $derived(
@@ -597,6 +602,12 @@
     function toggle() {
         isOpen = !isOpen;
     }
+
+    $effect(() => {
+        if (!$page.state.modalIsOpen) {
+            currentTooltip = '';
+        }
+    });
 </script>
 
 <svelte:head>
@@ -1116,26 +1127,18 @@ IMAGE_70_C51_LV04F1003GPDE</pre>
         role="dialog"
         aria-modal="true"
     >
-        <div
-            class="max-w-lg flex flex-col gap-4 overflow-hidden rounded-xl border border-slate-300 bg-white text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300"
-        >
-            <div
-                class="flex items-center justify-between border-b border-slate-300 bg-[#00174f] p-4 dark:border-slate-700 dark:bg-slate-900/20"
-            >
-                <h3
-                    class="font-semibold tracking-wide text-white dark:text-white"
-                >
+        <div class="max-w-lg flex flex-col gap-4 overflow-hidden rounded-xl border border-slate-300 bg-white text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">
+            <div class="flex items-center justify-between border-b border-slate-300 bg-[#00174f] p-4 dark:border-slate-700 dark:bg-slate-900/20">
+                <h3 class="font-semibold tracking-wide text-white dark:text-white">
                     Tool Tip
                 </h3>
             </div>
             <div class="px-4 py-8">
                 <p>{currentTooltip}</p>
             </div>
-            <div
-                class="flex justify-end border-t border-slate-300 bg-slate-100/60 p-4 dark:border-slate-700 dark:bg-slate-900/20"
-            >
+            <div class="flex justify-end border-t border-slate-300 bg-slate-100/60 p-4 dark:border-slate-700 dark:bg-slate-900/20">
                 <button
-                    onclick={() => (modalIsOpen = false)}
+                    onclick={closeModal}
                     type="button"
                     data-transaction-name="Tooltip Modal"
                     class="cursor-pointer whitespace-nowrap rounded-xl bg-blue-700 px-4 py-2 text-center text-sm font-medium tracking-wide text-slate-100 transition hover:text-red-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-700 active:opacity-100 active:outline-offset-0 dark:bg-blue-600 dark:text-slate-100 dark:focus-visible:outline-blue-600"
