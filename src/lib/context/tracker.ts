@@ -35,6 +35,16 @@ let graphqlTracker: any = null;
 let cachedFlags: Record<string, boolean> = {};
 let flagsInitialized = false;
 let flagsInitializationPromise: Promise<void> | null = null;
+let initializationPromise: Promise<Tracker | null> | null = null;
+
+const MAX_RETRY_ATTEMPTS = 3;
+const RETRY_DELAY = 2000;
+
+// Add storage key for tracker state
+const TRACKER_STATE_KEY = 'openreplay_tracker_initialized';
+
+// Add session storage key for tracker state
+const TRACKER_SESSION_KEY = 'openreplay_session_active';
 
 function getCurrentApmTransaction() {
     try {
@@ -51,174 +61,55 @@ const getIngestPoint = () => {
 };
 
 export async function initTracker() {
+    // If already initialized and started, return existing instance
     if (trackerInstance && isStarted) {
         console.log("📝 Tracker already initialized and started");
         return trackerInstance;
     }
 
-    if (isInitializing) {
-        console.log("⏳ Tracker initialization already in progress");
-        return null;
-    }
-
-    if (!browser) {
-        console.log("🚫 Cannot initialize tracker on server side");
-        return null;
+    // If initialization is in progress, wait for it
+    if (initializationPromise) {
+        console.log("⏳ Waiting for existing tracker initialization...");
+        return initializationPromise;
     }
 
     try {
         isInitializing = true;
-        console.log("🔍 Initializing OpenReplay tracker...");
-        
-        const tracker = new Tracker({
-            projectKey: frontendConfig.openreplay.PROJECT_KEY,
-            ingestPoint: getIngestPoint(),
-            __DISABLE_SECURE_MODE: import.meta.env.DEV,
-            network: {
-                enabled: true,
-                capturePayload: true,
-                failuresOnly: false,
-                ignoreHeaders: [
-                    'Cookie', 
-                    'Set-Cookie',
-                    'traceparent',  // Ignore APM trace headers
-                    'elastic-apm-traceparent' // Ignore APM trace headers
-                ],
-                sessionTokenHeader: false
-            },
-            console: {
-                enabled: true,
-                recordConsoleLog: true,
-                recordConsoleWarn: true,
-                recordConsoleError: true,
-            },
-            capturePerformance: true,
-            obscureTextNumbers: false,
-            obscureTextEmails: false,
-            respectDoNotTrack: false,
-            assist: {
-                forceSecure: true,
-                endpointURL: getIngestPoint().replace('http:', 'https:')
-                    .replace('/ingest', '')
-            }
-        });
-
-        if (tracker.setGlobalContext) {
-            console.log("🔗 Setting up APM context linking...");
-            const context = {
-                ...tracker.getGlobalContext(),
-                apmTraceId: () => getCurrentApmTransaction()?.traceId || null,
-                apmTransactionId: () => getCurrentApmTransaction()?.id || null,
-                apmSpanId: () => getCurrentApmTransaction()?.ensureParentId() || null
-            };
+        initializationPromise = (async () => {
+            console.log("🔍 Initializing OpenReplay tracker...");
             
-            tracker.setGlobalContext(context);
-            console.log("✅ APM context linked successfully");
-
-            console.group('🔍 Headers Verification');
-            const headers = getAPIHeaders();
-            console.log('Current Headers:', {
-                'x-openreplay-session-id': headers['x-openreplay-session-id'],
-                'traceparent': headers['traceparent'],
-                'sessionId': tracker.getSessionID(),
-                'currentTransaction': getCurrentApmTransaction()?.id
+            const tracker = new Tracker({
+                projectKey: frontendConfig.openreplay.PROJECT_KEY,
+                ingestPoint: getIngestPoint(),
+                __DISABLE_SECURE_MODE: import.meta.env.DEV,
+                network: {
+                    enabled: true,
+                    capturePayload: true,
+                    failuresOnly: false,
+                    ignoreHeaders: [
+                        'Cookie', 
+                        'Set-Cookie',
+                        'traceparent',
+                        'elastic-apm-traceparent'
+                    ],
+                    sessionTokenHeader: false
+                }
             });
-            console.groupEnd();
-        }
 
-        if (!isStarted) {
-            console.log("▶️ Starting tracker...");
             await tracker.start();
+            trackerInstance = tracker;
             isStarted = true;
             console.log("✅ Tracker started successfully");
-        }
+            return tracker;
+        })();
 
-        trackerInstance = tracker;
-
-        trackerInstance.use(trackerAssist({
-            callConfirm: "Would you like to start a support call?",
-            controlConfirm: "Would you like to allow support to control your screen?",
-            onCallStart: () => {
-                console.log("🎥 Support call started - checking DOM state");
-                const overlays = document.querySelectorAll('.fixed.inset-0');
-                console.log("Current overlay elements:", overlays);
-                
-                toast.info("Support call started", {
-                    description: "You are now connected to a support session",
-                    duration: Infinity
-                });
-                return () => {
-                    console.log("📞 Support call ended - checking DOM state");
-                    const overlays = document.querySelectorAll('.fixed.inset-0');
-                    console.log("Overlay elements at end:", overlays);
-                    
-                    toast.info("Support call ended", {
-                        description: "Your support session has ended",
-                        duration: Infinity
-                    });
-                };
-            },
-            onRemoteControlStart: () => {
-                console.log("🖱️ Remote control started");
-                toast.info("Remote control active", {
-                    description: "Support agent now has control of your screen",
-                    duration: Infinity
-                });
-                return () => {
-                    console.log("🔒 Remote control ended");
-                    toast.info("Remote control ended", {
-                        description: "Support agent no longer has control of your screen",
-                        duration: Infinity
-                    });
-                };
-            },
-            onAgentConnect: (agentInfo: any = {}) => {
-                const { email = '', name = '', query = '' } = agentInfo;
-                console.log("👋 Agent connected:", { email, name, query });
-                toast.info("Support agent connected", {
-                    description: `${name} (${email}) has joined the session`,
-                    duration: Infinity
-                });
-                return () => {
-                    console.log("�� Agent disconnected");
-                    toast.info("Support agent disconnected", {
-                        description: "The support agent has left the session",
-                        duration: Infinity
-                    });
-                };
-            }
-        }));
-
-        trackerInstance.use(trackerProfiler({
-            sampleRate: 50,
-            capturePerformance: true,
-            captureMemory: true,
-            captureNetwork: true,
-            networkHeuristics: true,
-            logPerformance: true,
-            logMemory: true,
-            logNetwork: true
-        }));
-
-        graphqlTracker = trackerInstance.use(createTrackerLink((variables) => {
-            const sanitized = { ...variables };
-            if (sanitized.password) sanitized.password = '***';
-            if (sanitized.token) sanitized.token = '***';
-            if (sanitized.apiKey) sanitized.apiKey = '***';
-            return sanitized;
-        }));
-
-        await initFeatureFlags();
-
-        return trackerInstance;
+        return await initializationPromise;
     } catch (error) {
-        console.error("��� Failed to initialize tracker:", error);
-        trackerInstance = null;
-        isStarted = false;
-        return null;
+        console.error('❌ Tracker initialization failed:', error);
+        throw error;
     } finally {
         isInitializing = false;
-        console.groupEnd();
+        initializationPromise = null;
     }
 }
 
@@ -307,7 +198,7 @@ export async function waitForTracker(timeout = 5000): Promise<boolean> {
         await new Promise(resolve => setTimeout(resolve, 100));
     }
     
-    console.warn('⏱��� Tracker initialization timeout');
+    console.warn('⏱ Tracker initialization timeout');
     return false;
 }
 
@@ -444,4 +335,20 @@ export function debugElasticIntegration() {
     } finally {
         console.groupEnd();
     }
+}
+
+// Add cleanup function for logout
+export function cleanupTracker() {
+    if (browser) {
+        localStorage.removeItem(TRACKER_STATE_KEY);
+    }
+    trackerInstance = null;
+    isStarted = false;
+    isInitializing = false;
+    initializationPromise = null;
+}
+
+// Add helper to check tracker status
+export function isTrackerReady() {
+    return trackerInstance !== null && isStarted;
 }

@@ -52,52 +52,22 @@
     async function initializeTracker() {
         if (isTrackerInitialized) {
             console.log("🔄 Tracker already initialized");
-            return tracker;
+            return;
         }
-        
-        if (browser) {
-            try {
-                console.log("🚀 Starting tracker initialization...");
-                const trackerInstance = await initTracker();
-                
-                if (trackerInstance) {
-                    tracker = trackerInstance;
-                    isTrackerInitialized = true;
 
-                    const widget = document.createElement('div');
-                    widget.id = 'openreplay-assist-widget';
-                    widget.style.cssText = `
-                        position: fixed;
-                        bottom: 20px;
-                        right: 20px;
-                        z-index: 999999;
-                    `;
-                    document.body.appendChild(widget);
-                    assistWidget = widget;
-
-                    if ($userAccount) {
-                        await identifyUser(
-                            $userAccount.localAccountId || $userAccount.homeAccountId || '',
-                            {
-                                email: $userAccount.username || '',
-                                name: $userAccount.name || ''
-                            }
-                        );
-                    }
-
-                    setTimeout(() => {
-                        debugTrackerStatus();
-                        const sessionId = getSessionId();
-                        if (sessionId) {
-                            console.log("🎯 Active session ID:", sessionId);
-                        }
-                    }, 2000);
-                }
-            } catch (error) {
-                console.error("❌ Tracker initialization failed:", error);
+        try {
+            const tracker = await initTracker();
+            if (tracker) {
+                isTrackerInitialized = true;
+                debugTrackerStatus();
+                debugElasticIntegration();
             }
+        } catch (error) {
+            console.warn(
+                "Failed to start OpenReplay:",
+                error instanceof Error ? error.message : String(error)
+            );
         }
-        return tracker;
     }
 
     function getTracker() {
@@ -274,6 +244,19 @@
                 path: $page.url.pathname,
                 isLoading: $isLoading
             });
+        }
+    });
+
+    onMount(async () => {
+        if (browser) {
+            try {
+                // Only initialize if not already initialized
+                if (!localStorage.getItem('openreplay_tracker_initialized')) {
+                    await initTracker();
+                }
+            } catch (error) {
+                console.error("❌ Tracker initialization failed:", error);
+            }
         }
     });
 </script>

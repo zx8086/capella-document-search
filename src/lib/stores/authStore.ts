@@ -2,10 +2,12 @@ import { browser } from '$app/environment';
 import { writable, get } from 'svelte/store';
 import { getMsalInstance } from '$lib/config/authConfig';
 import { goto } from '$app/navigation';
+import { trackEvent, cleanupTracker } from '$lib/context/tracker';
 
 export const isAuthenticated = writable(false);
 export const isLoading = writable(true);
 export const userAccount = writable(null);
+export const trackerLoading = writable(false);
 
 export const auth = {
     async initialize() {
@@ -13,6 +15,8 @@ export const auth = {
         
         try {
             isLoading.set(true);
+            trackerLoading.set(true);
+            
             const instance = await getMsalInstance();
             if (!instance) return false;
 
@@ -46,6 +50,7 @@ export const auth = {
             return false;
         } finally {
             isLoading.set(false);
+            trackerLoading.set(false);
         }
     },
 
@@ -57,6 +62,10 @@ export const auth = {
         console.log('Auth store: Starting login process...');
         try {
             isLoading.set(true);
+            trackEvent('Auth_Flow', { 
+                step: 'login_start',
+                testMode 
+            });
             
             if (testMode) {
                 console.log('Auth store: Test mode, bypassing MSAL');
@@ -68,17 +77,36 @@ export const auth = {
                     environment: 'test',
                     tenantId: Bun.env.PUBLIC_AZURE_TENANT_ID,
                 });
+                trackEvent('Auth_Flow', { 
+                    step: 'login_success_test',
+                    method: 'test' 
+                });
                 isLoading.set(false);
                 return;
             }
 
             const instance = await getMsalInstance();
-            if (!instance) return;
+            if (!instance) {
+                trackEvent('Auth_Flow', { 
+                    step: 'login_error',
+                    error: 'msal_instance_null' 
+                });
+                return;
+            }
 
+            trackEvent('Auth_Flow', { 
+                step: 'redirect_start',
+                method: 'microsoft' 
+            });
+            
             await instance.loginRedirect({
                 scopes: ['User.Read', 'email', 'openid', 'profile']
             });
         } catch (error) {
+            trackEvent('Auth_Flow', { 
+                step: 'login_error',
+                error: error?.message || 'unknown_error' 
+            });
             console.error('Login failed:', error);
             isAuthenticated.set(false);
             userAccount.set(null);
@@ -93,6 +121,7 @@ export const auth = {
         try {
             isLoading.set(true);
             const instance = await getMsalInstance();
+            cleanupTracker();
             await instance.logoutRedirect();
             isAuthenticated.set(false);
             userAccount.set(null);

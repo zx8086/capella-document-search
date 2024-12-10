@@ -1,10 +1,11 @@
 <script lang="ts">
+  import { page } from '$app/stores';
   import { Button } from "$lib/components/ui/button";
   import { browser } from "$app/environment";
   import { getContext, onMount, createEventDispatcher, onDestroy } from "svelte";
   import { key } from "$lib/context/tracker";
-  import { getFeatureFlag, trackEvent, waitForTracker } from "$lib/context/tracker";
-  import { userAccount } from '$lib/stores/authStore';
+  import { getFeatureFlag, trackEvent, waitForTracker, isTrackerReady } from "$lib/context/tracker";
+  import { userAccount, isAuthenticated } from '$lib/stores/authStore';
   
   const dispatch = createEventDispatcher();
   
@@ -17,6 +18,7 @@
   let isInitialized = $state(false);
   let newMessage = $state('');
   let isLoading = $state(false);
+  let trackerReady = $state(false);
   
   // Get first name from full name
   function getFirstName(fullName: string = ''): string {
@@ -50,36 +52,28 @@
   onMount(async () => {
     try {
       // Wait for tracker to be ready
-      const trackerReady = await waitForTracker();
+      while (!isTrackerReady()) {
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
+      trackerReady = true;
+      
       console.debug('🤖 Chat Assistant Init:', {
         trackerReady,
+        pathname: $page?.url?.pathname,
+        isAuthenticated: $isAuthenticated,
         timestamp: new Date().toISOString()
       });
-
-      // Even if tracker isn't ready, we'll show the chat if authenticated
-      if (!trackerReady) {
-        console.warn('🤖 Chat Assistant: Tracker not ready, but continuing');
-        isFeatureEnabled = true;
-        isInitialized = true;
-        return;
-      }
 
       // Get feature flag value
       const flagValue = await getFeatureFlag('rag-chat-assistant');
       isFeatureEnabled = true; // Default to true even if flag check fails
       isInitialized = true;
-      
-      console.debug('🤖 Chat Assistant Status:', {
-        isVisible: isFeatureEnabled,
-        flagValue,
-        flagKey: 'rag-chat-assistant',
-        component: 'chat-popup',
-        isInitialized,
-        timestamp: new Date().toISOString()
-      });
+
     } catch (error) {
-      console.error('Error initializing chat assistant:', error);
-      isFeatureEnabled = true; // Default to true even on error
+      console.warn('🤖 Chat Assistant: Tracker initialization failed', error);
+      // Continue without tracker if needed
+      trackerReady = true;
+      isFeatureEnabled = true;
       isInitialized = true;
     }
   });
@@ -277,6 +271,17 @@
       
       document.body.removeChild(scrollDiv);
     }
+  });
+
+  // Add effect to monitor visibility conditions
+  $effect(() => {
+    console.debug('🤖 Chat Assistant Visibility:', {
+        isInitialized,
+        isFeatureEnabled,
+        pathname: $page?.url?.pathname,
+        isAuthenticated: $isAuthenticated,
+        timestamp: new Date().toISOString()
+    });
   });
 </script>
 

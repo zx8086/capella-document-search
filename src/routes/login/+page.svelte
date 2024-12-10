@@ -1,8 +1,8 @@
 <script lang="ts">
-    import { auth, isLoading, isAuthenticated } from '$lib/stores/authStore';
+    import { auth, isLoading, isAuthenticated, trackerLoading } from '$lib/stores/authStore';
     import { onMount } from 'svelte';
     import { goto } from '$app/navigation';
-    // import { inspect } from 'svelte/internal';
+    import { initTracker } from '$lib/context/tracker';
 
     let loginAttempts = 0;
 
@@ -25,14 +25,20 @@
 
     onMount(async () => {
         try {
+            // Initialize tracker first
+            $trackerLoading = true;
+            await initTracker();
+            
+            // Then proceed with auth initialization
             await auth.initialize();
             if ($isAuthenticated) {
                 await goto('/', { replaceState: true });
                 return;
             }
-            await auth.handleRedirectPromise();
         } catch (error) {
-            // console.error('Redirect handling error:', inspect(error));
+            console.error('Initialization error:', error);
+        } finally {
+            $trackerLoading = false;
         }
     });
 </script>
@@ -40,7 +46,7 @@
     <title>Capella Document Search</title>
     <meta name="Capella Document Search" content="Capella Document Search" />
 </svelte:head>
-{#if !$isLoading}
+{#if !$isLoading && !$trackerLoading}
     <div class="flex min-h-screen items-center justify-center bg-gray-50">
         <div class="w-full max-w-md space-y-8 rounded-lg bg-white p-6 shadow-lg">
             <div class="text-center">
@@ -108,6 +114,11 @@
     </div>
 {:else}
     <div class="fixed inset-0 bg-white flex items-center justify-center z-50">
-        <div class="animate-spin rounded-full h-12 w-12 border-2 border-[#00174f] border-t-transparent"></div>
+        <div class="flex flex-col items-center">
+            <div class="animate-spin rounded-full h-12 w-12 border-2 border-[#00174f] border-t-transparent"></div>
+            <p class="mt-4 text-gray-600">
+                {$trackerLoading ? 'Initializing tracking...' : 'Loading...'}
+            </p>
+        </div>
     </div>
 {/if} 
