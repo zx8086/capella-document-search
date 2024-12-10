@@ -47,13 +47,11 @@ const getIngestPoint = () => {
 };
 
 export async function initTracker() {
-    // If already initialized and started, return existing instance
     if (trackerInstance && isStarted) {
         console.log("📝 Tracker already initialized and started");
         return trackerInstance;
     }
 
-    // If initialization is in progress, wait for it
     if (initializationPromise) {
         console.log("⏳ Waiting for existing tracker initialization...");
         return initializationPromise;
@@ -270,7 +268,7 @@ export async function getFeatureFlag(key: string): Promise<boolean> {
 
         return isEnabled;
     } catch (error) {
-        console.warn('⚠�� Feature flag check error:', {
+        console.warn('⚠ Feature flag check error:', {
             key,
             error: error instanceof Error ? error.message : String(error),
             timestamp: new Date().toISOString()

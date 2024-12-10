@@ -138,29 +138,31 @@
             }
         });
 
-        try {
-            await initializeTracker();
-            debugTrackerStatus();
-            debugElasticIntegration();
-        } catch (error) {
-            console.warn(
-                "Failed to start OpenReplay:",
-                error instanceof Error ? error.message : String(error),
-            );
+        if (browser) {
+            try {
+                await initializeTracker();
+                debugTrackerStatus();
+                debugElasticIntegration();
+            } catch (error) {
+                console.warn(
+                    "Failed to start OpenReplay:",
+                    error instanceof Error ? error.message : String(error),
+                );
+            }
         }
 
-        collections.fetchCollections(); // Initial fetch
+        collections.fetchCollections();
         
         pollInterval = setInterval(
             () => {
                 collections.fetchCollections();
             },
             60 * 60 * 1000,
-        ); // Poll every 60 minutes
+        );
 
         return () => {
             if (pollInterval) clearInterval(pollInterval);
-            unsubscribeUser(); // Clean up the subscription
+            unsubscribeUser();
         };
     });
 
@@ -244,19 +246,6 @@
                 path: $page.url.pathname,
                 isLoading: $isLoading
             });
-        }
-    });
-
-    onMount(async () => {
-        if (browser) {
-            try {
-                // Only initialize if not already initialized
-                if (!localStorage.getItem('openreplay_tracker_initialized')) {
-                    await initTracker();
-                }
-            } catch (error) {
-                console.error("❌ Tracker initialization failed:", error);
-            }
         }
     });
 
