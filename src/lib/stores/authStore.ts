@@ -3,6 +3,7 @@ import { writable, get } from 'svelte/store';
 import { getMsalInstance } from '$lib/config/authConfig';
 import { goto } from '$app/navigation';
 import { trackEvent, cleanupTracker } from '$lib/context/tracker';
+import { debugUserClaims } from '$lib/utils/claimsUtils';
 
 export const isAuthenticated = writable(false);
 export const isLoading = writable(true);
@@ -28,6 +29,14 @@ export const auth = {
                     instance.setActiveAccount(account);
                     isAuthenticated.set(true);
                     userAccount.set(account);
+                    debugUserClaims(account);
+                    console.log('🔐 User authenticated:', {
+                        id: account.localAccountId || account.homeAccountId,
+                        name: account.name,
+                        username: account.username,
+                        claims: account.idTokenClaims,
+                        timestamp: new Date().toISOString()
+                    });
                     return true;
                 }
             }

@@ -101,6 +101,11 @@
                     email: account.username || '',
                     name: account.name || ''
                 };
+                console.log('👤 Current User Updated:', {
+                    ...currentUser,
+                    timestamp: new Date().toISOString(),
+                    pathname: $page.url.pathname
+                });
             }
         });
 
