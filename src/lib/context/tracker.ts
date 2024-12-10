@@ -8,23 +8,7 @@ import trackerProfiler from '@openreplay/tracker-profiler';
 import { createTrackerLink } from '@openreplay/tracker-graphql';
 import { toast } from 'svelte-sonner';
 import type { IFeatureFlag } from '@openreplay/tracker';
-import * as elasticApm from '@elastic/apm-rum';
-
-const IGNORED_URLS = [
-  '/api/health-check'
-];
-
-const apmConfig = {
-  serviceName: frontendConfig.elasticApm.SERVICE_NAME,
-  serverUrl: frontendConfig.elasticApm.SERVER_URL,
-  serviceVersion: frontendConfig.elasticApm.SERVICE_VERSION,
-  active: browser,
-  instrumentationSettings: {
-    ignoreUrls: IGNORED_URLS
-  }
-};
-
-elasticApm.init(apmConfig);
+import apm from '../../apm-config';
 
 export const key = Symbol("openreplay tracker symbol");
 
@@ -48,7 +32,7 @@ const TRACKER_SESSION_KEY = 'openreplay_session_active';
 
 function getCurrentApmTransaction() {
     try {
-        return elasticApm.apm?.getCurrentTransaction() || null;
+        return apm.apm?.getCurrentTransaction() || null;
     } catch (error) {
         console.warn('Failed to get current APM transaction:', error);
         return null;
@@ -307,8 +291,8 @@ export function debugElasticIntegration() {
     console.group('🔍 Elastic APM Integration Status');
     try {
         // Create a new test transaction
-        const testTransaction = elasticApm.apm?.startTransaction('debug-test', 'test');
-        const currentTransaction = elasticApm.apm?.getCurrentTransaction();
+        const testTransaction = apm?.startTransaction('debug-test', 'test');
+        const currentTransaction = apm?.getCurrentTransaction();
         
         // Create a span for getting the span ID
         const span = testTransaction?.startSpan('debug-operation');
@@ -317,7 +301,7 @@ export function debugElasticIntegration() {
             traceId: testTransaction?.traceId,
             transactionId: testTransaction?.id,
             spanId: span?.id, 
-            hasAPM: !!elasticApm.apm,
+            hasAPM: !!apm,
             hasTransaction: !!testTransaction,
             currentTransaction: currentTransaction?.id,
             testTransactionId: testTransaction?.id,

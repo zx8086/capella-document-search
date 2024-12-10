@@ -259,6 +259,10 @@
             }
         }
     });
+
+    async function handleNavigation(path: string) {
+        await goto(path);
+    }
 </script>
 
 {#if !shouldShowContent}
