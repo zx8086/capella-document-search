@@ -814,19 +814,21 @@
                             <div>
                                 <button
                                     type="button"
-                                    onclick={selectAllCollections}
-                                    data-transaction-name="Select All Collections"
-                                    class="px-3 py-1 bg-[#00174f] text-white rounded hover:bg-[#00174f]/90 hover:ring-2 hover:ring-red-500 hover:ring-offset-2 transition-all duration-300 mr-2"
+                                    onclick={() => {
+                                        if (selectedCollections.length === allCollections.length) {
+                                            deselectAllCollections();
+                                        } else {
+                                            selectAllCollections();
+                                        }
+                                    }}
+                                    data-transaction-name={selectedCollections.length === allCollections.length 
+                                        ? "Deselect All Collections" 
+                                        : "Select All Collections"}
+                                    class="min-w-[120px] px-3 py-1 bg-[#00174f] text-white rounded hover:bg-[#00174f]/80 hover:ring-2 hover:ring-red-500 hover:ring-offset-2 transition-all duration-300"
                                 >
-                                    Select All
-                                </button>
-                                <button
-                                    type="button"
-                                    onclick={deselectAllCollections}
-                                    data-transaction-name="Deselect All Collections"
-                                    class="px-3 py-1 bg-[#00174f] text-white rounded hover:bg-[#00174f]/90 hover:ring-2 hover:ring-red-500 hover:ring-offset-2 transition-all duration-300"
-                                >
-                                    Deselect All
+                                    {selectedCollections.length === allCollections.length 
+                                        ? "Deselect All" 
+                                        : "Select All"}
                                 </button>
                             </div>
                         </div>
