@@ -23,7 +23,7 @@ export const msalConfig = {
     system: {
         allowRedirectInIframe: true,
         tokenRenewalOffsetSeconds: 300,
-        redirectNavigationTimeout: 10000, // 10 seconds timeout for redirects
+        redirectNavigationTimeout: 10000,
         telemetry: {
             disabled: true
         },
@@ -42,22 +42,16 @@ export const loginRequest = {
     scopes: [
         "User.Read",
         "User.ReadBasic.All",
-        "User.Read.All",
         "profile",
         "openid",
-        "email",
-        "User.Read.All",
-        "Files.Read"
+        "email"
     ]
 };
 
 export const photoRequest = {
     scopes: [
-        "User.Read.All",
-        "Files.Read",
         "User.Read",
-        "profile",
-        "openid"
+        "User.ReadBasic.All"
     ]
 };
 
