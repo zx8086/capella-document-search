@@ -15,6 +15,8 @@ export const handle: Handle = async ({ event, resolve }) => {
         connect-src 'self' 
             https://login.microsoftonline.com 
             https://*.microsoftonline.com 
+            https://graph.microsoft.com
+            https://*.graph.microsoft.com
             ws://localhost:* 
             http://localhost:* 
             https://*.openreplay.com 
@@ -43,7 +45,9 @@ export const handle: Handle = async ({ event, resolve }) => {
             https://openreplay.prd.shared-services.eu.pvh.cloud
             wss://*.openreplay.com;
         style-src 'self' 'unsafe-inline' https://vjs.zencdn.net;
-        img-src 'self' data: https: blob:;
+        img-src 'self' data: https: blob:
+            https://graph.microsoft.com
+            https://*.graph.microsoft.com;
         media-src 'self' blob: 
             https://*.openreplay.com 
             https://static.openreplay.com 

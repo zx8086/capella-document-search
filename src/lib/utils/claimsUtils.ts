@@ -46,16 +46,22 @@ export function validateTokenClaims(claims: ParsedClaims): boolean {
 
 export function debugUserClaims(account: AccountInfo) {
     const claims = parseTokenClaims(account);
-    console.group('🔍 User Claims Debug');
-    console.log('User Info:', {
-        username: claims.username,
-        name: claims.name,
-        email: claims.email,
-        roles: claims.roles,
-        expiration: claims.expiration,
-        isExpired: claims.isExpired
+    const rawClaims = account.idTokenClaims;
+    
+    console.log('🔍 User Claims Debug');
+    console.log('User Info:', claims);
+    console.log('Raw Claims:', rawClaims);
+    
+    // Add photo-related claims debugging
+    console.log('Photo-related claims:', {
+        hasPhoto: !!rawClaims?.photo,
+        photoUrl: rawClaims?.photo || 'Not available',
+        objectId: rawClaims?.oid,
+        upn: rawClaims?.upn,
+        timestamp: new Date().toISOString()
     });
-    console.log('Raw Claims:', account.idTokenClaims);
-    console.groupEnd();
-    return claims;
+
+    if (validateTokenClaims(claims)) {
+        console.log('✅ Token claims validation passed');
+    }
 } 

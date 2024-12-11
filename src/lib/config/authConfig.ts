@@ -24,6 +24,9 @@ export const msalConfig = {
         allowRedirectInIframe: true,
         tokenRenewalOffsetSeconds: 300,
         redirectNavigationTimeout: 10000, // 10 seconds timeout for redirects
+        telemetry: {
+            disabled: true
+        },
         loggerOptions: {
             loggerCallback: (level, message, containsPii) => {
                 if (!containsPii) {
@@ -36,7 +39,26 @@ export const msalConfig = {
 };
 
 export const loginRequest = {
-    scopes: ["User.Read", "email", "profile"]
+    scopes: [
+        "User.Read",
+        "User.ReadBasic.All",
+        "User.Read.All",
+        "profile",
+        "openid",
+        "email",
+        "User.Read.All",
+        "Files.Read"
+    ]
+};
+
+export const photoRequest = {
+    scopes: [
+        "User.Read.All",
+        "Files.Read",
+        "User.Read",
+        "profile",
+        "openid"
+    ]
 };
 
 export const getMsalInstance = async () => {

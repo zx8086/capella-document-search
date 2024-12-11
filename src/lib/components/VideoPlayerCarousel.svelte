@@ -116,7 +116,7 @@
                 preload="auto"
                 playsinline
                 muted
-                on:ended={handleVideoEnded}
+                onended={handleVideoEnded}
             >
                 <source src={currentVideoUrl} type="video/mp4" />
                 Your browser does not support the video tag.

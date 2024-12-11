@@ -6,6 +6,8 @@
   import { key } from "$lib/context/tracker";
   import { getFeatureFlag, trackEvent, waitForTracker, isTrackerReady } from "$lib/context/tracker";
   import { userAccount, isAuthenticated } from '$lib/stores/authStore';
+  import { userPhotoUrl, fetchUserPhoto } from '$lib/stores/photoStore';
+  import { getMsalInstance } from '$lib/config/authConfig';
   
   const dispatch = createEventDispatcher();
   
@@ -19,6 +21,7 @@
   let newMessage = $state('');
   let isLoading = $state(false);
   let trackerReady = $state(false);
+  let userPhoto = $state($userPhotoUrl);
   
   // Get first name from full name
   function getFirstName(fullName: string = ''): string {
@@ -66,12 +69,55 @@
 
       // Get feature flag value
       const flagValue = await getFeatureFlag('rag-chat-assistant');
-      isFeatureEnabled = true; // Default to true even if flag check fails
+      isFeatureEnabled = true;
       isInitialized = true;
 
+      // Fetch user photo if authenticated
+      if ($isAuthenticated && $userAccount) {
+        console.log('👤 Attempting to fetch user photo...', {
+          userId: $userAccount.localAccountId,
+          timestamp: new Date().toISOString()
+        });
+        
+        const msalInstance = await getMsalInstance();
+        if (msalInstance) {
+          try {
+            const tokenResponse = await msalInstance.acquireTokenSilent({
+              scopes: [
+                  'User.Read',
+                  'User.ReadBasic.All',
+                  'user.read.all',
+                  'user.read'
+              ]
+            });
+            
+            console.log('🎫 Token acquired for photo fetch:', {
+              success: !!tokenResponse.accessToken,
+              timestamp: new Date().toISOString()
+            });
+            
+            const photoUrl = await fetchUserPhoto(
+              tokenResponse.accessToken, 
+              $userAccount.localAccountId
+            );
+            
+            console.log('📸 User photo fetch result:', {
+              success: !!photoUrl,
+              isDefault: photoUrl === '/default-avatar.png',
+              timestamp: new Date().toISOString()
+            });
+            
+          } catch (error) {
+            console.warn('❌ Failed to fetch user photo:', {
+              error: error instanceof Error ? error.message : 'Unknown error',
+              timestamp: new Date().toISOString()
+            });
+          }
+        }
+      }
+
     } catch (error) {
-      console.warn('🤖 Chat Assistant: Tracker initialization failed', error);
-      // Continue without tracker if needed
+      console.warn('🤖 Chat Assistant: Initialization failed', error);
       trackerReady = true;
       isFeatureEnabled = true;
       isInitialized = true;
@@ -345,36 +391,46 @@
           aria-label="Chat messages"
         >
           {#each messages as message}
-            <div class="flex {message.type === 'user' ? 'justify-end' : 'justify-start'}">
-              <div 
-                class="rounded-lg px-4 py-2 max-w-[80%] {message.type === 'user' ? 'bg-[#00174f] text-white' : 'bg-gray-100 dark:bg-gray-800'}"
-                role="article"
-                aria-label={message.type === 'user' ? 'Your message' : 'Assistant message'}
-              >
+            <div class="flex {message.type === 'user' ? 'justify-end' : 'justify-start'} items-start gap-2">
+              {#if message.type === 'bot'}
+                <div class="w-8 h-8 rounded-full bg-[#00174f] flex-shrink-0 flex items-center justify-center">
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5 text-white">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M8.625 12a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0H8.25m4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0H12m4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0h-.375M21 12c0 4.556-4.03 8.25-9 8.25a9.764 9.764 0 0 1-2.555-.337A5.972 5.972 0 0 1 5.41 20.97a5.969 5.969 0 0 1-.474-.065 4.48 4.48 0 0 0 .978-2.025c.09-.457-.133-.901-.467-1.226C3.93 16.178 3 14.189 3 12c0-4.556 4.03-8.25 9-8.25s9 3.694 9 8.25Z" />
+                  </svg>
+                </div>
+              {/if}
+              <div class="rounded-lg px-4 py-2 max-w-[80%] {message.type === 'user' ? 'bg-[#00174f] text-white' : 'bg-gray-100 dark:bg-gray-800'}">
                 {#if message.isLoading}
-                    <div class="flex items-center justify-center p-2">
-                        <div class="animate-spin rounded-full h-5 w-5 border-2 border-gray-500 border-t-transparent"></div>
-                    </div>
+                  <div class="flex items-center justify-center p-2">
+                    <div class="animate-spin rounded-full h-5 w-5 border-2 border-gray-500 border-t-transparent"></div>
+                  </div>
                 {:else}
-                    <div class="whitespace-pre-wrap">
-                        {#if message.type === 'bot'}
-                            {#if message.text.includes('References:')}
-                                {message.text.split('References:')[0]}
-                                <div class="mt-2 text-sm text-gray-600 dark:text-gray-400 border-t border-gray-200 dark:border-gray-700 pt-2">
-                                    References:
-                                    {#each message.text.split('References:')[1].trim().split('\n').filter(ref => ref.trim()) as ref}
-                                        <div>- {ref.trim()}</div>
-                                    {/each}
-                                </div>
-                            {:else}
-                                {message.text}
-                            {/if}
-                        {:else}
-                            {message.text}
-                        {/if}
-                    </div>
+                  <div class="whitespace-pre-wrap">
+                    {#if message.type === 'bot'}
+                      {#if message.text.includes('References:')}
+                        {message.text.split('References:')[0]}
+                        <div class="mt-2 text-sm text-gray-600 dark:text-gray-400 border-t border-gray-200 dark:border-gray-700 pt-2">
+                          References:
+                          {#each message.text.split('References:')[1].trim().split('\n').filter(ref => ref.trim()) as ref}
+                            <div>- {ref.trim()}</div>
+                          {/each}
+                        </div>
+                      {:else}
+                        {message.text}
+                      {/if}
+                    {:else}
+                      {message.text}
+                    {/if}
+                  </div>
                 {/if}
               </div>
+              {#if message.type === 'user'}
+                <img 
+                  src={userPhoto} 
+                  alt="User" 
+                  class="w-8 h-8 rounded-full object-cover flex-shrink-0"
+                />
+              {/if}
             </div>
           {/each}
         </div>

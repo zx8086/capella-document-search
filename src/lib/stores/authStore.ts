@@ -111,7 +111,15 @@ export const auth = {
             });
             
             await instance.loginRedirect({
-                scopes: ['User.Read', 'email', 'openid', 'profile']
+                scopes: [
+                    'User.Read',
+                    'User.ReadBasic.All',
+                    'email',
+                    'openid',
+                    'profile',
+                    'user.read.all',
+                    'user.read'
+                ]
             });
         } catch (error) {
             trackEvent('Auth_Flow', { 
