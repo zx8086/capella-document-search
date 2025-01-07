@@ -7,7 +7,7 @@ import {
 import { browser } from '$app/environment';
 import { getMsalInstance, photoRequest } from '$lib/config/authConfig';
 
-const DEFAULT_AVATAR = 'static/default-avatar.png';
+const DEFAULT_AVATAR = '/default-avatar.png';
 export const userPhotoUrl = writable<string>(DEFAULT_AVATAR);
 
 export async function fetchUserPhoto(userId: string) {
@@ -40,7 +40,7 @@ export async function fetchUserPhoto(userId: string) {
       
       console.log('Checking photo metadata...');
       const metadata = await graphClient
-        .api('/me/photo')
+        .api('/me/photos/96x96')
         .get();
       
       console.log('Photo metadata:', metadata);
@@ -48,12 +48,12 @@ export async function fetchUserPhoto(userId: string) {
       if (metadata) {
         console.log('Fetching photo binary...');
         const photoResponse = await graphClient
-          .api('/me/photo/$value')
+          .api('/me/photos/96x96/$value')
           .responseType(ResponseType.ARRAYBUFFER)
           .get();
 
         if (photoResponse) {
-          const contentType = response.headers.get('content-type') || 'image/jpeg';
+          const contentType = metadata['@odata.mediaContentType'] || 'image/jpeg';
           const blob = new Blob([photoResponse], { type: contentType });
           const photoUrl = URL.createObjectURL(blob);
           
@@ -133,12 +133,14 @@ export async function fetchUserPhoto(userId: string) {
       clientRequestId: error?.clientRequestId
     });
     console.groupEnd();
+    
     userPhotoUrl.set(DEFAULT_AVATAR);
     return { 
       success: false, 
       isDefault: true,
       error: error?.message || 'Unknown error',
-      details: error.body
+      details: error.body,
+      fallbackUrl: DEFAULT_AVATAR
     };
   }
 } 

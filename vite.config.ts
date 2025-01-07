@@ -76,6 +76,7 @@ export default defineConfig(({ mode }): UserConfig => {
             'Access-Control-Allow-Origin',
             'Access-Control-Allow-Methods',
             'traceparent',
+            'tracestate',
             'elastic-apm-traceparent',
             'x-openreplay-session-id',
             'baggage',
@@ -84,6 +85,7 @@ export default defineConfig(({ mode }): UserConfig => {
           credentials: true,
           exposedHeaders: [
             'traceparent',
+            'tracestate',
             'elastic-apm-traceparent'
           ]
         },
