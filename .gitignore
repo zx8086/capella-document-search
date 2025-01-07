@@ -20,10 +20,8 @@ coverage                          # Test coverage reports
 
 # Environment files
 .env                              # Local environment file
-.env.*                            # All environment files
-!.env.example                     # Except example env
-
-
+.env.development                  # Development environment file
+.env.production                   # Production environment file
 
 # Temporary files
 *.tmp                             # Temporary files
@@ -38,7 +36,6 @@ redirect*.png                    # Redirect screenshots
 test-failure*.png               # Test failure screenshots
 test-results/                    # Test results directory
 node_modules
-
 
 .output
 .vercel
