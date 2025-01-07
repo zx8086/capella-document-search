@@ -49,10 +49,7 @@ export const loginRequest = {
 };
 
 export const photoRequest = {
-    scopes: [
-        "User.Read",
-        "User.ReadBasic.All"
-    ]
+    scopes: ["User.Read"]
 };
 
 export const getMsalInstance = async () => {

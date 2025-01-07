@@ -49,13 +49,12 @@ export async function fetchUserPhoto(userId: string) {
         console.log('Fetching photo binary...');
         const photoResponse = await graphClient
           .api('/me/photo/$value')
-          .header('Content-Type', 'image/jpeg')
           .responseType(ResponseType.ARRAYBUFFER)
-          .middlewareOptions([])
           .get();
 
         if (photoResponse) {
-          const blob = new Blob([photoResponse], { type: 'image/jpeg' });
+          const contentType = response.headers.get('content-type') || 'image/jpeg';
+          const blob = new Blob([photoResponse], { type: contentType });
           const photoUrl = URL.createObjectURL(blob);
           
           const cleanup = () => {
