@@ -20,7 +20,21 @@ export const handle: Handle = async ({ event, resolve }) => {
             ws://localhost:* 
             http://localhost:* 
             https://*.openreplay.com 
+            https://api.openreplay.com
             wss://*.openreplay.com
+            https://openreplay.prd.shared-services.eu.pvh.cloud
+            wss://openreplay.prd.shared-services.eu.pvh.cloud
+            https://*.pinecone.io
+            https://*.svc.pinecone.io
+            https://*.shared-services.eu.pvh.cloud
+            https://*.prd.shared-services.eu.pvh.cloud
+            https://*.cloudfront.net
+            https://*.aws.cloud.es.io
+            https://*.aws.elastic-cloud.com
+            https://*.cloud.couchbase.com
+            https://*.siobytes.com
+            https://eu-b2b.apm.eu-central-1.aws.cloud.es.io
+            https://apm.siobytes.com
             https://api.openai.com
             https://*.pinecone.io
             https://*.svc.pinecone.io
@@ -59,7 +73,10 @@ export const handle: Handle = async ({ event, resolve }) => {
             https://login.microsoftonline.com 
             https://*.microsoftonline.com;
         font-src 'self' data:;
-        worker-src 'self' blob:;
+        worker-src 'self' blob: 
+            https://openreplay.prd.shared-services.eu.pvh.cloud 
+            https://*.openreplay.com
+            https://api.openreplay.com;
         frame-ancestors 'self';
         base-uri 'self';
         object-src 'none'

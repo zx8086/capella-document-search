@@ -80,14 +80,15 @@ export default defineConfig(({ mode }): UserConfig => {
             'elastic-apm-traceparent',
             'x-openreplay-session-id',
             'baggage',
-            'sentry-trace'
+            'sentry-trace',
+            'Content-Encoding'
           ],
-          credentials: true,
           exposedHeaders: [
             'traceparent',
             'tracestate',
             'elastic-apm-traceparent'
-          ]
+          ],
+          credentials: true
         },
         hmr: {
           timeout: 5000
