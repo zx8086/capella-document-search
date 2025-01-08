@@ -86,22 +86,15 @@ export async function initTracker() {
                     failuresOnly: false,
                     ignoreHeaders: [
                         'Cookie', 
-                        'Set-Cookie',
-                        'traceparent',
-                        'elastic-apm-traceparent'
+                        'Set-Cookie'
                     ],
                     sessionTokenHeader: false,
-                    onResourceLoad: (resource: any) => {
-                        if (resource.initiatorType === 'stylesheet' || 
-                            resource.initiatorType === 'script') {
-                            console.debug('🎯 OpenReplay Resource Loaded:', {
-                                url: resource.name,
-                                type: resource.initiatorType,
-                                duration: resource.duration,
-                                timestamp: new Date().toISOString()
-                            });
-                        }
-                    }
+                    captureHeaders: [
+                        'traceparent',
+                        'tracestate',
+                        'elastic-apm-traceparent',
+                        'x-openreplay-session-id'
+                    ]
                 },
                 verbose: true,
                 onStart: () => {

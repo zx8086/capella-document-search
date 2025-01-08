@@ -50,6 +50,8 @@ export const handle: Handle = async ({ event, resolve }) => {
             ws://openreplay.prd.shared-services.eu.pvh.cloud
             https://*.openreplay.prd.shared-services.eu.pvh.cloud
             wss://*.openreplay.prd.shared-services.eu.pvh.cloud
+            https://openreplay.prd.shared-services.eu.pvh.cloud
+            wss://*.openreplay.prd.shared-services.eu.pvh.cloud
             ${import.meta.env.DEV ? 'ws://localhost:*' : ''};
         script-src 'self' 'unsafe-inline' 'unsafe-eval'
             https://vjs.zencdn.net 

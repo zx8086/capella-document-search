@@ -89,7 +89,8 @@ export default defineConfig(({ mode }): UserConfig => {
           exposedHeaders: [
             'traceparent',
             'tracestate',
-            'elastic-apm-traceparent'
+            'elastic-apm-traceparent',
+            'x-openreplay-session-id'
           ],
           credentials: true
         },
@@ -101,27 +102,33 @@ export default defineConfig(({ mode }): UserConfig => {
             target: env.PUBLIC_OPENREPLAY_INGEST_POINT || 'https://api.openreplay.com',
             changeOrigin: true,
             secure: true,
-            rewrite: (path) => {
-              // Keep the original path structure but remove the /openreplay prefix
-              return path.replace(/^\/openreplay/, '');
-            },
+            rewrite: (path) => path.replace(/^\/openreplay/, ''),
             configure: (proxy, _options) => {
               proxy.on('proxyReq', (proxyReq, req, _res) => {
-                // Preserve all original headers
+                // Add CORS headers to the proxy response
+                proxyReq.setHeader('Access-Control-Allow-Origin', '*');
+                proxyReq.setHeader('Access-Control-Allow-Methods', 'GET,HEAD,PUT,PATCH,POST,DELETE');
+                proxyReq.setHeader('Access-Control-Allow-Headers', [
+                  'Content-Type',
+                  'Authorization',
+                  'traceparent',
+                  'tracestate',
+                  'elastic-apm-traceparent',
+                  'x-openreplay-session-id'
+                ].join(','));
+                proxyReq.setHeader('Access-Control-Expose-Headers', [
+                  'traceparent',
+                  'tracestate',
+                  'elastic-apm-traceparent',
+                  'x-openreplay-session-id'
+                ].join(','));
+                
+                // Preserve original headers
                 if (req.headers.traceparent) {
                   proxyReq.setHeader('traceparent', req.headers.traceparent);
                 }
                 if (req.headers['elastic-apm-traceparent']) {
                   proxyReq.setHeader('elastic-apm-traceparent', req.headers['elastic-apm-traceparent']);
-                }
-                
-                // Debug logging in development
-                if (process.env.NODE_ENV === 'development') {
-                  console.debug('OpenReplay Proxy Request:', {
-                    from: req.url,
-                    to: proxyReq.path,
-                    target: env.PUBLIC_OPENREPLAY_INGEST_POINT
-                  });
                 }
               });
             }
