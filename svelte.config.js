@@ -57,7 +57,13 @@ const config = {
           "https://vjs.zencdn.net",
           "blob:"
         ],
-        "style-src": ["'self'", "https://vjs.zencdn.net", "'unsafe-inline'"],
+        "style-src": [
+          "'self'",
+          "'unsafe-inline'",
+          "https://vjs.zencdn.net",
+          "https://openreplay.prd.shared-services.eu.pvh.cloud",
+          "https://api.openreplay.com"
+        ],
         "img-src": [
           "'self'",
           "data:",

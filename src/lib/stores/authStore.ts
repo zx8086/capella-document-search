@@ -2,7 +2,7 @@ import { browser } from '$app/environment';
 import { writable, get } from 'svelte/store';
 import { getMsalInstance } from '$lib/config/authConfig';
 import { goto } from '$app/navigation';
-import { trackEvent, cleanupTracker } from '$lib/context/tracker';
+import { trackEvent, cleanupTracker, setTrackerUser } from '$lib/context/tracker';
 import { debugUserClaims } from '$lib/utils/claimsUtils';
 
 export const isAuthenticated = writable(false);
@@ -29,6 +29,9 @@ export const auth = {
                     instance.setActiveAccount(account);
                     isAuthenticated.set(true);
                     userAccount.set(account);
+                    if (account?.username) {
+                        setTrackerUser(account.username);
+                    }
                     debugUserClaims(account);
                     
                     console.log('🔐 User authenticated:', {
@@ -47,6 +50,9 @@ export const auth = {
                 instance.setActiveAccount(accounts[0]);
                 isAuthenticated.set(true);
                 userAccount.set(accounts[0]);
+                if (accounts[0]?.username) {
+                    setTrackerUser(accounts[0].username);
+                }
                 
                 return true;
             }

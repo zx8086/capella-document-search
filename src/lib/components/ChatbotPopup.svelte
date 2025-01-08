@@ -447,7 +447,7 @@
             <input
               type="text"
               bind:value={newMessage}
-              placeholder={isLoading ? "Please wait..." : "Type your message..."}
+              placeholder={isLoading ? "Please wait..." : "Type your Couchbase Capella related question here..."}
               disabled={isLoading}
               class="flex-1 rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring focus:ring-tommy-red/50 dark:border-gray-700 bg-white text-black dark:bg-white dark:text-black disabled:opacity-50"
               aria-label="Message input"

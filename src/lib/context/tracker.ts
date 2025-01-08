@@ -10,7 +10,12 @@ import { toast } from 'svelte-sonner';
 import type { IFeatureFlag } from '@openreplay/tracker';
 import apm from '../../apm-config';
 import { get } from 'svelte/store';
-import { userAccount } from '$lib/stores/authStore';
+
+// Remove the direct import of userAccount
+// import { userAccount } from '$lib/stores/authStore';
+
+// Instead, create a function to set the user later
+let setUserCallback: ((username: string) => void) | null = null;
 
 export const key = Symbol("openreplay tracker symbol");
 
@@ -46,6 +51,14 @@ const getIngestPoint = () => {
     return frontendConfig.openreplay.INGEST_POINT;
 };
 
+const getResourceBaseHref = () => {
+    // Point directly to the base URL without the _app/immutable path
+    // This lets SvelteKit handle the asset resolution
+    return import.meta.env.DEV 
+        ? 'http://localhost:5173'
+        : 'https://capella-document-search.prd.shared-services.eu.pvh.cloud';
+};
+
 export async function initTracker() {
     if (trackerInstance && isStarted) {
         console.log("📝 Tracker already initialized and started");
@@ -66,6 +79,7 @@ export async function initTracker() {
                 projectKey: frontendConfig.openreplay.PROJECT_KEY,
                 ingestPoint: getIngestPoint(),
                 __DISABLE_SECURE_MODE: import.meta.env.DEV,
+                resourceBaseHref: getResourceBaseHref(),
                 network: {
                     enabled: true,
                     capturePayload: true,
@@ -92,12 +106,13 @@ export async function initTracker() {
             isStarted = true;
             console.log("✅ Tracker started successfully");
 
-            // Set user ID after tracker starts
-            const user = get(userAccount);
-            if (user?.username) {
-                tracker.setUserID(user.username);
-                console.log("👤 User ID set for tracker:", user.username);
-            }
+            // Store the setUser callback for later use
+            setUserCallback = (username: string) => {
+                if (tracker) {
+                    tracker.setUserID(username);
+                    console.log("👤 User ID set for tracker:", username);
+                }
+            };
 
             return tracker;
         })();
@@ -350,4 +365,11 @@ export function cleanupTracker() {
 // Add helper to check tracker status
 export function isTrackerReady() {
     return trackerInstance !== null && isStarted;
+}
+
+// Export a function to set the user that can be called from authStore
+export function setTrackerUser(username: string) {
+    if (setUserCallback) {
+        setUserCallback(username);
+    }
 }
