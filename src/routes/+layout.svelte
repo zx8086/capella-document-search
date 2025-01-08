@@ -14,7 +14,7 @@
     import { Toaster } from "$lib/components/ui/sonner";
     import { onMount, setContext, onDestroy } from "svelte";
     import { browser } from "$app/environment";
-    import { key, initTracker, debugTrackerStatus, identifyUser, getSessionId, debugElasticIntegration } from "$lib/context/tracker";
+    import { key, initTracker, debugTrackerStatus, identifyUser, getSessionId, debugElasticIntegration, debugAssetAccess } from "$lib/context/tracker";
     import { frontendConfig } from "$frontendConfig";
     import { writable } from "svelte/store";
     import { collections } from "../stores/collectionsStore";
@@ -159,6 +159,14 @@
             },
             60 * 60 * 1000,
         );
+
+        if (browser) {
+            const tracker = await initTracker();
+            if (tracker) {
+                debugAssetAccess();
+                debugTrackerStatus();
+            }
+        }
 
         return () => {
             if (pollInterval) clearInterval(pollInterval);

@@ -90,7 +90,18 @@ export async function initTracker() {
                         'traceparent',
                         'elastic-apm-traceparent'
                     ],
-                    sessionTokenHeader: false
+                    sessionTokenHeader: false,
+                    onResourceLoad: (resource: any) => {
+                        if (resource.initiatorType === 'stylesheet' || 
+                            resource.initiatorType === 'script') {
+                            console.debug('🎯 OpenReplay Resource Loaded:', {
+                                url: resource.name,
+                                type: resource.initiatorType,
+                                duration: resource.duration,
+                                timestamp: new Date().toISOString()
+                            });
+                        }
+                    }
                 },
                 verbose: true,
                 onStart: () => {
@@ -372,4 +383,41 @@ export function setTrackerUser(username: string) {
     if (setUserCallback) {
         setUserCallback(username);
     }
+}
+
+// Add this debug function
+export function debugAssetAccess() {
+    const tracker = getTracker();
+    if (!tracker) {
+        console.warn("⚠️ Tracker not initialized");
+        return;
+    }
+
+    console.group('🔍 OpenReplay Asset Access Debug');
+    try {
+        // @ts-ignore - accessing internal property
+        const sessionID = tracker.__sessionID;
+        
+        // Log relevant info
+        console.log('Session ID:', sessionID);
+        console.log('Resource Base URL:', getResourceBaseHref());
+        
+        // Log all stylesheets
+        const styles = document.styleSheets;
+        console.log('Active Stylesheets:', Array.from(styles).map(sheet => ({
+            href: sheet.href,
+            rules: sheet.cssRules?.length,
+            disabled: sheet.disabled
+        })));
+
+        // Log asset loading status
+        console.log('Asset Loading Status:', {
+            cssLoaded: document.styleSheets.length > 0,
+            baseUrl: window.location.origin,
+            pathname: window.location.pathname
+        });
+    } catch (error) {
+        console.error('Debug Error:', error);
+    }
+    console.groupEnd();
 }
