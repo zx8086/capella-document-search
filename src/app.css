@@ -74,6 +74,8 @@
     }
     body {
         @apply bg-background text-foreground;
+        -webkit-user-select: text;
+        user-select: text;
     }
 }
 
@@ -99,24 +101,22 @@
 
 /* For selection */
 ::selection {
-    color: black !important;
-    background: white !important;
+    background: rgba(0, 0, 0, 0.2);
 }
 
 ::-moz-selection {
-    color: black !important;
-    background: white !important;
+    background: rgba(0, 0, 0, 0.2);
 }
 
 /* For input selection and autofill */
 input::selection {
-    color: black !important;
-    background: white !important;
+    color: inherit;
+    background: rgba(255, 255, 255, 0.3);
 }
 
 input::-moz-selection {
-    color: black !important;
-    background: white !important;
+    color: inherit;
+    background: rgba(255, 255, 255, 0.3);
 }
 
 /* For autofill */
