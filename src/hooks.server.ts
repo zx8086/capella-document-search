@@ -5,12 +5,7 @@ import crypto from 'crypto';
 export const handle: Handle = async ({ event, resolve }) => {
     const response = await resolve(event);
     
-    // Add security headers
-    response.headers.set('X-Frame-Options', 'DENY');
-    response.headers.set('X-Content-Type-Options', 'nosniff');
-    response.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
-    response.headers.set('Permissions-Policy', 'camera=(), microphone=(), geolocation=(), private-state-token-redemption=(), private-state-token-issuance=(), browsing-topics=()');
-    response.headers.set('Content-Security-Policy', `
+    const csp = `
         default-src 'self';
         connect-src 'self' 
             https://login.microsoftonline.com 
@@ -50,14 +45,18 @@ export const handle: Handle = async ({ event, resolve }) => {
             https://openreplay.prd.shared-services.eu.pvh.cloud
             ws://*.openreplay.prd.shared-services.eu.pvh.cloud
             wss://*.openreplay.prd.shared-services.eu.pvh.cloud
+            https://openreplay.prd.shared-services.eu.pvh.cloud
+            wss://*.openreplay.prd.shared-services.eu.pvh.cloud
+            ws://openreplay.prd.shared-services.eu.pvh.cloud
+            https://*.openreplay.prd.shared-services.eu.pvh.cloud
+            wss://*.openreplay.prd.shared-services.eu.pvh.cloud
             ${import.meta.env.DEV ? 'ws://localhost:*' : ''};
         script-src 'self' 'unsafe-inline' 'unsafe-eval'
             https://vjs.zencdn.net 
             https://apm.siobytes.com 
             https://api.openreplay.com
             https://static.openreplay.com
-            https://openreplay.prd.shared-services.eu.pvh.cloud
-            wss://*.openreplay.com;
+            https://openreplay.prd.shared-services.eu.pvh.cloud;
         style-src 'self' 'unsafe-inline' https://vjs.zencdn.net;
         img-src 'self' data: https: blob:
             https://graph.microsoft.com
@@ -80,7 +79,13 @@ export const handle: Handle = async ({ event, resolve }) => {
         frame-ancestors 'self';
         base-uri 'self';
         object-src 'none'
-    `.replace(/\s+/g, ' ').trim());
+    `.replace(/\s+/g, ' ').trim();
+
+    response.headers.set('Content-Security-Policy', csp);
+    response.headers.set('X-Frame-Options', 'DENY');
+    response.headers.set('X-Content-Type-Options', 'nosniff');
+    response.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
+    response.headers.set('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
 
     return response;
 }; 

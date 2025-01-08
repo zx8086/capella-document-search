@@ -6,12 +6,16 @@
         <meta charset="utf-8" />
         <meta name="viewport" content="width=device-width" />
         <link rel="icon" href="%sveltekit.assets%/favicon.png" />
+        <style>
+            body { margin: 0; }
+            .loading { display: none; }
+        </style>
         %sveltekit.head%
     </head>
     <body data-sveltekit-preload-data="hover">
         <div style="display: contents">%sveltekit.body%</div>
         <script nonce="%sveltekit.nonce%">
-            // Any inline scripts will go here
+            window.nonce = "%sveltekit.nonce%";
         </script>
     </body>
 </html>

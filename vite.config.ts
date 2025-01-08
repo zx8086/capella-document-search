@@ -52,7 +52,7 @@ export default defineConfig(({ mode }): UserConfig => {
       envPrefix: ["PUBLIC_"],
       server: {
         fs: {
-          allow: ["..", "./static"],
+          allow: ['.', 'static'],
           strict: false,
         },
         port: parseInt(env.PORT || "5173"),
@@ -81,7 +81,10 @@ export default defineConfig(({ mode }): UserConfig => {
             'x-openreplay-session-id',
             'baggage',
             'sentry-trace',
-            'Content-Encoding'
+            'Content-Encoding',
+            'Cross-Origin-Opener-Policy',
+            'Cross-Origin-Embedder-Policy',
+            'Cross-Origin-Resource-Policy'
           ],
           exposedHeaders: [
             'traceparent',
@@ -162,6 +165,9 @@ export default defineConfig(({ mode }): UserConfig => {
       },
       esbuild: {
         target: "esnext",
+      },
+      css: {
+        postcss: true,
       },
     };
 

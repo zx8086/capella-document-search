@@ -77,6 +77,13 @@ export async function initTracker() {
                         'elastic-apm-traceparent'
                     ],
                     sessionTokenHeader: false
+                },
+                verbose: true,
+                onStart: () => {
+                    console.log("✅ OpenReplay tracker started successfully");
+                },
+                onError: (error) => {
+                    console.error("❌ OpenReplay tracker error:", error);
                 }
             });
 
