@@ -1,0 +1,84 @@
+import type { Handle } from '@sveltejs/kit';
+import { redirect } from '@sveltejs/kit';
+import crypto from 'crypto';
+
+export const handle: Handle = async ({ event, resolve }) => {
+    const response = await resolve(event);
+    
+    const openReplayEndpoints = import.meta.env.DEV 
+        ? [
+            'https://api.openreplay.com',
+            'wss://api.openreplay.com',
+            'https://*.openreplay.com',
+            'wss://*.openreplay.com'
+          ]
+        : [
+            'https://openreplay.prd.shared-services.eu.pvh.cloud',
+            'https://*.openreplay.prd.shared-services.eu.pvh.cloud',
+            'wss://*.openreplay.prd.shared-services.eu.pvh.cloud'
+          ];
+
+    // Add OpenReplay endpoints to your existing connect-src
+    const connectSrcAdditions = openReplayEndpoints.join(' ');
+    
+    const csp = `
+        default-src 'self';
+        connect-src 'self' 
+            https://login.microsoftonline.com 
+            https://*.microsoftonline.com 
+            https://graph.microsoft.com
+            https://*.graph.microsoft.com
+            ws://localhost:* 
+            http://localhost:* 
+            ${connectSrcAdditions}
+            https://*.pinecone.io
+            https://*.svc.pinecone.io
+            https://*.shared-services.eu.pvh.cloud
+            https://*.prd.shared-services.eu.pvh.cloud
+            https://*.cloudfront.net
+            https://*.aws.cloud.es.io
+            https://*.aws.elastic-cloud.com
+            https://*.cloud.couchbase.com
+            https://*.siobytes.com
+            https://eu-b2b.apm.eu-central-1.aws.cloud.es.io
+            https://apm.siobytes.com
+            https://api.openai.com
+            ${import.meta.env.DEV ? 'ws://localhost:*' : ''};
+        script-src 'self' 'unsafe-inline' 'unsafe-eval'
+            https://vjs.zencdn.net 
+            https://apm.siobytes.com 
+            https://api.openreplay.com
+            https://static.openreplay.com
+            https://openreplay.prd.shared-services.eu.pvh.cloud;
+        style-src 'self' 'unsafe-inline' https://vjs.zencdn.net;
+        img-src 'self' data: https: blob:
+            https://graph.microsoft.com
+            https://*.graph.microsoft.com;
+        media-src 'self' blob: 
+            https://*.openreplay.com 
+            https://static.openreplay.com 
+            https://d2bgp0ri487o97.cloudfront.net;
+        frame-src 'self' 
+            https://login.microsoftonline.com 
+            https://*.microsoftonline.com;
+        form-action 'self' 
+            https://login.microsoftonline.com 
+            https://*.microsoftonline.com;
+        font-src 'self' data:;
+        worker-src 'self' blob: 
+            https://openreplay.prd.shared-services.eu.pvh.cloud 
+            https://*.openreplay.com
+            https://api.openreplay.com;
+        frame-ancestors 'self';
+        base-uri 'self';
+        object-src 'none'
+    `.replace(/\s+/g, ' ').trim();
+
+    response.headers.set('Content-Security-Policy', csp);
+    response.headers.set('X-Frame-Options', 'DENY');
+    response.headers.set('X-Content-Type-Options', 'nosniff');
+    response.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
+    response.headers.set('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
+
+    return response;
+}; 

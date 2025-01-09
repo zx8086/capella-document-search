@@ -134,24 +134,27 @@ export default defineConfig(({ mode }): UserConfig => {
             }
           },
           '/ingest': {
-            target: 'https://openreplay.prd.shared-services.eu.pvh.cloud',
+            target: import.meta.env.DEV 
+                ? 'https://api.openreplay.com'
+                : 'https://openreplay.prd.shared-services.eu.pvh.cloud',
             changeOrigin: true,
             secure: true,
+            rewrite: (path) => path,
             headers: {
-              'Access-Control-Allow-Headers': [
-                'Content-Type',
-                'Authorization',
-                'traceparent',
-                'tracestate',
-                'elastic-apm-traceparent',
-                'x-openreplay-session-id'
-              ].join(','),
-              'Access-Control-Expose-Headers': [
-                'traceparent',
-                'tracestate',
-                'elastic-apm-traceparent',
-                'x-openreplay-session-id'
-              ].join(',')
+                'Access-Control-Allow-Headers': [
+                    'Content-Type',
+                    'Authorization',
+                    'traceparent',
+                    'tracestate',
+                    'elastic-apm-traceparent',
+                    'x-openreplay-session-id'
+                ].join(','),
+                'Access-Control-Expose-Headers': [
+                    'traceparent',
+                    'tracestate',
+                    'elastic-apm-traceparent',
+                    'x-openreplay-session-id'
+                ].join(',')
             }
           }
         }

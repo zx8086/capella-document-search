@@ -47,14 +47,13 @@ function getCurrentApmTransaction() {
 }
 
 const getIngestPoint = () => {
+    // Use the environment-specific ingest point
     return import.meta.env.DEV 
-        ? frontendConfig.openreplay.INGEST_POINT
-        : '/ingest';
+        ? 'https://api.openreplay.com/ingest'  // Development environment
+        : 'https://openreplay.prd.shared-services.eu.pvh.cloud/ingest'; // Production environment
 };
 
 const getResourceBaseHref = () => {
-    // Point directly to the base URL without the _app/immutable path
-    // This lets SvelteKit handle the asset resolution
     return import.meta.env.DEV 
         ? 'http://localhost:5173'
         : 'https://capella-document-search.prd.shared-services.eu.pvh.cloud';
@@ -79,7 +78,6 @@ export async function initTracker() {
             const tracker = new Tracker({
                 projectKey: frontendConfig.openreplay.PROJECT_KEY,
                 ingestPoint: getIngestPoint(),
-                // Disable secure mode check in development and enable in production
                 __DISABLE_SECURE_MODE: import.meta.env.DEV,
                 resourceBaseHref: getResourceBaseHref(),
                 network: {
