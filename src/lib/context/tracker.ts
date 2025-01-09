@@ -47,8 +47,9 @@ function getCurrentApmTransaction() {
 }
 
 const getIngestPoint = () => {
-    // Always use the direct URL from config
-    return frontendConfig.openreplay.INGEST_POINT;
+    return import.meta.env.DEV 
+        ? frontendConfig.openreplay.INGEST_POINT
+        : '/ingest';
 };
 
 const getResourceBaseHref = () => {
@@ -78,6 +79,7 @@ export async function initTracker() {
             const tracker = new Tracker({
                 projectKey: frontendConfig.openreplay.PROJECT_KEY,
                 ingestPoint: getIngestPoint(),
+                // Disable secure mode check in development and enable in production
                 __DISABLE_SECURE_MODE: import.meta.env.DEV,
                 resourceBaseHref: getResourceBaseHref(),
                 network: {
@@ -97,18 +99,41 @@ export async function initTracker() {
                     ]
                 },
                 verbose: true,
+                // Add required browser checks
                 onStart: () => {
                     console.log("✅ OpenReplay tracker started successfully");
                 },
                 onError: (error) => {
                     console.error("❌ OpenReplay tracker error:", error);
-                }
+                },
+                // Add these options to ensure browser compatibility
+                respectDoNotTrack: false,
+                sanitizer: true,
+                // Ensure assets are properly loaded
+                resourceUploadingEnabled: false,
+                defaultInputMode: 0,
             });
 
-            await tracker.start();
-            trackerInstance = tracker;
-            isStarted = true;
-            console.log("✅ Tracker started successfully");
+            // Check browser compatibility before starting
+            if (!browser) {
+                throw new Error('OpenReplay requires a browser environment');
+            }
+
+            // Check if DoNotTrack is enabled
+            const dnt = navigator.doNotTrack || window.doNotTrack;
+            if (dnt === "1" || dnt === "yes") {
+                console.warn("DoNotTrack is enabled, but continuing anyway as per configuration");
+            }
+
+            try {
+                await tracker.start();
+                trackerInstance = tracker;
+                isStarted = true;
+                console.log("✅ Tracker started successfully");
+            } catch (startError) {
+                console.error("Failed to start tracker:", startError);
+                throw startError;
+            }
 
             // Store the setUser callback for later use
             setUserCallback = (username: string) => {
@@ -124,7 +149,8 @@ export async function initTracker() {
         return await initializationPromise;
     } catch (error) {
         console.error('❌ Tracker initialization failed:', error);
-        throw error;
+        // Don't throw the error, return null instead
+        return null;
     } finally {
         isInitializing = false;
         initializationPromise = null;
