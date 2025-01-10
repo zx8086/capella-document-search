@@ -133,11 +133,11 @@ export async function initTracker() {
                 isStarted = true;
                 console.log("✅ Tracker started successfully");
 
-                // Set user ID immediately after tracker starts
+                // Set user ID immediately after tracker starts if user exists
                 const user = get(userAccount);
                 if (user?.username) {
                     tracker.setUserID(user.username);
-                    console.log("👤 User ID set for tracker:", user.username);
+                    console.log("👤 User ID set for tracker on init:", user.username);
                 }
 
                 return tracker;
@@ -416,7 +416,7 @@ export function isTrackerReady() {
 }
 
 // Export a function to set the user that can be called from authStore
-export function setTrackerUser(username: string, metadata?: Record<string, any>) {
+export function setTrackerUser(username: string) {
     const tracker = getTracker();
     if (!tracker || !username) {
         console.warn("⚠️ Cannot set user: tracker not initialized or username empty");
@@ -424,9 +424,8 @@ export function setTrackerUser(username: string, metadata?: Record<string, any>)
     }
 
     try {
-        // Directly set the user ID on the tracker instance
         tracker.setUserID(username);
-        console.log("👤 User ID set for tracker:", username);
+        console.log("👤 User ID set for tracker on login:", username);
     } catch (error) {
         console.error("❌ Failed to set user ID:", error);
     }

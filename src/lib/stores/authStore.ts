@@ -31,12 +31,7 @@ export const auth = {
                     userAccount.set(account);
                     
                     if (account?.username) {
-                        setTrackerUser(account.username, {
-                            name: account.name,
-                            email: account.username,
-                            accountId: account.localAccountId || account.homeAccountId,
-                            environment: import.meta.env.DEV ? 'development' : 'production'
-                        });
+                        setTrackerUser(account.username);
                     }
                     
                     debugUserClaims(account);
@@ -57,6 +52,7 @@ export const auth = {
                 instance.setActiveAccount(accounts[0]);
                 isAuthenticated.set(true);
                 userAccount.set(accounts[0]);
+                
                 if (accounts[0]?.username) {
                     setTrackerUser(accounts[0].username);
                 }
