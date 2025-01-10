@@ -29,9 +29,16 @@ export const auth = {
                     instance.setActiveAccount(account);
                     isAuthenticated.set(true);
                     userAccount.set(account);
+                    
                     if (account?.username) {
-                        setTrackerUser(account.username);
+                        setTrackerUser(account.username, {
+                            name: account.name,
+                            email: account.username,
+                            accountId: account.localAccountId || account.homeAccountId,
+                            environment: import.meta.env.DEV ? 'development' : 'production'
+                        });
                     }
+                    
                     debugUserClaims(account);
                     
                     console.log('🔐 User authenticated:', {
@@ -86,14 +93,25 @@ export const auth = {
             
             if (testMode) {
                 console.log('Auth store: Test mode, bypassing MSAL');
-                isAuthenticated.set(true);
-                userAccount.set({
+                const testUser = {
                     name: 'Test User',
                     username: 'test@example.com',
                     homeAccountId: 'test-account',
                     environment: 'test',
                     tenantId: Bun.env.PUBLIC_AZURE_TENANT_ID,
+                };
+                
+                isAuthenticated.set(true);
+                userAccount.set(testUser);
+                
+                setTrackerUser(testUser.username, {
+                    name: testUser.name,
+                    accountId: testUser.homeAccountId,
+                    environment: testUser.environment,
+                    tenantId: testUser.tenantId,
+                    isTestUser: true
                 });
+                
                 trackEvent('Auth_Flow', { 
                     step: 'login_success_test',
                     method: 'test' 

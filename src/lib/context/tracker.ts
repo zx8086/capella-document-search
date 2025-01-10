@@ -10,6 +10,7 @@ import { toast } from 'svelte-sonner';
 import type { IFeatureFlag } from '@openreplay/tracker';
 import apm from '../../apm-config';
 import { get } from 'svelte/store';
+import { userAccount } from '$lib/stores/authStore';
 
 // Remove the direct import of userAccount
 // import { userAccount } from '$lib/stores/authStore';
@@ -78,7 +79,7 @@ export async function initTracker() {
             const tracker = new Tracker({
                 projectKey: frontendConfig.openreplay.PROJECT_KEY,
                 ingestPoint: getIngestPoint(),
-                __DISABLE_SECURE_MODE: import.meta.env.DEV,
+                __DISABLE_SECURE_MODE: true,
                 resourceBaseHref: getResourceBaseHref(),
                 network: {
                     enabled: true,
@@ -93,16 +94,19 @@ export async function initTracker() {
                         'traceparent',
                         'tracestate',
                         'elastic-apm-traceparent',
-                        'x-openreplay-session-id'
+                        'x-openreplay-session-id',
+                        'baggage',
+                        'sentry-trace'
                     ]
                 },
                 verbose: true,
-                // Add required browser checks
                 onStart: () => {
                     console.log("✅ OpenReplay tracker started successfully");
                 },
                 onError: (error) => {
                     console.error("❌ OpenReplay tracker error:", error);
+                    console.error("Headers:", error.headers);
+                    console.error("Status:", error.status);
                 },
                 // Add these options to ensure browser compatibility
                 respectDoNotTrack: false,
@@ -128,26 +132,24 @@ export async function initTracker() {
                 trackerInstance = tracker;
                 isStarted = true;
                 console.log("✅ Tracker started successfully");
+
+                // Set user ID immediately after tracker starts
+                const user = get(userAccount);
+                if (user?.username) {
+                    tracker.setUserID(user.username);
+                    console.log("👤 User ID set for tracker:", user.username);
+                }
+
+                return tracker;
             } catch (startError) {
                 console.error("Failed to start tracker:", startError);
                 throw startError;
             }
-
-            // Store the setUser callback for later use
-            setUserCallback = (username: string) => {
-                if (tracker) {
-                    tracker.setUserID(username);
-                    console.log("👤 User ID set for tracker:", username);
-                }
-            };
-
-            return tracker;
         })();
 
         return await initializationPromise;
     } catch (error) {
         console.error('❌ Tracker initialization failed:', error);
-        // Don't throw the error, return null instead
         return null;
     } finally {
         isInitializing = false;
@@ -183,24 +185,42 @@ export function debugTrackerStatus() {
 }
 
 export async function identifyUser(userId: string, metadata?: Record<string, any>) {
-  const tracker = getTracker();
-  if (!tracker) {
-    console.warn("⚠️ Cannot identify user: tracker not initialized or not started");
-    return;
-  }
-
-  try {
-    console.log("👤 Identifying user:", { userId, metadata });
-    await tracker.setUserID(metadata?.email || userId);
-    if (metadata) {
-      await tracker.setMetadata('name', metadata.name || '');
-      await tracker.setMetadata('accountId', userId);
-      await tracker.setMetadata('email', metadata.email || '');
+    const tracker = getTracker();
+    if (!tracker) {
+        console.warn("⚠️ Cannot identify user: tracker not initialized or not started");
+        return;
     }
-    console.log("✅ User identification complete");
-  } catch (error) {
-    console.error("❌ Failed to identify user:", error);
-  }
+
+    try {
+        console.log("👤 Identifying user:", { userId, metadata });
+        
+        // Set the user ID first
+        await tracker.setUserID(userId);
+
+        // Then set metadata with error handling
+        if (metadata) {
+            try {
+                await Promise.all([
+                    tracker.setMetadata('name', metadata.name || ''),
+                    tracker.setMetadata('accountId', userId),
+                    tracker.setMetadata('email', metadata.email || ''),
+                    // Add any additional user metadata
+                    tracker.setMetadata('environment', import.meta.env.DEV ? 'development' : 'production'),
+                    tracker.setMetadata('timestamp', new Date().toISOString())
+                ]);
+            } catch (metadataError) {
+                console.error("Failed to set user metadata:", metadataError);
+            }
+        }
+
+        console.log("✅ User identification complete:", {
+            userId,
+            metadata,
+            timestamp: new Date().toISOString()
+        });
+    } catch (error) {
+        console.error("❌ Failed to identify user:", error);
+    }
 }
 
 export function trackEvent(eventName: string, metadata: Record<string, any> = {}) {
@@ -396,9 +416,19 @@ export function isTrackerReady() {
 }
 
 // Export a function to set the user that can be called from authStore
-export function setTrackerUser(username: string) {
-    if (setUserCallback) {
-        setUserCallback(username);
+export function setTrackerUser(username: string, metadata?: Record<string, any>) {
+    const tracker = getTracker();
+    if (!tracker || !username) {
+        console.warn("⚠️ Cannot set user: tracker not initialized or username empty");
+        return;
+    }
+
+    try {
+        // Directly set the user ID on the tracker instance
+        tracker.setUserID(username);
+        console.log("👤 User ID set for tracker:", username);
+    } catch (error) {
+        console.error("❌ Failed to set user ID:", error);
     }
 }
 

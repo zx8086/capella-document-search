@@ -5,20 +5,55 @@ import crypto from 'crypto';
 export const handle: Handle = async ({ event, resolve }) => {
     const response = await resolve(event);
     
-    const openReplayEndpoints = import.meta.env.DEV 
-        ? [
-            'https://api.openreplay.com',
-            'wss://api.openreplay.com',
-            'https://*.openreplay.com',
-            'wss://*.openreplay.com'
-          ]
-        : [
-            'https://openreplay.prd.shared-services.eu.pvh.cloud',
-            'https://*.openreplay.prd.shared-services.eu.pvh.cloud',
-            'wss://*.openreplay.prd.shared-services.eu.pvh.cloud'
-          ];
+    // Add CORS headers for all responses
+    response.headers.set('Access-Control-Allow-Origin', '*');
+    response.headers.set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+    response.headers.set('Access-Control-Allow-Headers', [
+        'Content-Type',
+        'Authorization',
+        'traceparent',
+        'tracestate',
+        'elastic-apm-traceparent',
+        'x-openreplay-session-id',
+        'baggage',
+        'sentry-trace'
+    ].join(', '));
 
-    // Add OpenReplay endpoints to your existing connect-src
+    response.headers.set('Access-Control-Expose-Headers', [
+        'traceparent',
+        'tracestate',
+        'elastic-apm-traceparent',
+        'x-openreplay-session-id',
+        'baggage',
+        'sentry-trace'
+    ].join(', '));
+
+    // Handle preflight requests
+    if (event.request.method === 'OPTIONS') {
+        return new Response(null, {
+            status: 204,
+            headers: response.headers
+        });
+    }
+
+    // Include both development and production endpoints regardless of environment
+    const openReplayEndpoints = [
+        // Development endpoints
+        'https://api.openreplay.com',
+        'wss://api.openreplay.com',
+        'https://*.openreplay.com',
+        'wss://*.openreplay.com',
+        // Production endpoints
+        'https://openreplay.prd.shared-services.eu.pvh.cloud',
+        'https://*.openreplay.prd.shared-services.eu.pvh.cloud',
+        'wss://*.openreplay.prd.shared-services.eu.pvh.cloud',
+        // Local development
+        'http://localhost:*',
+        'ws://localhost:*',
+        'https://localhost:*',
+        'wss://localhost:*'
+    ];
+
     const connectSrcAdditions = openReplayEndpoints.join(' ');
     
     const csp = `
@@ -28,8 +63,6 @@ export const handle: Handle = async ({ event, resolve }) => {
             https://*.microsoftonline.com 
             https://graph.microsoft.com
             https://*.graph.microsoft.com
-            ws://localhost:* 
-            http://localhost:* 
             ${connectSrcAdditions}
             https://*.pinecone.io
             https://*.svc.pinecone.io
@@ -42,8 +75,7 @@ export const handle: Handle = async ({ event, resolve }) => {
             https://*.siobytes.com
             https://eu-b2b.apm.eu-central-1.aws.cloud.es.io
             https://apm.siobytes.com
-            https://api.openai.com
-            ${import.meta.env.DEV ? 'ws://localhost:*' : ''};
+            https://api.openai.com;
         script-src 'self' 'unsafe-inline' 'unsafe-eval'
             https://vjs.zencdn.net 
             https://apm.siobytes.com 
