@@ -6,7 +6,7 @@
 # Description: Integer Overflow or Wraparound
 # Info: https://security.snyk.io/vuln/SNYK-DEBIAN11-ZLIB-6008961
 # This vulnerability is present in the base image and cannot be immediately resolved.
-FROM oven/bun:slim AS builder
+FROM oven/bun:canary-alpine AS builder
 
 # Add build args with defaults
 ARG BUILD_VERSION=development
