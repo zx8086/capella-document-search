@@ -106,10 +106,8 @@ export async function initTracker() {
                         baseHref: getResourceBaseHref()
                     });
                 },
-                // Add these options to ensure browser compatibility
                 respectDoNotTrack: false,
                 sanitizer: true,
-                // Ensure assets are properly loaded
                 resourceUploadingEnabled: false,
                 defaultInputMode: 0,
             });
