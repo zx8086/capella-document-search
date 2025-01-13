@@ -91,12 +91,20 @@ export async function initTracker() {
                 },
                 verbose: true,
                 onStart: () => {
-                    console.log("✅ OpenReplay tracker started successfully");
+                    console.log("✅ OpenReplay tracker started successfully", {
+                        ingestPoint: getIngestPoint(),
+                        baseHref: getResourceBaseHref(),
+                        projectKey: frontendConfig.openreplay.PROJECT_KEY
+                    });
                 },
                 onError: (error) => {
-                    console.error("❌ OpenReplay tracker error:", error);
-                    console.error("Headers:", error.headers);
-                    console.error("Status:", error.status);
+                    console.error("❌ OpenReplay tracker error:", {
+                        error,
+                        headers: error.headers,
+                        status: error.status,
+                        ingestPoint: getIngestPoint(),
+                        baseHref: getResourceBaseHref()
+                    });
                 },
                 // Add these options to ensure browser compatibility
                 respectDoNotTrack: false,
