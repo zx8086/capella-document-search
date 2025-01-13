@@ -37,10 +37,15 @@ export const handle: Handle = async ({ event, resolve }) => {
 
     // Handle preflight requests
     if (event.request.method === 'OPTIONS') {
-        response.headers.set('Access-Control-Max-Age', '3600');
         return new Response(null, {
             status: 204,
-            headers: response.headers
+            headers: {
+                'Access-Control-Allow-Origin': '*',
+                'Access-Control-Allow-Methods': 'GET,HEAD,PUT,PATCH,POST,DELETE',
+                'Access-Control-Allow-Headers': '*',
+                'Access-Control-Max-Age': '86400',
+                'Access-Control-Expose-Headers': '*'
+            }
         });
     }
 

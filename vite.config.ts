@@ -138,40 +138,21 @@ export default defineConfig(({ mode }): UserConfig => {
                 : 'https://openreplay.prd.shared-services.eu.pvh.cloud',
             changeOrigin: true,
             secure: true,
-            rewrite: (path) => path,
+            ws: true,
             configure: (proxy, _options) => {
                 proxy.on('proxyReq', (proxyReq, req, _res) => {
-                    // Remove any existing CORS headers to prevent conflicts
-                    proxyReq.removeHeader('Access-Control-Allow-Origin');
-                    proxyReq.removeHeader('Access-Control-Allow-Methods');
-                    proxyReq.removeHeader('Access-Control-Allow-Headers');
-                    
-                    // Add fresh CORS headers
-                    proxyReq.setHeader('Access-Control-Allow-Origin', '*');
-                    proxyReq.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-                    proxyReq.setHeader('Access-Control-Allow-Headers', [
-                        'Content-Type',
-                        'Authorization',
-                        'traceparent',
-                        'tracestate',
-                        'elastic-apm-traceparent',
-                        'x-openreplay-session-id',
-                        'baggage',
-                        'sentry-trace',
-                        'x-requested-with',
-                        'content-encoding',
-                        'accept',
-                        'origin',
-                        'cache-control',
-                        'x-openreplay-metadata'
-                    ].join(', '));
-                    
-                    // Forward original headers
-                    ['traceparent', 'tracestate', 'elastic-apm-traceparent', 'x-openreplay-session-id'].forEach(header => {
-                        if (req.headers[header]) {
-                            proxyReq.setHeader(header, req.headers[header]);
-                        }
+                    // Forward all headers
+                    Object.keys(req.headers).forEach(key => {
+                        proxyReq.setHeader(key, req.headers[key]);
                     });
+                });
+
+                proxy.on('proxyRes', (proxyRes, req, res) => {
+                    // Set CORS headers on response
+                    proxyRes.headers['Access-Control-Allow-Origin'] = '*';
+                    proxyRes.headers['Access-Control-Allow-Methods'] = 'GET,HEAD,PUT,PATCH,POST,DELETE';
+                    proxyRes.headers['Access-Control-Allow-Headers'] = '*';
+                    proxyRes.headers['Access-Control-Expose-Headers'] = '*';
                 });
             }
           }

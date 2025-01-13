@@ -85,20 +85,9 @@ export async function initTracker() {
                     enabled: true,
                     capturePayload: true,
                     failuresOnly: false,
-                    ignoreHeaders: [
-                        'Cookie', 
-                        'Set-Cookie'
-                    ],
-                    sessionTokenHeader: false,
+                    ignoreHeaders: false,
                     captureHeaders: true,
-                    defaultHeaders: [
-                        'traceparent',
-                        'tracestate',
-                        'elastic-apm-traceparent',
-                        'x-openreplay-session-id',
-                        'baggage',
-                        'sentry-trace'
-                    ]
+                    defaultHeaders: true
                 },
                 verbose: true,
                 onStart: () => {
