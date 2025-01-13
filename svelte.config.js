@@ -48,7 +48,11 @@ const config = {
           "http://collector.prd.shared-services.eu.pvh.cloud",
           "https://apm.siobytes.com",
           "https://api.openreplay.com",
-          "https://*.shared-services.eu.pvh.cloud"
+          "https://*.shared-services.eu.pvh.cloud",
+          "https://openreplay.prd.shared-services.eu.pvh.cloud",
+          "wss://openreplay.prd.shared-services.eu.pvh.cloud",
+          "https://*.openreplay.prd.shared-services.eu.pvh.cloud",
+          "wss://*.openreplay.prd.shared-services.eu.pvh.cloud"
         ],
         "script-src": [
           "'self'",

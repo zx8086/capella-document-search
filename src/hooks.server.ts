@@ -89,5 +89,27 @@ export const handle: Handle = async ({ event, resolve }) => {
     response.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
     response.headers.set('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
 
+    response.headers.set('Access-Control-Allow-Headers', [
+        'Content-Type',
+        'Authorization',
+        'traceparent',
+        'tracestate',
+        'elastic-apm-traceparent',
+        'x-openreplay-session-id',
+        'baggage',
+        'sentry-trace',
+        'x-requested-with',
+        'content-encoding',
+        'accept',
+        'origin',
+        'cache-control'
+    ].join(', '));
+
+    if (event.url.pathname.startsWith('/ingest')) {
+        response.headers.set('Access-Control-Allow-Origin', '*');
+        response.headers.set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+        response.headers.set('Access-Control-Max-Age', '86400');
+    }
+
     return response;
 }; 

@@ -141,57 +141,11 @@ export default defineConfig(({ mode }): UserConfig => {
             secure: true,
             rewrite: (path) => path,
             configure: (proxy, _options) => {
-                // Handle preflight OPTIONS requests
                 proxy.on('proxyReq', (proxyReq, req, _res) => {
-                    if (req.method === 'OPTIONS') {
-                        proxyReq.setHeader('Access-Control-Allow-Origin', '*');
-                        proxyReq.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-                        proxyReq.setHeader('Access-Control-Allow-Headers', [
-                            'Content-Type',
-                            'Authorization',
-                            'traceparent',
-                            'tracestate',
-                            'elastic-apm-traceparent',
-                            'x-openreplay-session-id',
-                            'baggage',
-                            'sentry-trace'
-                        ].join(', '));
-                        proxyReq.setHeader('Access-Control-Max-Age', '86400'); // 24 hours
-                    }
-
-                    // Always set these headers for all requests
-                    proxyReq.setHeader('Access-Control-Expose-Headers', [
-                        'traceparent',
-                        'tracestate',
-                        'elastic-apm-traceparent',
-                        'x-openreplay-session-id',
-                        'baggage',
-                        'sentry-trace'
-                    ].join(', '));
-
-                    // Copy original headers
-                    const headersToForward = [
-                        'traceparent',
-                        'tracestate',
-                        'elastic-apm-traceparent',
-                        'x-openreplay-session-id',
-                        'baggage',
-                        'sentry-trace'
-                    ];
-
-                    headersToForward.forEach(header => {
-                        if (req.headers[header]) {
-                            proxyReq.setHeader(header, req.headers[header]);
-                        }
-                    });
-                });
-
-                // Handle the proxy response
-                proxy.on('proxyRes', (proxyRes, req, res) => {
-                    // Add CORS headers to the response
-                    proxyRes.headers['Access-Control-Allow-Origin'] = '*';
-                    proxyRes.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS';
-                    proxyRes.headers['Access-Control-Allow-Headers'] = [
+                    // Add these headers for all requests
+                    proxyReq.setHeader('Access-Control-Allow-Origin', '*');
+                    proxyReq.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+                    proxyReq.setHeader('Access-Control-Allow-Headers', [
                         'Content-Type',
                         'Authorization',
                         'traceparent',
@@ -199,17 +153,21 @@ export default defineConfig(({ mode }): UserConfig => {
                         'elastic-apm-traceparent',
                         'x-openreplay-session-id',
                         'baggage',
-                        'sentry-trace'
-                    ].join(', ');
-
-                    if (req.method === 'OPTIONS') {
-                        proxyRes.statusCode = 204;
+                        'sentry-trace',
+                        'x-requested-with',
+                        'content-encoding',
+                        'accept',
+                        'origin',
+                        'cache-control'
+                    ].join(', '));
+                    
+                    // Forward the original headers
+                    if (req.headers.traceparent) {
+                        proxyReq.setHeader('traceparent', req.headers.traceparent);
                     }
-                });
-
-                // Handle proxy errors
-                proxy.on('error', (err, _req, _res) => {
-                    console.error('Proxy Error:', err);
+                    if (req.headers['elastic-apm-traceparent']) {
+                        proxyReq.setHeader('elastic-apm-traceparent', req.headers['elastic-apm-traceparent']);
+                    }
                 });
             }
           }
