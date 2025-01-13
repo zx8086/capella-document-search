@@ -90,7 +90,8 @@ export async function initTracker() {
                         'Set-Cookie'
                     ],
                     sessionTokenHeader: false,
-                    captureHeaders: [
+                    captureHeaders: true,
+                    defaultHeaders: [
                         'traceparent',
                         'tracestate',
                         'elastic-apm-traceparent',

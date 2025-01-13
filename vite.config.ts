@@ -142,7 +142,12 @@ export default defineConfig(({ mode }): UserConfig => {
             rewrite: (path) => path,
             configure: (proxy, _options) => {
                 proxy.on('proxyReq', (proxyReq, req, _res) => {
-                    // Add these headers for all requests
+                    // Remove any existing CORS headers to prevent conflicts
+                    proxyReq.removeHeader('Access-Control-Allow-Origin');
+                    proxyReq.removeHeader('Access-Control-Allow-Methods');
+                    proxyReq.removeHeader('Access-Control-Allow-Headers');
+                    
+                    // Add fresh CORS headers
                     proxyReq.setHeader('Access-Control-Allow-Origin', '*');
                     proxyReq.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
                     proxyReq.setHeader('Access-Control-Allow-Headers', [
@@ -158,16 +163,16 @@ export default defineConfig(({ mode }): UserConfig => {
                         'content-encoding',
                         'accept',
                         'origin',
-                        'cache-control'
+                        'cache-control',
+                        'x-openreplay-metadata'
                     ].join(', '));
                     
-                    // Forward the original headers
-                    if (req.headers.traceparent) {
-                        proxyReq.setHeader('traceparent', req.headers.traceparent);
-                    }
-                    if (req.headers['elastic-apm-traceparent']) {
-                        proxyReq.setHeader('elastic-apm-traceparent', req.headers['elastic-apm-traceparent']);
-                    }
+                    // Forward original headers
+                    ['traceparent', 'tracestate', 'elastic-apm-traceparent', 'x-openreplay-session-id'].forEach(header => {
+                        if (req.headers[header]) {
+                            proxyReq.setHeader(header, req.headers[header]);
+                        }
+                    });
                 });
             }
           }

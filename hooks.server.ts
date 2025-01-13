@@ -16,7 +16,13 @@ export const handle: Handle = async ({ event, resolve }) => {
         'elastic-apm-traceparent',
         'x-openreplay-session-id',
         'baggage',
-        'sentry-trace'
+        'sentry-trace',
+        'x-requested-with',
+        'content-encoding',
+        'accept',
+        'origin',
+        'cache-control',
+        'x-openreplay-metadata'
     ].join(', '));
 
     response.headers.set('Access-Control-Expose-Headers', [
@@ -25,11 +31,13 @@ export const handle: Handle = async ({ event, resolve }) => {
         'elastic-apm-traceparent',
         'x-openreplay-session-id',
         'baggage',
-        'sentry-trace'
+        'sentry-trace',
+        'x-openreplay-metadata'
     ].join(', '));
 
     // Handle preflight requests
     if (event.request.method === 'OPTIONS') {
+        response.headers.set('Access-Control-Max-Age', '3600');
         return new Response(null, {
             status: 204,
             headers: response.headers
