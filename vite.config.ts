@@ -13,7 +13,6 @@ export default defineConfig(({ mode }): UserConfig => {
   });
 
   try {
-    // Load environment variables
     const env = loadEnv(mode, process.cwd(), "");
     
     if (!env) {
