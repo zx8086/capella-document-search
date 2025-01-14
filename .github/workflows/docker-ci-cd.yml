@@ -160,13 +160,21 @@ jobs:
 
       # Container security scanning
       - name: Run Snyk container scan
+        continue-on-error: true
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
         run: |
-          snyk container test zx8086/capella-document-search:latest \
+          bun install
+          bun run snyk test --file=package.json --sarif-file-output=snyk.sarif --severity-threshold=high
+          bun run snyk container test zx8086/capella-document-search:latest \
             --file=Dockerfile \
             --severity-threshold=high \
             --sarif-file-output=snyk-docker.sarif || true
+          if [[ "${{ github.ref }}" == "refs/heads/master" ]]; then
+            bun run snyk container monitor zx8086/capella-document-search:latest \
+              --file=Dockerfile \
+              --platform=linux/arm64 || true
+          fi
 
       - name: Upload Docker Snyk scan results
         if: always() && hashFiles('snyk-docker.sarif') != ''
