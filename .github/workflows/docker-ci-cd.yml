@@ -129,8 +129,8 @@ jobs:
           # Stop existing containers using port 3000
           docker ps -q --filter publish=3000 | xargs -r docker stop
           docker rm -f capella-search-test 2>/dev/null || true
-
-          # Run new container
+          
+          # Run container with properly formatted environment variables
           docker run -d \
             --name capella-search-test \
             -p 3000:3000 \
@@ -139,11 +139,19 @@ jobs:
             -e BUILD_VERSION=${{ github.ref_name || '0.0.1' }} \
             -e COMMIT_HASH=${{ github.sha }} \
             -e BUILD_DATE=${{ env.BUILD_TIMESTAMP }} \
+            -e ENABLE_FILE_LOGGING=false \
+            -e LOG_MAX_FILES=7d \
+            -e LOG_MAX_SIZE=10m \
+            -e LOG_LEVEL=info \
             zx8086/capella-document-search:latest
-
-          # Wait for container to start
-          sleep 10
-          docker ps | grep capella-search-test || (docker logs capella-search-test && exit 1)
+          
+          # Add delay and better error handling
+          sleep 15
+          if ! docker ps | grep -q capella-search-test; then
+            echo "Container failed to start. Showing logs:"
+            docker logs capella-search-test
+            exit 1
+          fi
 
           # Capture metrics
           CONTAINER_STATUS=$(docker inspect --format='{{.State.Status}}' capella-search-test)
