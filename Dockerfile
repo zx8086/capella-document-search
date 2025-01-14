@@ -1,11 +1,6 @@
-# Dockerfile
+# syntax=docker/dockerfile:1.4
 
-# Use the official Bun image
-# Note: As of the last check, this image contains a known vulnerability:
-# Critical severity vulnerability found in zlib/zlib1g
-# Description: Integer Overflow or Wraparound
-# Info: https://security.snyk.io/vuln/SNYK-DEBIAN11-ZLIB-6008961
-# This vulnerability is present in the base image and cannot be immediately resolved.
+# Base stage
 FROM oven/bun:canary-alpine AS builder
 
 # Add build args with defaults

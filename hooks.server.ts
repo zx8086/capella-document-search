@@ -3,51 +3,27 @@ import { redirect } from '@sveltejs/kit';
 import crypto from 'crypto';
 
 export const handle: Handle = async ({ event, resolve }) => {
-    const response = await resolve(event);
-    
-    // Add CORS headers for all responses
-    response.headers.set('Access-Control-Allow-Origin', '*');
-    response.headers.set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-    response.headers.set('Access-Control-Allow-Headers', [
-        'Content-Type',
-        'Authorization',
-        'traceparent',
-        'tracestate',
-        'elastic-apm-traceparent',
-        'x-openreplay-session-id',
-        'baggage',
-        'sentry-trace',
-        'x-requested-with',
-        'content-encoding',
-        'accept',
-        'origin',
-        'cache-control',
-        'x-openreplay-metadata'
-    ].join(', '));
-
-    response.headers.set('Access-Control-Expose-Headers', [
-        'traceparent',
-        'tracestate',
-        'elastic-apm-traceparent',
-        'x-openreplay-session-id',
-        'baggage',
-        'sentry-trace',
-        'x-openreplay-metadata'
-    ].join(', '));
-
-    // Handle preflight requests
+    // Handle preflight requests first
     if (event.request.method === 'OPTIONS') {
         return new Response(null, {
             status: 204,
             headers: {
                 'Access-Control-Allow-Origin': '*',
-                'Access-Control-Allow-Methods': 'GET,HEAD,PUT,PATCH,POST,DELETE',
-                'Access-Control-Allow-Headers': '*',
+                'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+                'Access-Control-Allow-Headers': 'Content-Type, Authorization, traceparent, tracestate, elastic-apm-traceparent, x-openreplay-session-id, baggage, sentry-trace, x-requested-with, content-encoding, accept, origin, cache-control, x-openreplay-metadata',
                 'Access-Control-Max-Age': '86400',
-                'Access-Control-Expose-Headers': '*'
+                'Access-Control-Expose-Headers': 'traceparent, tracestate, elastic-apm-traceparent, x-openreplay-session-id, baggage, sentry-trace, x-openreplay-metadata'
             }
         });
     }
+
+    const response = await resolve(event);
+    
+    // Set CORS headers for all responses
+    response.headers.set('Access-Control-Allow-Origin', '*');
+    response.headers.set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+    response.headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization, traceparent, tracestate, elastic-apm-traceparent, x-openreplay-session-id, baggage, sentry-trace, x-requested-with, content-encoding, accept, origin, cache-control, x-openreplay-metadata');
+    response.headers.set('Access-Control-Expose-Headers', 'traceparent, tracestate, elastic-apm-traceparent, x-openreplay-session-id, baggage, sentry-trace, x-openreplay-metadata');
 
     // Include both development and production endpoints regardless of environment
     const openReplayEndpoints = [
