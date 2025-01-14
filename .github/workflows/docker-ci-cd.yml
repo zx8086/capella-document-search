@@ -9,26 +9,26 @@ on:
 permissions:
   contents: read
   security-events: write
+  packages: write
+
+env:
+  DOCKER_BUILDKIT: 1
+  COMPOSE_DOCKER_CLI_BUILD: 1
+  BUILDX_NO_DEFAULT_LOAD: true
+  BUILDKIT_INLINE_CACHE: 1
+  BUILDX_CACHE_TTL: "168h"
 
 jobs:
   build-and-deploy:
     runs-on: self-hosted
+
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
-        with:
-          platforms: linux/amd64,linux/arm64
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-        id: buildx
-        with:
-          version: latest
-          driver-opts: |
-            image=moby/buildkit:latest
-          platforms: linux/amd64,linux/arm64
+      # Initial Setup
+      - name: Set build timestamp
+        id: timestamp
+        run: echo "BUILD_TIMESTAMP=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" >> $GITHUB_ENV
 
       - name: Setup environment files
         env:
@@ -37,81 +37,169 @@ jobs:
           echo "$ENV_PRODUCTION" > .env.production
           cp .env.production .env
 
+      # Docker metadata setup
+      - name: Docker meta
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: docker.io/zx8086/capella-document-search
+          tags: |
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=sha,format=long
+            type=ref,event=branch
+            type=ref,event=tag
+
+      # Platform and runtime setup
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: linux/amd64,linux/arm64
+
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v1
+        with:
+          bun-version: latest
+
+      - name: Cache Bun dependencies
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.bun/install/cache
+            node_modules
+          key: ${{ runner.os }}-bun-${{ hashFiles('**/bun.lockb', '**/package.json') }}
+          restore-keys: |
+            ${{ runner.os }}-bun-
+
+      # Security scanning section
+      - name: Run Snyk code scan
+        continue-on-error: true
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        run: |
+          bun install
+          bun run snyk test --file=package.json --sarif-file-output=snyk.sarif --severity-threshold=high
+          bun run snyk monitor --file=package.json
+
+      - name: Upload Snyk code scan results
+        if: hashFiles('snyk.sarif') != ''
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: snyk.sarif
+          category: snyk-code
+
+      # Docker build setup
       - name: Log in to Docker Hub
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKER_HUB_USERNAME }}
           password: ${{ secrets.DOCKER_HUB_ACCESS_TOKEN }}
 
-      - name: Cache Docker layers
-        uses: actions/cache@v3
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
         with:
-          path: /tmp/.buildx-cache
-          key: ${{ runner.os }}-buildx-${{ github.sha }}
-          restore-keys: |
-            ${{ runner.os }}-buildx-
+          platforms: linux/amd64,linux/arm64
+          driver-opts: |
+            image=moby/buildkit:latest
 
-      - name: Set build timestamp
-        id: timestamp
-        run: echo "BUILD_TIMESTAMP=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" >> $GITHUB_ENV
-
+      # Build and push section
       - name: Build and push Docker image
         uses: docker/build-push-action@v6
         with:
           context: .
-          builder: ${{ steps.buildx.outputs.name }}
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          platforms: linux/amd64,linux/arm64
+          provenance: true
+          sbom: true
+          cache-from: type=registry,ref=docker.io/zx8086/capella-document-search:buildcache
+          cache-to: type=registry,ref=docker.io/zx8086/capella-document-search:buildcache,mode=max
           build-args: |
+            BUILDKIT_INLINE_CACHE=1
+            DOCKER_BUILDKIT=1
             NODE_ENV=production
+            BUILD_DATE=${{ env.BUILD_TIMESTAMP }}
             BUILD_VERSION=${{ github.ref_name || '0.0.1' }}
             COMMIT_HASH=${{ github.sha }}
-            BUILD_DATE=${{ env.BUILD_TIMESTAMP }}
-          cache-from: type=local,src=/tmp/.buildx-cache
-          cache-to: type=local,dest=/tmp/.buildx-cache-new,mode=max
-          push: ${{ github.event_name != 'pull_request' }}
-          tags: |
-            zx8086/capella-document-search:latest
-            zx8086/capella-document-search:${{ github.sha }}
-          platforms: linux/amd64,linux/arm64
-          provenance: false
 
-      - name: Run Snyk to check Docker image for vulnerabilities
-        uses: snyk/actions/docker@master
-        continue-on-error: true
-        env:
-          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
-        with:
-          image: zx8086/capella-document-search:latest
-          args: --file=Dockerfile --severity-threshold=high
-
+      # Testing section
       - name: Test container
         if: github.event_name != 'pull_request'
         run: |
           # Stop existing containers using port 3000
           docker ps -q --filter publish=3000 | xargs -r docker stop
-          
-          # Remove existing container with same name if exists
           docker rm -f capella-search-test 2>/dev/null || true
-          
-          # Run new container with specific name and environment variables
+
+          # Run new container
           docker run -d \
             --name capella-search-test \
             -p 3000:3000 \
+            --env-file .env \
             -e NODE_ENV=production \
             -e BUILD_VERSION=${{ github.ref_name || '0.0.1' }} \
             -e COMMIT_HASH=${{ github.sha }} \
             -e BUILD_DATE=${{ env.BUILD_TIMESTAMP }} \
             zx8086/capella-document-search:latest
-          
-          # Wait for container to be healthy (optional)
+
+          # Wait for container to start
           sleep 10
-          
-          # Verify container is running
           docker ps | grep capella-search-test || (docker logs capella-search-test && exit 1)
 
+          # Capture metrics
+          CONTAINER_STATUS=$(docker inspect --format='{{.State.Status}}' capella-search-test)
+          echo "CONTAINER_STATUS=${CONTAINER_STATUS}" >> $GITHUB_ENV
+          echo "CONTAINER_START_TIME=$(docker inspect --format='{{.State.StartedAt}}' capella-search-test)" >> $GITHUB_ENV
+
+      # Container security scanning
+      - name: Run Snyk container scan
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        run: |
+          snyk container test zx8086/capella-document-search:latest \
+            --file=Dockerfile \
+            --severity-threshold=high \
+            --sarif-file-output=snyk-docker.sarif || true
+
+      - name: Upload Docker Snyk scan results
+        if: always() && hashFiles('snyk-docker.sarif') != ''
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: snyk-docker.sarif
+          category: snyk-docker
+
+      # Build Summary
+      - name: Docker Build Summary
+        if: always()
+        run: |
+          {
+            echo "### 🐳 Docker Build Summary"
+            echo ""
+            echo "#### 📊 Build Overview"
+            echo "| Metric | Value |"
+            echo "|--------|-------|"
+            echo "| 🆔 Build ID | \`${GITHUB_SHA::7}\` |"
+            echo "| 📦 Image | capella-document-search |"
+            echo "| ⚡ Status | ${CONTAINER_STATUS:-N/A} |"
+            
+            # Container Status
+            if [ "${CONTAINER_STATUS:-}" = "running" ]; then
+              STATS=$(docker stats capella-search-test --no-stream --format "{{.CPUPerc}},{{.MemUsage}},{{.NetIO}},{{.BlockIO}}")
+              echo "| 🔄 Status | ✅ Running |"
+              echo "| 🕒 Start Time | ${CONTAINER_START_TIME} |"
+            else
+              echo "| 🔄 Status | ⚠️ Not Running |"
+            fi
+          } >> $GITHUB_STEP_SUMMARY
+
+      # Cleanup
       - name: Cleanup
         if: always()
         run: |
           rm -f .env .env.production
+          rm -f snyk.sarif snyk-docker.sarif
+          docker container rm -f capella-search-test || true
           docker image prune -f
           docker volume prune -f
+          docker builder prune -a -f
+          rm -rf node_modules
           echo "Cleanup completed"
