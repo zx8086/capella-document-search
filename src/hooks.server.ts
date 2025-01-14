@@ -3,6 +3,35 @@ import { redirect } from '@sveltejs/kit';
 import crypto from 'crypto';
 
 export const handle: Handle = async ({ event, resolve }) => {
+    // Handle CORS preflight requests
+    if (event.request.method === 'OPTIONS' && event.url.pathname.startsWith('/ingest')) {
+        return new Response(null, {
+            headers: {
+                'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+                'Access-Control-Allow-Origin': '*',
+                'Access-Control-Allow-Headers': [
+                    'Content-Type',
+                    'Authorization',
+                    'traceparent',
+                    'tracestate',
+                    'elastic-apm-traceparent',
+                    'x-openreplay-session-id',
+                    'baggage',
+                    'sentry-trace',
+                    'x-requested-with',
+                    'content-encoding',
+                    'accept',
+                    'origin',
+                    'cache-control',
+                    'X-Openreplay-Batch'
+                ].join(', '),
+                'Access-Control-Expose-Headers': 'Content-Length',
+                'Access-Control-Max-Age': '86400',
+                'Access-Control-Allow-Credentials': 'true'
+            }
+        });
+    }
+
     const response = await resolve(event);
     
     const csp = `
@@ -102,13 +131,16 @@ export const handle: Handle = async ({ event, resolve }) => {
         'content-encoding',
         'accept',
         'origin',
-        'cache-control'
+        'cache-control',
+        'X-Openreplay-Batch'
     ].join(', '));
 
     if (event.url.pathname.startsWith('/ingest')) {
         response.headers.set('Access-Control-Allow-Origin', '*');
         response.headers.set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
         response.headers.set('Access-Control-Max-Age', '86400');
+        response.headers.set('Access-Control-Allow-Credentials', 'true');
+        response.headers.set('Access-Control-Expose-Headers', 'Content-Length');
     }
 
     return response;
