@@ -40,51 +40,43 @@ export const handle: Handle = async ({ event, resolve }) => {
             https://*.openreplay.com 
             https://api.openreplay.com 
             wss://*.openreplay.com
-            https://openreplay.prd.shared-services.eu.pvh.cloud 
-            wss://openreplay.prd.shared-services.eu.pvh.cloud
-            https://login.microsoftonline.com 
+            https://*.prd.shared-services.eu.pvh.cloud 
+            wss://*.prd.shared-services.eu.pvh.cloud
             https://*.microsoftonline.com 
-            https://graph.microsoft.com
             https://*.graph.microsoft.com
-            ws://localhost:* 
-            http://localhost:* 
             https://*.pinecone.io
             https://*.svc.pinecone.io
             https://*.shared-services.eu.pvh.cloud
-            https://*.prd.shared-services.eu.pvh.cloud
             https://*.cloudfront.net
             https://*.aws.cloud.es.io
             https://*.aws.elastic-cloud.com
             https://*.cloud.couchbase.com
             https://*.siobytes.com
             https://eu-b2b.apm.eu-central-1.aws.cloud.es.io
-            https://apm.siobytes.com
             https://api.openai.com
-            ${import.meta.env.DEV ? 'ws://localhost:*' : ''};
+            ${import.meta.env.DEV ? 'ws://localhost:* http://localhost:*' : ''};
         script-src 'self' 'unsafe-inline' 'unsafe-eval'
+            https://*.openreplay.com
             https://static.openreplay.com
             https://vjs.zencdn.net 
-            https://apm.siobytes.com 
-            https://api.openreplay.com
-            https://openreplay.prd.shared-services.eu.pvh.cloud;
+            https://*.siobytes.com
+            https://*.prd.shared-services.eu.pvh.cloud
+            ${import.meta.env.DEV ? 'http://localhost:* ws://localhost:*' : ''};
         style-src 'self' 'unsafe-inline' 
             https://vjs.zencdn.net;
         img-src 'self' data: blob: https: 
-            https://graph.microsoft.com
-            https://*.graph.microsoft.com;
+            https://*.graph.microsoft.com
+            https://*.prd.shared-services.eu.pvh.cloud;
         media-src 'self' blob: 
             https://*.openreplay.com 
             https://static.openreplay.com 
-            https://d2bgp0ri487o97.cloudfront.net;
+            https://*.cloudfront.net;
         worker-src 'self' blob: 
-            https://openreplay.prd.shared-services.eu.pvh.cloud 
-            https://*.openreplay.com
-            https://api.openreplay.com;
+            https://*.prd.shared-services.eu.pvh.cloud
+            https://*.openreplay.com;
         frame-src 'self' 
-            https://login.microsoftonline.com 
             https://*.microsoftonline.com;
         form-action 'self' 
-            https://login.microsoftonline.com 
             https://*.microsoftonline.com;
         font-src 'self' data:;
         child-src 'self' blob:;
