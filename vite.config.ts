@@ -63,29 +63,12 @@ export default defineConfig(({ mode }): UserConfig => {
             'https://*.pinecone.io',
             'https://*.svc.*.pinecone.io',
             'https://api.openreplay.com',
-            'https://openreplay.prd.shared-services.eu.pvh.cloud',
-            ...ALLOWED_ORIGINS,
+            'https://openreplay.prd.shared-services.eu.pvh.cloud'
           ],
           methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
           allowedHeaders: [
             'Content-Type', 
             'Authorization',
-            'user-agent',
-            'Access-Control-Allow-Headers',
-            'Access-Control-Allow-Origin',
-            'Access-Control-Allow-Methods',
-            'traceparent',
-            'tracestate',
-            'elastic-apm-traceparent',
-            'x-openreplay-session-id',
-            'baggage',
-            'sentry-trace',
-            'Content-Encoding',
-            'Cross-Origin-Opener-Policy',
-            'Cross-Origin-Embedder-Policy',
-            'Cross-Origin-Resource-Policy'
-          ],
-          exposedHeaders: [
             'traceparent',
             'tracestate',
             'elastic-apm-traceparent',
@@ -97,62 +80,24 @@ export default defineConfig(({ mode }): UserConfig => {
           timeout: 5000
         },
         proxy: {
-          '/openreplay': {
-            target: env.PUBLIC_OPENREPLAY_INGEST_POINT || 'https://api.openreplay.com',
-            changeOrigin: true,
-            secure: true,
-            rewrite: (path) => path.replace(/^\/openreplay/, ''),
-            configure: (proxy, _options) => {
-              proxy.on('proxyReq', (proxyReq, req, _res) => {
-                // Add CORS headers to the proxy response
-                proxyReq.setHeader('Access-Control-Allow-Origin', '*');
-                proxyReq.setHeader('Access-Control-Allow-Methods', 'GET,HEAD,PUT,PATCH,POST,DELETE');
-                proxyReq.setHeader('Access-Control-Allow-Headers', [
-                  'Content-Type',
-                  'Authorization',
-                  'traceparent',
-                  'tracestate',
-                  'elastic-apm-traceparent',
-                  'x-openreplay-session-id'
-                ].join(','));
-                proxyReq.setHeader('Access-Control-Expose-Headers', [
-                  'traceparent',
-                  'tracestate',
-                  'elastic-apm-traceparent',
-                  'x-openreplay-session-id'
-                ].join(','));
-                
-                // Preserve original headers
-                if (req.headers.traceparent) {
-                  proxyReq.setHeader('traceparent', req.headers.traceparent);
-                }
-                if (req.headers['elastic-apm-traceparent']) {
-                  proxyReq.setHeader('elastic-apm-traceparent', req.headers['elastic-apm-traceparent']);
-                }
-              });
-            }
-          },
           '/ingest': {
             target: import.meta.env.DEV 
                 ? 'https://api.openreplay.com'
                 : 'https://openreplay.prd.shared-services.eu.pvh.cloud',
             changeOrigin: true,
             secure: true,
-            ws: true,
             configure: (proxy, _options) => {
                 proxy.on('proxyReq', (proxyReq, req, _res) => {
-                    // Forward all headers
-                    Object.keys(req.headers).forEach(key => {
-                        proxyReq.setHeader(key, req.headers[key]);
-                    });
-                });
-
-                proxy.on('proxyRes', (proxyRes, req, res) => {
-                    // Set CORS headers on response
-                    proxyRes.headers['Access-Control-Allow-Origin'] = '*';
-                    proxyRes.headers['Access-Control-Allow-Methods'] = 'GET,HEAD,PUT,PATCH,POST,DELETE';
-                    proxyRes.headers['Access-Control-Allow-Headers'] = '*';
-                    proxyRes.headers['Access-Control-Expose-Headers'] = '*';
+                    // Only forward essential headers
+                    if (req.headers.traceparent) {
+                        proxyReq.setHeader('traceparent', req.headers.traceparent);
+                    }
+                    if (req.headers['elastic-apm-traceparent']) {
+                        proxyReq.setHeader('elastic-apm-traceparent', req.headers['elastic-apm-traceparent']);
+                    }
+                    if (req.headers['x-openreplay-session-id']) {
+                        proxyReq.setHeader('x-openreplay-session-id', req.headers['x-openreplay-session-id']);
+                    }
                 });
             }
           }

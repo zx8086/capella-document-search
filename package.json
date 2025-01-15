@@ -100,7 +100,6 @@
     "clsx": "^2.1.1",
     "cross-fetch": "^4.1.0",
     "csv-parse": "^5.6.0",
-    "dns": "^0.2.2",
     "dotenv": "^16.4.7",
     "graphql": "^16.10.0",
     "graphql-request": "^7.1.2",
