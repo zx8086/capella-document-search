@@ -48,10 +48,13 @@ function getCurrentApmTransaction() {
 }
 
 const getIngestPoint = () => {
-    // Use the environment-specific ingest point
-    return import.meta.env.DEV 
-        ? 'https://api.openreplay.com/ingest'  // Development environment
-        : 'https://openreplay.prd.shared-services.eu.pvh.cloud/ingest'; // Production environment
+    // For development, use the direct OpenReplay API
+    if (import.meta.env.DEV) {
+        return 'https://api.openreplay.com/ingest';
+    }
+    
+    // For production, use the proxied endpoint through our server
+    return '/ingest';
 };
 
 const getResourceBaseHref = () => {
