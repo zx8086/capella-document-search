@@ -31,22 +31,27 @@
             const newType = checkType === "Simple" ? "Detailed" : "Simple";
             loadingType = newType;
             
-            // Use replaceState instead of goto for a more efficient shallow route update
+            const response = await fetch(`/api/health-check?type=${newType}`);
+            if (!response.ok) {
+                throw new Error(`Health check failed: ${response.statusText}`);
+            }
+            
+            const data = await response.json();
+            if (data.status === "ERROR") {
+                throw new Error(data.message || "Health check returned an error");
+            }
+            
+            // Update the URL and state
             replaceState('', {
                 type: newType,
                 timestamp: Date.now()
             });
             
-            // Invalidate the data to trigger a reload
-            await goto(`?type=${newType}`, {
-                replaceState: true,
-                noScroll: true,
-                invalidateAll: true
-            });
-            
             checkType = newType;
+            healthStatus = data;
         } catch (e) {
             error = e instanceof Error ? e.message : String(e);
+            console.error("Health check error:", e);
         } finally {
             loading = false;
         }

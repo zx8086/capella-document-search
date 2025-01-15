@@ -158,8 +158,10 @@ async function checkGraphQLEndpoint(): Promise<CheckResult> {
 async function checkCapellaAPI(): Promise<CheckResult> {
   const startTime = Date.now();
   try {
+    log("Starting Capella API check...");
     const collections = await getAllScopes();
     const duration = Date.now() - startTime;
+    log(`Capella API check successful: ${collections.length} collections retrieved`);
     return {
       status: "OK",
       message: `External API is working. Retrieved ${collections.length} collections.`,
@@ -167,7 +169,11 @@ async function checkCapellaAPI(): Promise<CheckResult> {
     };
   } catch (error) {
     const duration = Date.now() - startTime;
-    err("Capella Cloud API health check failed:", error);
+    err("Capella Cloud API health check failed:", {
+      error: error instanceof Error ? error.message : String(error),
+      duration,
+      timestamp: new Date().toISOString()
+    });
     return {
       status: "ERROR",
       message: error instanceof Error ? error.message : String(error),
@@ -229,87 +235,143 @@ async function checkInternalAPI(fetch: Function): Promise<CheckResult> {
 }
 
 export async function GET({ fetch, url }: RequestEvent) {
-  log("GET request received for health check");
-  const checkType = url.searchParams.get("type") || "Simple";
-  const isSimpleCheck = checkType === "Simple";
-  
-  log(`Processing ${checkType} check`);
-  
-  const healthStatus: Record<string, CheckResult> = {};
-  
-  // Define the checks
-  const simpleChecks = [
-    { name: "Internal Collections API", check: () => checkInternalAPI(fetch) },
-    { name: "SQLite Database", check: checkDatabase },
-    { name: "GraphQL Endpoint", check: checkGraphQLEndpoint },
-  ].sort((a, b) => a.name.localeCompare(b.name));
-
-  const detailedChecks = [
-    ...simpleChecks,
-    { name: "Elastic APM Server", check: checkElasticAPMEndpoint },
-    { name: "External Capella Cloud API", check: checkCapellaAPI },
-    // { name: "OpenTelemetry Logs Endpoint", check: checkLogsEndpoint },
-    // { name: "OpenTelemetry Metrics Endpoint", check: checkMetricsEndpoint },
-    // { name: "OpenTelemetry Traces Endpoint", check: checkTracesEndpoint },
-  ].sort((a, b) => a.name.localeCompare(b.name));
-  
-  // Ensure we're properly awaiting all check promises
-  const checkPromises = (isSimpleCheck ? simpleChecks : detailedChecks)
-    .map(async ({ name, check }) => {
-      try {
-        const result = await Promise.race([
-          check(),
-          new Promise<CheckResult>((_, reject) =>
-            setTimeout(
-              () => reject(new Error("Individual check timeout")),
-              name === "External Capella Cloud API"
-                ? CAPELLA_API_TIMEOUT
-                : INDIVIDUAL_CHECK_TIMEOUT,
-            ),
-          ),
-        ]);
-        healthStatus[name] = result;
-      } catch (error) {
-        healthStatus[name] = {
-          status: "ERROR",
-          message: error instanceof Error ? error.message : String(error),
-        };
-      }
+  try {
+    log("Health check started", {
+      type: url.searchParams.get("type") || "Simple",
+      timestamp: new Date().toISOString()
     });
 
-  // Wait for all checks to complete
-  await Promise.race([
-    Promise.all(checkPromises),
-    new Promise((_, reject) =>
-      setTimeout(
-        () => reject(new Error("Global health check timeout")),
-        GLOBAL_CHECK_TIMEOUT,
-      ),
-    ),
-  ]);
+    const checkType = url.searchParams.get("type") || "Simple";
+    const isSimpleCheck = checkType === "Simple";
+    
+    log(`Processing ${checkType} check`);
+    
+    const healthStatus: Record<string, CheckResult> = {};
+    
+    // Track which check is currently running
+    let currentCheck = "";
+    
+    // Define the checks
+    const simpleChecks = [
+      { name: "Internal Collections API", check: () => checkInternalAPI(fetch) },
+      { name: "SQLite Database", check: checkDatabase },
+      { name: "GraphQL Endpoint", check: checkGraphQLEndpoint },
+    ].sort((a, b) => a.name.localeCompare(b.name));
 
-  // Sort the healthStatus object
-  const sortedHealthStatus = Object.fromEntries(
-    Object.entries(healthStatus).sort(([a], [b]) => a.localeCompare(b)),
-  );
+    const detailedChecks = [
+      ...simpleChecks,
+      { name: "Elastic APM Server", check: checkElasticAPMEndpoint },
+      { name: "External Capella Cloud API", check: checkCapellaAPI },
+      // { name: "OpenTelemetry Logs Endpoint", check: checkLogsEndpoint },
+      // { name: "OpenTelemetry Metrics Endpoint", check: checkMetricsEndpoint },
+      // { name: "OpenTelemetry Traces Endpoint", check: checkTracesEndpoint },
+    ].sort((a, b) => a.name.localeCompare(b.name));
+    
+    // Ensure we're properly awaiting all check promises
+    const checkPromises = (isSimpleCheck ? simpleChecks : detailedChecks)
+      .map(async ({ name, check }) => {
+        try {
+          currentCheck = name;
+          log(`Starting check: ${name}`);
+          
+          const result = await Promise.race([
+            check(),
+            new Promise<CheckResult>((_, reject) =>
+              setTimeout(
+                () => reject(new Error(`Timeout: ${name} check took too long`)),
+                name === "External Capella Cloud API"
+                  ? CAPELLA_API_TIMEOUT
+                  : INDIVIDUAL_CHECK_TIMEOUT,
+              ),
+            ),
+          ]);
+          
+          log(`Check completed: ${name}`, {
+            status: result.status,
+            responseTime: result.responseTime
+          });
+          
+          healthStatus[name] = result;
+        } catch (error) {
+          err(`Health check failed for ${name}:`, {
+            error: error instanceof Error ? error.message : String(error),
+            currentCheck,
+            timestamp: new Date().toISOString()
+          });
+          healthStatus[name] = {
+            status: "ERROR",
+            message: error instanceof Error ? error.message : String(error),
+            responseTime: 0
+          };
+        }
+      });
 
-  const overallStatus = Object.values(sortedHealthStatus).every(
-    (s) => s.status === "OK",
-  )
-    ? "OK"
-    : "ERROR";
+    // Add global timeout with better error handling
+    try {
+      await Promise.race([
+        Promise.all(checkPromises),
+        new Promise((_, reject) =>
+          setTimeout(
+            () => {
+              err("Global health check timeout", {
+                currentCheck,
+                checkType,
+                timestamp: new Date().toISOString()
+              });
+              reject(new Error("Global health check timeout"));
+            },
+            GLOBAL_CHECK_TIMEOUT,
+          ),
+        ),
+      ]);
+    } catch (error) {
+      err("Global health check error:", {
+        error: error instanceof Error ? error.message : String(error),
+        currentCheck,
+        checkType,
+        timestamp: new Date().toISOString()
+      });
+      return json({
+        status: "ERROR",
+        message: "Health check timed out",
+        checks: healthStatus,
+        checkType: checkType
+      }, { status: 200 });
+    }
 
-  return json(
-    {
-      status: overallStatus,
-      version: {
-        build: BUILD_VERSION,
-        commit: COMMIT_HASH,
-        buildDate: BUILD_DATE
+    // Log final results
+    log("Health check completed", {
+      status: Object.values(healthStatus).every((s) => s.status === "OK") ? "OK" : "ERROR",
+      checkType,
+      results: Object.fromEntries(
+        Object.entries(healthStatus).map(([k, v]) => [k, { status: v.status, responseTime: v.responseTime }])
+      )
+    });
+
+    return json(
+      {
+        status: Object.values(healthStatus).every((s) => s.status === "OK") ? "OK" : "ERROR",
+        version: {
+          build: BUILD_VERSION,
+          commit: COMMIT_HASH,
+          buildDate: BUILD_DATE
+        },
+        checks: healthStatus,
+        checkType: checkType,
       },
-      checks: sortedHealthStatus,
-      checkType: checkType, // Ensure we're returning the actual checkType
-    },
-    { status: 200 },
-  );
+      { status: 200 },
+    );
+  } catch (error) {
+    err("Unhandled health check error:", {
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+      timestamp: new Date().toISOString()
+    });
+    return json({
+      status: "ERROR",
+      message: error instanceof Error ? error.message : "Unknown error",
+      checks: {},
+      checkType: url.searchParams.get("type") || "Simple"
+    }, { status: 200 });
+  }
 }
