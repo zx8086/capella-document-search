@@ -3,7 +3,6 @@ import { redirect } from '@sveltejs/kit';
 import crypto from 'crypto';
 
 export const handle: Handle = async ({ event, resolve }) => {
-    // Handle all CORS preflight requests
     if (event.request.method === 'OPTIONS') {
         return new Response(null, {
             headers: {
@@ -91,7 +90,6 @@ export const handle: Handle = async ({ event, resolve }) => {
     response.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
     response.headers.set('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
 
-    // Add CORS headers to all responses
     response.headers.set('Access-Control-Allow-Headers', [
         'Content-Type',
         'Authorization',
