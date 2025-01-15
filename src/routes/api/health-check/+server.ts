@@ -20,7 +20,7 @@ import type { RequestEvent } from '@sveltejs/kit';
 
 const INDIVIDUAL_CHECK_TIMEOUT = 15000; // 15 seconds timeout for most checks
 const CAPELLA_API_TIMEOUT = 30000; // 30 seconds timeout for Capella API
-const GLOBAL_CHECK_TIMEOUT = 60000; // 60 seconds timeout for the entire health check
+const GLOBAL_CHECK_TIMEOUT = 60000; // 60 seconds timeout for the entire health check dummy
 
 const BUILD_VERSION = process.env.BUILD_VERSION || 'development';
 const COMMIT_HASH = process.env.COMMIT_HASH || 'unknown';
