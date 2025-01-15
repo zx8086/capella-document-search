@@ -24,7 +24,12 @@ export const handle: Handle = async ({ event, resolve }) => {
                     'cache-control',
                     'X-Openreplay-Batch'
                 ].join(', '),
-                'Access-Control-Expose-Headers': 'Content-Length',
+                'Access-Control-Expose-Headers': [
+                    'Content-Length',
+                    'traceparent',
+                    'tracestate',
+                    'baggage'
+                ].join(', '),
                 'Access-Control-Max-Age': '86400',
                 'Access-Control-Allow-Credentials': 'true'
             }
@@ -39,6 +44,8 @@ export const handle: Handle = async ({ event, resolve }) => {
             https://*.openreplay.com 
             https://api.openreplay.com 
             wss://*.openreplay.com
+            https://*.graph.microsoft.com
+            https://graph.microsoft.com
             https://*.prd.shared-services.eu.pvh.cloud 
             wss://*.prd.shared-services.eu.pvh.cloud
             https://*.microsoftonline.com 
