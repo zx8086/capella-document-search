@@ -3,7 +3,6 @@
 # Base stage
 FROM oven/bun:canary-alpine AS builder
 
-# Add build args with defaults
 ARG BUILD_VERSION=development
 ARG COMMIT_HASH=unknown
 ARG BUILD_DATE
