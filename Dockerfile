@@ -31,7 +31,7 @@ RUN bun run svelte-kit sync && \
     bun run build:no-telemetry
 
 # Production image
-FROM oven/bun:slim
+FROM oven/bun:canary-alpine
 
 # Copy build args to production stage
 ARG BUILD_VERSION
