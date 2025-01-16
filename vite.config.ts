@@ -80,23 +80,28 @@ export default defineConfig(({ mode }): UserConfig => {
           timeout: 5000
         },
         proxy: {
-          '^/ingest/.*': {  // Match any path starting with /ingest/
+          '^/ingest/v1/web/(start|not-started)': {  // Match specific OpenReplay endpoints
             target: import.meta.env.DEV 
                 ? 'https://api.openreplay.com'
                 : 'https://openreplay.prd.shared-services.eu.pvh.cloud',
             changeOrigin: true,
             secure: true,
+            rewrite: (path) => path,  // Keep the full path
             configure: (proxy, _options) => {
                 proxy.on('proxyReq', (proxyReq, req, _res) => {
-                    // Only forward essential headers
-                    if (req.headers.traceparent) {
-                        proxyReq.setHeader('traceparent', req.headers.traceparent);
-                    }
-                    if (req.headers['elastic-apm-traceparent']) {
-                        proxyReq.setHeader('elastic-apm-traceparent', req.headers['elastic-apm-traceparent']);
-                    }
-                    if (req.headers['x-openreplay-session-id']) {
-                        proxyReq.setHeader('x-openreplay-session-id', req.headers['x-openreplay-session-id']);
+                    // Copy all headers
+                    Object.keys(req.headers).forEach(key => {
+                        if (req.headers[key]) {
+                            proxyReq.setHeader(key, req.headers[key]);
+                        }
+                    });
+
+                    // Debug logging
+                    if (import.meta.env.DEV) {
+                        console.log('Proxying OpenReplay request:', {
+                            path: req.url,
+                            headers: req.headers
+                        });
                     }
                 });
             }
