@@ -10,9 +10,34 @@ export const handle: Handle = async ({ event, resolve }) => {
             headers: {
                 'Access-Control-Allow-Origin': '*',
                 'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-                'Access-Control-Allow-Headers': 'Content-Type, Authorization, traceparent, tracestate, elastic-apm-traceparent, x-openreplay-session-id, baggage, sentry-trace, x-requested-with, content-encoding, accept, origin, cache-control, x-openreplay-metadata',
+                'Access-Control-Allow-Headers': [
+                    'Content-Type',
+                    'Authorization',
+                    'traceparent',
+                    'tracestate',
+                    'elastic-apm-traceparent',
+                    'x-openreplay-session-id',
+                    'baggage',
+                    'sentry-trace',
+                    'x-requested-with',
+                    'content-encoding',
+                    'accept',
+                    'origin',
+                    'cache-control',
+                    'x-openreplay-metadata',
+                    'x-openreplay-session-token'
+                ].join(', '),
                 'Access-Control-Max-Age': '86400',
-                'Access-Control-Expose-Headers': 'traceparent, tracestate, elastic-apm-traceparent, x-openreplay-session-id, baggage, sentry-trace, x-openreplay-metadata'
+                'Access-Control-Expose-Headers': [
+                    'traceparent',
+                    'tracestate',
+                    'elastic-apm-traceparent',
+                    'x-openreplay-session-id',
+                    'baggage',
+                    'sentry-trace',
+                    'x-openreplay-metadata',
+                    'x-openreplay-session-token'
+                ].join(', ')
             }
         });
     }
@@ -22,8 +47,33 @@ export const handle: Handle = async ({ event, resolve }) => {
     // Set CORS headers for all responses
     response.headers.set('Access-Control-Allow-Origin', '*');
     response.headers.set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-    response.headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization, traceparent, tracestate, elastic-apm-traceparent, x-openreplay-session-id, baggage, sentry-trace, x-requested-with, content-encoding, accept, origin, cache-control, x-openreplay-metadata');
-    response.headers.set('Access-Control-Expose-Headers', 'traceparent, tracestate, elastic-apm-traceparent, x-openreplay-session-id, baggage, sentry-trace, x-openreplay-metadata');
+    response.headers.set('Access-Control-Allow-Headers', [
+        'Content-Type',
+        'Authorization',
+        'traceparent',
+        'tracestate',
+        'elastic-apm-traceparent',
+        'x-openreplay-session-id',
+        'baggage',
+        'sentry-trace',
+        'x-requested-with',
+        'content-encoding',
+        'accept',
+        'origin',
+        'cache-control',
+        'x-openreplay-metadata',
+        'x-openreplay-session-token'
+    ].join(', '));
+    response.headers.set('Access-Control-Expose-Headers', [
+        'traceparent',
+        'tracestate',
+        'elastic-apm-traceparent',
+        'x-openreplay-session-id',
+        'baggage',
+        'sentry-trace',
+        'x-openreplay-metadata',
+        'x-openreplay-session-token'
+    ].join(', '));
 
     // Include both development and production endpoints regardless of environment
     const openReplayEndpoints = [
@@ -88,8 +138,16 @@ export const handle: Handle = async ({ event, resolve }) => {
         font-src 'self' data:;
         worker-src 'self' blob: 
             https://openreplay.prd.shared-services.eu.pvh.cloud 
+            https://*.openreplay.com;
+        script-src 'self' 'unsafe-inline' 'unsafe-eval'
+            https://openreplay.prd.shared-services.eu.pvh.cloud
+            https://*.openreplay.com;
+        connect-src 'self' 
+            https://openreplay.prd.shared-services.eu.pvh.cloud
             https://*.openreplay.com
-            https://api.openreplay.com;
+            wss://openreplay.prd.shared-services.eu.pvh.cloud
+            wss://*.openreplay.com
+            ${connectSrcAdditions};
         frame-ancestors 'self';
         base-uri 'self';
         object-src 'none'

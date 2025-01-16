@@ -80,13 +80,13 @@ export default defineConfig(({ mode }): UserConfig => {
           timeout: 5000
         },
         proxy: {
-          '^/ingest/v1/web/(start|not-started)': {  // Match specific OpenReplay endpoints
+          '^/ingest/v1/web/(start|not-started)': {  
             target: import.meta.env.DEV 
                 ? 'https://api.openreplay.com'
                 : 'https://openreplay.prd.shared-services.eu.pvh.cloud',
             changeOrigin: true,
             secure: true,
-            rewrite: (path) => path,  // Keep the full path
+            rewrite: (path) => path,
             configure: (proxy, _options) => {
                 proxy.on('proxyReq', (proxyReq, req, _res) => {
                     // Copy all headers
@@ -95,14 +95,6 @@ export default defineConfig(({ mode }): UserConfig => {
                             proxyReq.setHeader(key, req.headers[key]);
                         }
                     });
-
-                    // Debug logging
-                    if (import.meta.env.DEV) {
-                        console.log('Proxying OpenReplay request:', {
-                            path: req.url,
-                            headers: req.headers
-                        });
-                    }
                 });
             }
           }

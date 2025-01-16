@@ -48,8 +48,8 @@ function getCurrentApmTransaction() {
 }
 
 const getIngestPoint = () => {
-    // Always use relative path to force proxy usage
-    return window.location.origin + '/ingest';
+    // Use the existing environment variables that worked before
+    return import.meta.env.PUBLIC_OPENREPLAY_INGEST_POINT;
 };
 
 const getResourceBaseHref = () => {
@@ -75,7 +75,7 @@ export async function initTracker() {
             console.log("🔍 Initializing OpenReplay tracker...");
             
             const tracker = new Tracker({
-                projectKey: frontendConfig.openreplay.PROJECT_KEY,
+                projectKey: import.meta.env.PUBLIC_OPENREPLAY_PROJECT_KEY,
                 ingestPoint: getIngestPoint(),
                 __DISABLE_SECURE_MODE: true,
                 resourceBaseHref: getResourceBaseHref(),
