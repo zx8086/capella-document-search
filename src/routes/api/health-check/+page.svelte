@@ -31,27 +31,34 @@
             const newType = checkType === "Simple" ? "Detailed" : "Simple";
             loadingType = newType;
             
+            console.log(`Starting ${newType} health check...`);
             const response = await fetch(`/api/health-check?type=${newType}`);
+            
             if (!response.ok) {
+                console.error('Health check response not OK:', response.status, response.statusText);
                 throw new Error(`Health check failed: ${response.statusText}`);
             }
             
             const data = await response.json();
-            if (data.status === "ERROR") {
-                throw new Error(data.message || "Health check returned an error");
+            console.log('Health check response:', data);
+            
+            // Update state even if some checks failed
+            checkType = newType;
+            healthStatus = data;
+            
+            // Show error message if there are failed checks but don't prevent display
+            if (data.failedChecks?.length > 0) {
+                error = `Some checks failed: ${data.failedChecks.join(", ")}`;
             }
             
-            // Update the URL and state
+            // Update the URL
             replaceState('', {
                 type: newType,
                 timestamp: Date.now()
             });
-            
-            checkType = newType;
-            healthStatus = data;
         } catch (e) {
+            console.error("Health check error details:", e);
             error = e instanceof Error ? e.message : String(e);
-            console.error("Health check error:", e);
         } finally {
             loading = false;
         }
@@ -90,6 +97,34 @@
             timestamp: new Date().toISOString()
         });
     });
+
+    // Add helper function to get status color
+    function getStatusColor(status: string): string {
+        switch (status) {
+            case 'OK':
+                return 'text-green-600';
+            case 'WARNING':
+                return 'text-yellow-600';
+            case 'ERROR':
+                return 'text-red-600';
+            default:
+                return 'text-gray-600';
+        }
+    }
+
+    // Add helper function to get status background
+    function getStatusBackground(status: string): string {
+        switch (status) {
+            case 'OK':
+                return 'bg-green-50';
+            case 'WARNING':
+                return 'bg-yellow-50';
+            case 'ERROR':
+                return 'bg-red-50';
+            default:
+                return 'bg-gray-50';
+        }
+    }
 </script>
 
 <svelte:head>
@@ -102,11 +137,11 @@
 
     <div class="mb-6">
         <button
-            onclick={toggleCheckType}
-            class="bg-[#00174f] hover:bg-[#00174f]/80 text-white font-bold py-2 px-4 rounded hover:ring-2 hover:ring-red-500 hover:ring-offset-2 transition-all duration-300"
+            on:click={toggleCheckType}
+            class="w-48 bg-[#00174f] hover:bg-[#00174f]/80 text-white font-bold py-2 px-4 rounded hover:ring-2 hover:ring-red-500 hover:ring-offset-2 transition-all duration-300"
             data-transaction-name={`Switch to ${checkType === "Simple" ? "Detailed" : "Simple"} Check`}
         >
-            Switch to {checkType === "Simple" ? "Detailed" : "Simple"} Check
+            Switch to {checkType === "Simple" ? "Detailed" : "Simple"}
         </button>
         <p class="text-sm text-gray-600 mt-2">
             {checkType === "Simple"
@@ -118,28 +153,31 @@
     {#if loading}
         <div class="flex flex-col items-center justify-center gap-4">
             <p class="text-gray-600">
-                Loading {(checkType === "Simple" ? "detailed" : "simple")} health check...
+                Loading {loadingType} health check...
             </p>
             <div class="animate-spin rounded-full h-12 w-12 border-2 border-gray-200 border-b-gray-900">
                 <span class="sr-only">Loading health check status...</span>
             </div>
         </div>
-    {:else if error}
-        <p class="text-red-600">Error fetching health check: {error}</p>
     {:else if healthStatus}
         <div class="bg-white shadow-md rounded px-8 pt-6 pb-8 mb-4">
-            <h2 class="text-xl font-semibold mb-4">
-                Overall Status:
-                <span
-                    class={healthStatus.status === "OK"
-                        ? "text-green-600"
-                        : "text-red-600"}
-                >
-                    {healthStatus.status}
-                </span>
-            </h2>
+            <!-- Overall Status -->
+            <div class={`mb-6 p-4 rounded-lg ${getStatusBackground(healthStatus.status)}`}>
+                <h2 class="text-xl font-semibold mb-2">
+                    Overall Status:
+                    <span class={getStatusColor(healthStatus.status)}>
+                        {healthStatus.status}
+                    </span>
+                </h2>
+                {#if healthStatus.failedChecks?.length > 0}
+                    <p class="text-red-600 text-sm">
+                        Failed checks: {healthStatus.failedChecks.join(', ')}
+                    </p>
+                {/if}
+            </div>
 
-            {#if showBuildInfo}
+            <!-- Version Information -->
+            {#if showBuildInfo && healthStatus.version}
                 <div class="bg-gray-100 p-4 rounded-lg mb-4">
                     <h3 class="text-lg font-semibold mb-2">Version Information</h3>
                     <div class="grid grid-cols-2 gap-2 text-sm">
@@ -155,38 +193,43 @@
                 </div>
             {/if}
 
+            <!-- Check Type -->
             <p class="text-md text-gray-700 mb-4">
-                Check Type: <span class="font-semibold"
-                    >{healthStatus.checkType}</span
-                >
+                Check Type: <span class="font-semibold">{healthStatus.checkType}</span>
             </p>
-            <ul class="space-y-4">
-                {#each Object.entries(healthStatus.checks) as [service, check]}
-                    <li class="border-b pb-2">
-                        <span class="font-medium">{service}:</span>
-                        <span
-                            class={check.status === "OK"
-                                ? "text-green-600 ml-2"
-                                : "text-red-600 ml-2"}
-                        >
-                            {check.status}
-                        </span>
-                        {#if check.responseTime !== undefined}
-                            <span class="text-sm text-gray-600 ml-2">
-                                (Response time: {check.responseTime}ms)
+
+            <!-- Individual Checks -->
+            <div class="space-y-4">
+                {#each Object.entries(healthStatus.checks).sort(([a], [b]) => a.localeCompare(b)) as [service, check]}
+                    <div class={`p-4 rounded-lg ${getStatusBackground(check.status)} border border-${check.status === 'OK' ? 'green' : check.status === 'WARNING' ? 'yellow' : 'red'}-200`}>
+                        <div class="flex justify-between items-start">
+                            <span class="font-medium">{service}:</span>
+                            <span class={getStatusColor(check.status)}>
+                                {check.status}
                             </span>
+                        </div>
+                        {#if check.responseTime !== undefined}
+                            <div class="text-sm text-gray-600 mt-1">
+                                Response time: {check.responseTime}ms
+                            </div>
                         {/if}
                         {#if check.message}
-                            <p class="text-sm text-gray-600 mt-1">
+                            <div class={`text-sm mt-1 ${check.status === 'ERROR' ? 'text-red-600' : 'text-gray-600'}`}>
                                 {check.message}
-                            </p>
+                            </div>
                         {/if}
-                    </li>
+                    </div>
                 {/each}
-            </ul>
+            </div>
+        </div>
+    {:else if error}
+        <div class="bg-red-50 border border-red-200 rounded-lg p-4 mb-4">
+            <p class="text-red-600">{error}</p>
         </div>
     {:else}
-        <p class="text-red-600">No health check data available.</p>
+        <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+            <p class="text-yellow-600">No health check data available.</p>
+        </div>
     {/if}
 </div>
 

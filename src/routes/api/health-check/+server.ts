@@ -20,7 +20,7 @@ import type { RequestEvent } from '@sveltejs/kit';
 
 const INDIVIDUAL_CHECK_TIMEOUT = 15000; // 15 seconds timeout for most checks
 const CAPELLA_API_TIMEOUT = 30000; // 30 seconds timeout for Capella API
-const GLOBAL_CHECK_TIMEOUT = 60000; // 60 seconds timeout for the entire health check dummy
+const GLOBAL_CHECK_TIMEOUT = 60000; // 60 seconds timeout for the entire health check
 
 const BUILD_VERSION = process.env.BUILD_VERSION || 'development';
 const COMMIT_HASH = process.env.COMMIT_HASH || 'unknown';
@@ -169,14 +169,26 @@ async function checkCapellaAPI(): Promise<CheckResult> {
     };
   } catch (error) {
     const duration = Date.now() - startTime;
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    
+    // Handle certificate error specifically
+    if (errorMessage.includes('SELF_SIGNED_CERT_IN_CHAIN')) {
+      return {
+        status: "ERROR",
+        message: "SSL Certificate validation failed for Capella API",
+        responseTime: duration,
+        details: errorMessage
+      };
+    }
+    
     err("Capella Cloud API health check failed:", {
-      error: error instanceof Error ? error.message : String(error),
+      error: errorMessage,
       duration,
       timestamp: new Date().toISOString()
     });
     return {
       status: "ERROR",
-      message: error instanceof Error ? error.message : String(error),
+      message: errorMessage,
       responseTime: duration,
     };
   }
@@ -234,6 +246,131 @@ async function checkInternalAPI(fetch: Function): Promise<CheckResult> {
   }
 }
 
+async function checkOpenReplayEndpoint(): Promise<CheckResult> {
+    const startTime = Date.now();
+    const openReplayUrl = frontendConfig.openreplay.INGEST_POINT;
+
+    try {
+        // Validate configuration
+        if (!openReplayUrl) {
+            return {
+                status: "ERROR",
+                message: "OpenReplay ingest point URL is not configured",
+                responseTime: 0,
+            };
+        }
+
+        // Validate URL format
+        try {
+            new URL(openReplayUrl);
+        } catch {
+            return {
+                status: "ERROR",
+                message: "Invalid OpenReplay ingest point URL format",
+                responseTime: 0,
+            };
+        }
+
+        // Attempt connection with OPTIONS request instead of HEAD
+      const response = await fetch(`${openReplayUrl}/healthz`, {
+            method: "GET",
+            headers: {
+                'Accept': '*/*',
+                'Content-Type': 'application/json'
+            }
+        });
+
+        const duration = Date.now() - startTime;
+
+        // Check if the response is 404 but the base URL might still be valid
+        if (response.status === 404) {
+            const baseResponse = await fetch(openReplayUrl, {
+                method: "GET",
+                headers: {
+                    'Accept': '*/*',
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            if (baseResponse.ok || baseResponse.status === 405) {
+                return {
+                    status: "OK",
+                    message: "OpenReplay endpoint is accessible",
+                    responseTime: duration,
+                };
+            }
+        }
+
+        if (response.ok) {
+            return {
+                status: "OK",
+                message: "OpenReplay endpoint is responsive",
+                responseTime: duration,
+            };
+        }
+
+        // Handle specific status codes
+        if (response.status === 401 || response.status === 403) {
+            return {
+                status: "ERROR",
+                message: "OpenReplay authentication failed",
+                responseTime: duration,
+            };
+        }
+
+        return {
+            status: "WARNING",
+            message: `OpenReplay endpoint responded with status: ${response.status}`,
+            responseTime: duration,
+        };
+
+    } catch (error) {
+        const duration = Date.now() - startTime;
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        
+        // Handle specific error types
+        if (errorMessage.includes('certificate')) {
+            return {
+                status: "ERROR",
+                message: "SSL Certificate validation failed for OpenReplay endpoint",
+                responseTime: duration,
+                details: errorMessage
+            };
+        }
+
+        if (errorMessage.includes('ECONNREFUSED')) {
+            return {
+                status: "ERROR",
+                message: "Connection refused to OpenReplay endpoint",
+                responseTime: duration,
+                details: errorMessage
+            };
+        }
+
+        if (errorMessage.includes('ETIMEDOUT')) {
+            return {
+                status: "ERROR",
+                message: "Connection timed out to OpenReplay endpoint",
+                responseTime: duration,
+                details: errorMessage
+            };
+        }
+
+        err("OpenReplay endpoint health check failed:", {
+            error: errorMessage,
+            duration,
+            timestamp: new Date().toISOString()
+        });
+
+        return {
+            status: "ERROR",
+            message: "Failed to connect to OpenReplay endpoint",
+            responseTime: duration,
+            details: errorMessage
+        };
+    }
+}
+
 export async function GET({ fetch, url }: RequestEvent) {
   try {
     log("Health check started", {
@@ -247,11 +384,9 @@ export async function GET({ fetch, url }: RequestEvent) {
     log(`Processing ${checkType} check`);
     
     const healthStatus: Record<string, CheckResult> = {};
-    
-    // Track which check is currently running
     let currentCheck = "";
-    
-    // Define the checks
+    let failedChecks: string[] = [];
+
     const simpleChecks = [
       { name: "Internal Collections API", check: () => checkInternalAPI(fetch) },
       { name: "SQLite Database", check: checkDatabase },
@@ -262,13 +397,14 @@ export async function GET({ fetch, url }: RequestEvent) {
       ...simpleChecks,
       { name: "Elastic APM Server", check: checkElasticAPMEndpoint },
       { name: "External Capella Cloud API", check: checkCapellaAPI },
+      { name: "OpenReplay Endpoint", check: checkOpenReplayEndpoint },
       // { name: "OpenTelemetry Logs Endpoint", check: checkLogsEndpoint },
       // { name: "OpenTelemetry Metrics Endpoint", check: checkMetricsEndpoint },
       // { name: "OpenTelemetry Traces Endpoint", check: checkTracesEndpoint },
     ].sort((a, b) => a.name.localeCompare(b.name));
     
-    // Ensure we're properly awaiting all check promises
-    const checkPromises = (isSimpleCheck ? simpleChecks : detailedChecks)
+    // Run all checks in parallel but handle each independently
+    await Promise.all((isSimpleCheck ? simpleChecks : detailedChecks)
       .map(async ({ name, check }) => {
         try {
           currentCheck = name;
@@ -292,86 +428,68 @@ export async function GET({ fetch, url }: RequestEvent) {
           });
           
           healthStatus[name] = result;
+          
+          if (result.status === "ERROR") {
+            failedChecks.push(name);
+          }
         } catch (error) {
+          const errorMessage = error instanceof Error ? error.message : String(error);
           err(`Health check failed for ${name}:`, {
-            error: error instanceof Error ? error.message : String(error),
+            error: errorMessage,
             currentCheck,
             timestamp: new Date().toISOString()
           });
           healthStatus[name] = {
             status: "ERROR",
-            message: error instanceof Error ? error.message : String(error),
+            message: errorMessage,
             responseTime: 0
           };
+          failedChecks.push(name);
         }
-      });
+      }));
 
-    // Add global timeout with better error handling
-    try {
-      await Promise.race([
-        Promise.all(checkPromises),
-        new Promise((_, reject) =>
-          setTimeout(
-            () => {
-              err("Global health check timeout", {
-                currentCheck,
-                checkType,
-                timestamp: new Date().toISOString()
-              });
-              reject(new Error("Global health check timeout"));
-            },
-            GLOBAL_CHECK_TIMEOUT,
-          ),
-        ),
-      ]);
-    } catch (error) {
-      err("Global health check error:", {
-        error: error instanceof Error ? error.message : String(error),
-        currentCheck,
-        checkType,
-        timestamp: new Date().toISOString()
-      });
-      return json({
-        status: "ERROR",
-        message: "Health check timed out",
-        checks: healthStatus,
-        checkType: checkType
-      }, { status: 200 });
-    }
-
-    // Log final results
+    // Log final results with detailed information
+    const finalStatus = Object.values(healthStatus).every((s) => s.status === "OK") ? "OK" : "WARNING";
     log("Health check completed", {
-      status: Object.values(healthStatus).every((s) => s.status === "OK") ? "OK" : "ERROR",
+      status: finalStatus,
       checkType,
+      failedChecks,
       results: Object.fromEntries(
-        Object.entries(healthStatus).map(([k, v]) => [k, { status: v.status, responseTime: v.responseTime }])
+        Object.entries(healthStatus).map(([k, v]) => [k, { 
+          status: v.status, 
+          responseTime: v.responseTime,
+          message: v.message 
+        }])
       )
     });
 
-    return json(
-      {
-        status: Object.values(healthStatus).every((s) => s.status === "OK") ? "OK" : "ERROR",
-        version: {
-          build: BUILD_VERSION,
-          commit: COMMIT_HASH,
-          buildDate: BUILD_DATE
-        },
-        checks: healthStatus,
-        checkType: checkType,
+    return json({
+      status: finalStatus,
+      version: {
+        build: BUILD_VERSION,
+        commit: COMMIT_HASH,
+        buildDate: BUILD_DATE
       },
-      { status: 200 },
-    );
+      checks: healthStatus,
+      checkType: checkType,
+      failedChecks: failedChecks.length > 0 ? failedChecks : undefined
+    }, { status: 200 });
   } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : "Unknown error";
     err("Unhandled health check error:", {
-      error: error instanceof Error ? error.message : String(error),
+      error: errorMessage,
       stack: error instanceof Error ? error.stack : undefined,
       timestamp: new Date().toISOString()
     });
     return json({
       status: "ERROR",
-      message: error instanceof Error ? error.message : "Unknown error",
+      message: errorMessage,
       checks: {},
-      checkType: url.searchParams.get("type") || "Simple"
+      checkType: url.searchParams.get("type") || "Simple",
+      error: {
+        message: errorMessage,
+        stack: error instanceof Error ? error.stack : undefined
+      }
     }, { status: 200 });
   }
 }
