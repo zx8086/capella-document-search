@@ -80,7 +80,7 @@ export default defineConfig(({ mode }): UserConfig => {
           timeout: 5000
         },
         proxy: {
-          '/ingest': {
+          '^/ingest/.*': {  // Match any path starting with /ingest/
             target: import.meta.env.DEV 
                 ? 'https://api.openreplay.com'
                 : 'https://openreplay.prd.shared-services.eu.pvh.cloud',
