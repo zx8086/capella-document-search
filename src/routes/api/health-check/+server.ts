@@ -17,6 +17,8 @@ import {
   gql,
 } from "@apollo/client/core";
 import type { RequestEvent } from '@sveltejs/kit';
+import { OpenAI } from "openai";
+import { Pinecone } from "@pinecone-database/pinecone";
 
 const INDIVIDUAL_CHECK_TIMEOUT = 15000; // 15 seconds timeout for most checks
 const CAPELLA_API_TIMEOUT = 30000; // 30 seconds timeout for Capella API
@@ -371,6 +373,82 @@ async function checkOpenReplayEndpoint(): Promise<CheckResult> {
     }
 }
 
+async function checkOpenAIEndpoint(): Promise<CheckResult> {
+    const startTime = Date.now();
+    try {
+        const openai = new OpenAI({
+            apiKey: Bun.env.OPENAI_API_KEY
+        });
+
+        // Simple models list request to check connectivity
+        const response = await openai.models.list();
+        const duration = Date.now() - startTime;
+
+        return {
+            status: "OK",
+            message: "OpenAI API is responsive",
+            responseTime: duration,
+        };
+    } catch (error) {
+        const duration = Date.now() - startTime;
+        const errorMessage = error instanceof Error ? error.message : String(error);
+
+        // Handle specific error cases
+        if (errorMessage.includes('401')) {
+            return {
+                status: "ERROR",
+                message: "OpenAI API key is invalid",
+                responseTime: duration,
+            };
+        }
+
+        err("OpenAI endpoint health check failed:", error);
+        return {
+            status: "ERROR",
+            message: errorMessage,
+            responseTime: duration,
+        };
+    }
+}
+
+async function checkPineconeEndpoint(): Promise<CheckResult> {
+    const startTime = Date.now();
+    try {
+        const pc = new Pinecone({
+            apiKey: Bun.env.PINECONE_API_KEY as string,
+        });
+
+        // List indexes to check connectivity
+        const indexes = await pc.listIndexes();
+        const duration = Date.now() - startTime;
+
+        return {
+            status: "OK",
+            message: `Pinecone API is responsive (${indexes.length} indexes found)`,
+            responseTime: duration,
+        };
+    } catch (error) {
+        const duration = Date.now() - startTime;
+        const errorMessage = error instanceof Error ? error.message : String(error);
+
+        // Handle specific error cases
+        if (errorMessage.includes('401')) {
+            return {
+                status: "ERROR",
+                message: "Pinecone API key is invalid",
+                responseTime: duration,
+            };
+        }
+
+        err("Pinecone endpoint health check failed:", error);
+        return {
+            status: "ERROR",
+            message: errorMessage,
+            responseTime: duration,
+        };
+    }
+}
+
 export async function GET({ fetch, url }: RequestEvent) {
   try {
     log("Health check started", {
@@ -398,6 +476,8 @@ export async function GET({ fetch, url }: RequestEvent) {
       { name: "Elastic APM Server", check: checkElasticAPMEndpoint },
       { name: "External Capella Cloud API", check: checkCapellaAPI },
       { name: "OpenReplay Endpoint", check: checkOpenReplayEndpoint },
+      { name: "OpenAI API", check: checkOpenAIEndpoint },
+      { name: "Pinecone API", check: checkPineconeEndpoint },
       // { name: "OpenTelemetry Logs Endpoint", check: checkLogsEndpoint },
       // { name: "OpenTelemetry Metrics Endpoint", check: checkMetricsEndpoint },
       // { name: "OpenTelemetry Traces Endpoint", check: checkTracesEndpoint },
