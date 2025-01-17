@@ -88,14 +88,89 @@ export default defineConfig(({ mode }): UserConfig => {
             secure: true,
             rewrite: (path) => path,
             configure: (proxy, _options) => {
-                proxy.on('proxyReq', (proxyReq, req, _res) => {
-                    // Copy all headers
+              proxy.on('proxyReq', (proxyReq, req, _res) => {
+                try {
+                  // Handle preflight requests
+                  if (req.method === 'OPTIONS') {
+                    proxyReq.setHeader('Access-Control-Allow-Origin', '*');
+                    proxyReq.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+                    proxyReq.setHeader('Access-Control-Allow-Headers', [
+                      'Content-Type',
+                      'Authorization',
+                      'traceparent',
+                      'tracestate',
+                      'elastic-apm-traceparent',
+                      'x-openreplay-session-id',
+                      'baggage',
+                      'sentry-trace',
+                      'x-requested-with',
+                      'content-encoding',
+                      'accept',
+                      'origin',
+                      'cache-control',
+                      'x-openreplay-metadata',
+                      'x-openreplay-session-token'
+                    ].join(', '));
+                    proxyReq.setHeader('Access-Control-Max-Age', '86400');
+                  }
+
+                  // Copy original headers for all requests
+                  if (req.headers) {
                     Object.keys(req.headers).forEach(key => {
-                        if (req.headers[key]) {
-                            proxyReq.setHeader(key, req.headers[key]);
-                        }
+                      if (req.headers[key]) {
+                        proxyReq.setHeader(key, req.headers[key]);
+                      }
                     });
-                });
+                  }
+
+                  // Ensure critical OpenReplay headers are set
+                  const criticalHeaders = ['traceparent', 'x-openreplay-session-id'];
+                  criticalHeaders.forEach(header => {
+                    if (req.headers[header]) {
+                      proxyReq.setHeader(header, req.headers[header]);
+                    }
+                  });
+
+                } catch (error) {
+                  console.error('Error in proxy request:', error);
+                }
+              });
+
+              // Handle the proxy response
+              proxy.on('proxyRes', (proxyRes, req, res) => {
+                try {
+                  proxyRes.headers['access-control-allow-origin'] = '*';
+                  proxyRes.headers['access-control-allow-methods'] = 'GET, POST, PUT, DELETE, OPTIONS';
+                  proxyRes.headers['access-control-allow-headers'] = [
+                    'Content-Type',
+                    'Authorization',
+                    'traceparent',
+                    'tracestate',
+                    'elastic-apm-traceparent',
+                    'x-openreplay-session-id',
+                    'baggage',
+                    'sentry-trace',
+                    'x-requested-with',
+                    'content-encoding',
+                    'accept',
+                    'origin',
+                    'cache-control',
+                    'x-openreplay-metadata',
+                    'x-openreplay-session-token'
+                  ].join(', ');
+
+                  if (req.method === 'OPTIONS') {
+                    proxyRes.statusCode = 204;
+                  }
+                } catch (error) {
+                  console.error('Error in proxy response:', error);
+                }
+              });
+
+              // Error handling
+              proxy.on('error', (err, req, res) => {
+                console.error('Proxy error:', err);
+              });
             }
           }
         }
