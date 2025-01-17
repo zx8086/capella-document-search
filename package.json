@@ -130,7 +130,9 @@
   ],
   "snyk": true,
   "resolutions": {
-    "xmlhttprequest": "1.7.0",
+    "xmlhttprequest": "1.7.0"
+  },
+  "overrides": {
     "cookie": "^0.7.0"
   }
 }
