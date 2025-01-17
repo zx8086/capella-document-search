@@ -34,10 +34,16 @@ async function checkOpenTelemetryEndpoint(
 ): Promise<CheckResult> {
   const startTime = Date.now();
   try {
-    const response = await fetch(url, { method: "HEAD" });
+    const response = await fetch(url, {
+      method: "POST",
+      headers: {
+        'Content-Type': 'application/x-protobuf',
+        'Accept': 'application/x-protobuf'
+      }
+    });
     const duration = Date.now() - startTime;
 
-    if (response.ok) {
+    if (response.ok || response.status === 415 || response.status === 400) {
       return {
         status: "OK",
         message: `${name} endpoint is responsive`,
@@ -478,9 +484,9 @@ export async function GET({ fetch, url }: RequestEvent) {
       { name: "OpenReplay Endpoint", check: checkOpenReplayEndpoint },
       { name: "OpenAI API", check: checkOpenAIEndpoint },
       { name: "Pinecone API", check: checkPineconeEndpoint },
-      // { name: "OpenTelemetry Logs Endpoint", check: checkLogsEndpoint },
-      // { name: "OpenTelemetry Metrics Endpoint", check: checkMetricsEndpoint },
-      // { name: "OpenTelemetry Traces Endpoint", check: checkTracesEndpoint },
+      { name: "OpenTelemetry Logs Endpoint", check: checkLogsEndpoint },
+      { name: "OpenTelemetry Metrics Endpoint", check: checkMetricsEndpoint },
+      { name: "OpenTelemetry Traces Endpoint", check: checkTracesEndpoint },
     ].sort((a, b) => a.name.localeCompare(b.name));
     
     // Run all checks in parallel but handle each independently
