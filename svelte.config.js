@@ -52,6 +52,13 @@ const config = {
           "https://openreplay.prd.shared-services.eu.pvh.cloud",
           "wss://openreplay.prd.shared-services.eu.pvh.cloud",
           "https://*.openreplay.prd.shared-services.eu.pvh.cloud",
+          "wss://*.openreplay.prd.shared-services.eu.pvh.cloud",
+          "https://*.openreplay.com",
+          "wss://*.openreplay.com",
+          "https://api.openreplay.com",
+          "https://openreplay.prd.shared-services.eu.pvh.cloud",
+          "wss://openreplay.prd.shared-services.eu.pvh.cloud",
+          "https://*.openreplay.prd.shared-services.eu.pvh.cloud",
           "wss://*.openreplay.prd.shared-services.eu.pvh.cloud"
         ],
         "script-src": [
@@ -59,7 +66,10 @@ const config = {
           "'unsafe-inline'",
           "'unsafe-eval'",
           "https://vjs.zencdn.net",
-          "blob:"
+          "blob:",
+          "https://openreplay.prd.shared-services.eu.pvh.cloud",
+          "https://api.openreplay.com",
+          "https://static.openreplay.com"
         ],
         "style-src": [
           "'self'",

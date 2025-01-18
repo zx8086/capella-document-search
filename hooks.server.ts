@@ -9,35 +9,10 @@ export const handle: Handle = async ({ event, resolve }) => {
             status: 204,
             headers: {
                 'Access-Control-Allow-Origin': '*',
-                'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-                'Access-Control-Allow-Headers': [
-                    'Content-Type',
-                    'Authorization',
-                    'traceparent',
-                    'tracestate',
-                    'elastic-apm-traceparent',
-                    'x-openreplay-session-id',
-                    'baggage',
-                    'sentry-trace',
-                    'x-requested-with',
-                    'content-encoding',
-                    'accept',
-                    'origin',
-                    'cache-control',
-                    'x-openreplay-metadata',
-                    'x-openreplay-session-token'
-                ].join(', '),
+                'Access-Control-Allow-Methods': '*',
+                'Access-Control-Allow-Headers': '*',
                 'Access-Control-Max-Age': '86400',
-                'Access-Control-Expose-Headers': [
-                    'traceparent',
-                    'tracestate',
-                    'elastic-apm-traceparent',
-                    'x-openreplay-session-id',
-                    'baggage',
-                    'sentry-trace',
-                    'x-openreplay-metadata',
-                    'x-openreplay-session-token'
-                ].join(', ')
+                'Access-Control-Expose-Headers': '*'
             }
         });
     }
@@ -46,34 +21,9 @@ export const handle: Handle = async ({ event, resolve }) => {
     
     // Set CORS headers for all responses
     response.headers.set('Access-Control-Allow-Origin', '*');
-    response.headers.set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-    response.headers.set('Access-Control-Allow-Headers', [
-        'Content-Type',
-        'Authorization',
-        'traceparent',
-        'tracestate',
-        'elastic-apm-traceparent',
-        'x-openreplay-session-id',
-        'baggage',
-        'sentry-trace',
-        'x-requested-with',
-        'content-encoding',
-        'accept',
-        'origin',
-        'cache-control',
-        'x-openreplay-metadata',
-        'x-openreplay-session-token'
-    ].join(', '));
-    response.headers.set('Access-Control-Expose-Headers', [
-        'traceparent',
-        'tracestate',
-        'elastic-apm-traceparent',
-        'x-openreplay-session-id',
-        'baggage',
-        'sentry-trace',
-        'x-openreplay-metadata',
-        'x-openreplay-session-token'
-    ].join(', '));
+    response.headers.set('Access-Control-Allow-Methods', '*');
+    response.headers.set('Access-Control-Allow-Headers', '*');
+    response.headers.set('Access-Control-Expose-Headers', '*');
 
     // Include both development and production endpoints regardless of environment
     const openReplayEndpoints = [
