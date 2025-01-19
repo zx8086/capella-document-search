@@ -47,7 +47,12 @@ jobs:
 
       - name: Install Syft
         run: |
-          curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh | sudo sh -s -- -b /usr/local/bin
+          SYFT_FILENAME="syft_${SYFT_VERSION}_linux_amd64.tar.gz"
+          curl -sSfL "https://github.com/anchore/syft/releases/download/${SYFT_VERSION}/${SYFT_FILENAME}" -o syft.tar.gz
+          tar -xzf syft.tar.gz syft
+          chmod +x syft
+          sudo mv syft /usr/local/bin/
+          rm syft.tar.gz
           # Verify installation
           syft --version
 
