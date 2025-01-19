@@ -376,12 +376,13 @@ jobs:
               --file=Dockerfile \
               --platform=linux/amd64 \
               --severity-threshold=high \
-              --sarif-file-output=snyk-docker.sarif || true
+              --sarif-file-output=snyk-docker.sarif \
+              --json > snyk-report.json || echo "Vulnerabilities found but continuing..."
               
             if [[ "${{ github.ref }}" == "refs/heads/master" ]]; then
               bun run snyk container monitor docker.io/zx8086/capella-document-search:latest \
                 --file=Dockerfile \
-                --platform=linux/amd64 || true
+                --platform=linux/amd64 || echo "Monitor command failed but continuing..."
             fi
           else
             echo "Skipping Snyk container scan for ${{ matrix.platform }} - only running on amd64"
