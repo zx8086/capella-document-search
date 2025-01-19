@@ -39,23 +39,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # Add these new installation steps
-      - name: Install Cosign
-        uses: sigstore/cosign-installer@v3.3.0
-        with:
-          cosign-release: 'v2.2.2'
-
-      - name: Install Syft
-        run: |
-          SYFT_FILENAME="syft_${SYFT_VERSION}_linux_amd64.tar.gz"
-          curl -sSfL "https://github.com/anchore/syft/releases/download/${SYFT_VERSION}/${SYFT_FILENAME}" -o syft.tar.gz
-          tar -xzf syft.tar.gz syft
-          chmod +x syft
-          sudo mv syft /usr/local/bin/
-          rm syft.tar.gz
-          # Verify installation
-          syft --version
-
       - name: Install additional security tools
         run: |
           # Install jq if not present
