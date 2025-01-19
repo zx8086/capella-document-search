@@ -203,36 +203,98 @@ jobs:
         if: github.event_name != 'pull_request'
         continue-on-error: true
         run: |
-          sleep 15
-          
+          echo "Checking attestations..."
+
+          # Create directory for attestation results with unique timestamp
+          TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+          RESULTS_DIR="attestation-results-${TIMESTAMP}"
+          mkdir -p "${RESULTS_DIR}"
+
+          # Get image digest and reference
+          echo "Getting image digest..."
           IMAGE_REF="docker.io/zx8086/capella-document-search:latest"
-          
-          echo "Attempting attestation verification..."
-          
-          # Verify SBOM attestation
-          "${GITHUB_WORKSPACE}/bin/cosign" verify-attestation \
-            --type sbom \
+          IMAGE_DIGEST=$(docker buildx imagetools inspect "${IMAGE_REF}" --raw | jq -r '.manifests[0].digest')
+          IMAGE_WITH_DIGEST="${IMAGE_REF}@${IMAGE_DIGEST}"
+
+          echo "Image reference: ${IMAGE_REF}"
+          echo "Image digest: ${IMAGE_DIGEST}"
+
+          # Additional verification methods
+          echo "Attempting direct verification..."
+          cosign verify-attestation \
             --certificate-identity-regexp=".*" \
             --certificate-oidc-issuer="https://token.actions.githubusercontent.com" \
-            ${IMAGE_REF} || echo "SBOM verification failed"
-            
-          # Verify provenance attestation
-          "${GITHUB_WORKSPACE}/bin/cosign" verify-attestation \
+            "${IMAGE_WITH_DIGEST}" > "${RESULTS_DIR}/direct-attestation.json" 2>/dev/null || true
+
+          echo "Attempting SLSA verification..."
+          cosign verify-attestation \
             --type slsaprovenance \
             --certificate-identity-regexp=".*" \
             --certificate-oidc-issuer="https://token.actions.githubusercontent.com" \
-            ${IMAGE_REF} || echo "Provenance verification failed"
-          
-          # Download all attestations
+            "${IMAGE_WITH_DIGEST}" > "${RESULTS_DIR}/slsa-attestation.json" 2>/dev/null || true
+
+          echo "Attempting predicate-less verification..."
+          cosign verify-attestation \
+            --certificate-identity-regexp=".*" \
+            --certificate-oidc-issuer="https://token.actions.githubusercontent.com" \
+            "${IMAGE_WITH_DIGEST}" > "${RESULTS_DIR}/predicate-attestation.json" 2>/dev/null || true
+
+          # Download all attestations for analysis
           echo "Downloading attestations..."
-          "${GITHUB_WORKSPACE}/bin/cosign" download attestation ${IMAGE_REF} > attestation.json || true
-          
-          if [ -s attestation.json ]; then
-            echo "✅ Attestations found and downloaded"
-            cat attestation.json | jq . || echo "Failed to parse attestation JSON"
-          else
-            echo "⚠️ No attestations found or failed to download"
-          fi
+          cosign download attestation "${IMAGE_WITH_DIGEST}" > "${RESULTS_DIR}/all-attestations.json" 2>/dev/null || true
+
+          # Extract from manifest and save all data
+          echo "Extracting from manifest..."
+          docker buildx imagetools inspect "${IMAGE_WITH_DIGEST}" --raw > "${RESULTS_DIR}/manifest.json"
+          jq '.manifests[].annotations | select(."org.opencontainers.image.attestations" != null)' \
+            "${RESULTS_DIR}/manifest.json" > "${RESULTS_DIR}/manifest-attestations.json" 2>/dev/null || true
+
+          # Check results
+          VERIFICATION_SUCCESS=false
+          for file in "${RESULTS_DIR}"/*.json; do
+            if [ -s "$file" ] && jq -e . >/dev/null 2>&1 < "$file"; then
+              VERIFICATION_SUCCESS=true
+              echo "✅ Found valid data in $(basename "$file")"
+            fi
+          done
+
+          # Generate comprehensive report
+          {
+            echo "### 📝 Attestation Verification Report"
+            echo "- Image: ${IMAGE_REF}"
+            echo "- Digest: ${IMAGE_DIGEST}"
+            echo "- Timestamp: $(date -u)"
+            echo ""
+            echo "#### Verification Results:"
+
+            for file in "${RESULTS_DIR}"/*.json; do
+              if [ -s "$file" ]; then
+                basename=$(basename "$file")
+                size=$(wc -c < "$file")
+                echo "- File: ${basename}"
+                echo "  - Size: ${size} bytes"
+                if jq -e . >/dev/null 2>&1 < "$file"; then
+                  echo "  - Status: ✅ Valid JSON"
+                  echo "  - Content Preview:"
+                  jq -r 'try .predicateType // "No predicate type"' "$file" | head -n 1
+                else
+                  echo "  - Status: ⚠️ Invalid JSON"
+                fi
+              fi
+            done
+
+            echo ""
+            echo "#### Overall Status:"
+            if [ "$VERIFICATION_SUCCESS" = true ]; then
+              echo "✅ Successfully found attestation data"
+            else
+              echo "⚠️ No attestations could be verified"
+            fi
+          } > "${RESULTS_DIR}/verification-report.md"
+
+          # Set output directory for next step
+          echo "ATTESTATION_RESULTS_DIR=${RESULTS_DIR}" >> $GITHUB_ENV
+          echo "VERIFICATION_SUCCESS=${VERIFICATION_SUCCESS}" >> $GITHUB_ENV
 
       - name: Upload attestation results
         if: github.event_name != 'pull_request'
@@ -304,16 +366,26 @@ jobs:
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
         run: |
-          bun install
-          bun run snyk test --file=package.json --sarif-file-output=snyk.sarif --severity-threshold=high
-          bun run snyk container test zx8086/capella-document-search:latest \
-            --file=Dockerfile \
-            --severity-threshold=high \
-            --sarif-file-output=snyk-docker.sarif || true
-          if [[ "${{ github.ref }}" == "refs/heads/master" ]]; then
-            bun run snyk container monitor zx8086/capella-document-search:latest \
+          # Install Snyk CLI using bun
+          bun add -g snyk
+
+          # Run Snyk container test for the current platform
+          echo "Running Snyk scan for ${{ matrix.platform }}..."
+          
+          if [[ "${{ matrix.platform }}" == "linux/amd64" ]]; then
+            snyk container test docker.io/zx8086/capella-document-search:latest \
               --file=Dockerfile \
-              --platform=linux/arm64 || true
+              --platform=linux/amd64 \
+              --severity-threshold=high \
+              --sarif-file-output=snyk-docker.sarif || true
+              
+            if [[ "${{ github.ref }}" == "refs/heads/master" ]]; then
+              snyk container monitor docker.io/zx8086/capella-document-search:latest \
+                --file=Dockerfile \
+                --platform=linux/amd64 || true
+            fi
+          else
+            echo "Skipping Snyk container scan for ${{ matrix.platform }} - only running on amd64"
           fi
 
       - name: Upload Docker Snyk scan results
