@@ -144,9 +144,9 @@ jobs:
           provenance: true
           sbom: true
           cache-from: |
-            type=registry,ref=docker.io/zx8086/capellaql:buildcache
+            type=registry,ref=docker.io/zx8086/capella-document-search:buildcache
           cache-to: |
-            type=registry,ref=docker.io/zx8086/capellaql:buildcache,mode=max
+            type=registry,ref=docker.io/zx8086/capella-document-search:buildcache,mode=max
 
       # Add these new steps after the build step
       - name: Push image with digest
@@ -154,14 +154,14 @@ jobs:
         run: |
           DIGEST="${{ steps.docker_build.outputs.digest }}"
           docker buildx imagetools create \
-            --tag docker.io/zx8086/capellaql:latest \
-            --tag docker.io/zx8086/capellaql:${{ github.sha }} \
-            docker.io/zx8086/capellaql@${DIGEST}
+            --tag docker.io/zx8086/capella-document-search:latest \
+            --tag docker.io/zx8086/capella-document-search:${{ github.sha }} \
+            docker.io/zx8086/capella-document-search@${DIGEST}
 
       - name: Validate image metadata
         if: github.event_name != 'pull_request'
         run: |
-          IMAGE_REF="docker.io/zx8086/capellaql:latest"
+          IMAGE_REF="docker.io/zx8086/capella-document-search:latest"
           echo "Validating image metadata..."
           docker buildx imagetools inspect ${IMAGE_REF} --format '{{json .}}' | jq .
 
@@ -169,7 +169,7 @@ jobs:
         if: github.event_name != 'pull_request'
         run: |
           echo "Checking manifest..."
-          MANIFEST=$(docker buildx imagetools inspect docker.io/zx8086/capellaql:latest --raw)
+          MANIFEST=$(docker buildx imagetools inspect docker.io/zx8086/capella-document-search:latest --raw)
           echo "$MANIFEST" | jq .
 
       - name: Verify image attestations
@@ -179,7 +179,7 @@ jobs:
             --type slsaprovenance \
             --certificate-identity-regexp=".*" \
             --certificate-oidc-issuer="https://token.actions.githubusercontent.com" \
-            docker.io/zx8086/capellaql:latest
+            docker.io/zx8086/capella-document-search:latest
 
       - name: Upload attestation results
         if: github.event_name != 'pull_request'
@@ -195,7 +195,7 @@ jobs:
         if: github.event_name != 'pull_request'
         run: |
           mkdir -p sbom-output
-          syft docker.io/zx8086/capellaql:latest \
+          syft docker.io/zx8086/capella-document-search:latest \
             -o json=sbom-output/syft-sbom.json \
             -o spdx-json=sbom-output/spdx-sbom.json \
             -o cyclonedx-json=sbom-output/cyclonedx-sbom.json

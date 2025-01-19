@@ -137,7 +137,7 @@
 
     <div class="mb-6">
         <button
-            on:click={toggleCheckType}
+            onclick={toggleCheckType}
             class="w-48 bg-[#00174f] hover:bg-[#00174f]/80 text-white font-bold py-2 px-4 rounded hover:ring-2 hover:ring-red-500 hover:ring-offset-2 transition-all duration-300"
             data-transaction-name={`Switch to ${checkType === "Simple" ? "Detailed" : "Simple"} Check`}
         >
