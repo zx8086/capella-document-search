@@ -141,13 +141,12 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           platforms: ${{ matrix.platform }}
-          builder: ${{ format('builder-{0}', matrix.platform-name) }}
           provenance: true
           sbom: true
           cache-from: |
-            type=registry,ref=docker.io/zx8086/capellaql:buildcache-${{ matrix.platform-name }}
+            type=registry,ref=docker.io/zx8086/capellaql:buildcache
           cache-to: |
-            type=registry,ref=docker.io/zx8086/capellaql:buildcache-${{ matrix.platform-name }},mode=max
+            type=registry,ref=docker.io/zx8086/capellaql:buildcache,mode=max
 
       # Add these new steps after the build step
       - name: Push image with digest
