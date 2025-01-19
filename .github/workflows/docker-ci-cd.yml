@@ -42,22 +42,27 @@ jobs:
       - name: Install verification tools
         shell: bash
         run: |
-          mkdir -p ~/tmp
+          # Create directories with sudo
+          sudo mkdir -p ~/tmp
+          sudo chown $USER:$USER ~/tmp
           cd ~/tmp
 
-          # Install cosign
+          # Install cosign without sudo (downloaded to tmp first)
           curl -Lo cosign https://github.com/sigstore/cosign/releases/latest/download/cosign-linux-arm64
           chmod +x cosign
-          sudo mv cosign /usr/local/bin/
+          sudo install cosign /usr/local/bin/
 
-          # Install syft
-          curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh | sudo sh -s -- -b /usr/local/bin
+          # Install syft using direct download and install
+          SYFT_RELEASE=$(curl -s https://api.github.com/repos/anchore/syft/releases/latest | grep -o '"tag_name": ".*"' | cut -d'"' -f4)
+          curl -Lo syft.tar.gz "https://github.com/anchore/syft/releases/download/${SYFT_RELEASE}/syft_${SYFT_RELEASE#v}_linux_amd64.tar.gz"
+          tar xzf syft.tar.gz syft
+          sudo install syft /usr/local/bin/
 
-          cd - && rm -rf ~/tmp
+          cd - && sudo rm -rf ~/tmp
 
           # Verify installations
-          echo "Cosign version: $(cosign version)"
-          echo "Syft version: $(syft --version)"
+          cosign version || true
+          syft --version || true
 
       - name: Install additional security tools
         run: |
