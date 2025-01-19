@@ -201,26 +201,32 @@ jobs:
 
       - name: Verify image attestations
         if: github.event_name != 'pull_request'
-        continue-on-error: true  # Allow the workflow to continue if verification fails
+        continue-on-error: true
         run: |
-          # Wait for attestations to be available
           sleep 15
           
           IMAGE_REF="docker.io/zx8086/capella-document-search:latest"
           
           echo "Attempting attestation verification..."
           
-          # Try different verification methods
+          # Verify SBOM attestation
           "${GITHUB_WORKSPACE}/bin/cosign" verify-attestation \
+            --type sbom \
             --certificate-identity-regexp=".*" \
             --certificate-oidc-issuer="https://token.actions.githubusercontent.com" \
-            ${IMAGE_REF} || echo "Standard verification failed"
+            ${IMAGE_REF} || echo "SBOM verification failed"
+            
+          # Verify provenance attestation
+          "${GITHUB_WORKSPACE}/bin/cosign" verify-attestation \
+            --type slsaprovenance \
+            --certificate-identity-regexp=".*" \
+            --certificate-oidc-issuer="https://token.actions.githubusercontent.com" \
+            ${IMAGE_REF} || echo "Provenance verification failed"
           
-          # Download attestations for inspection
+          # Download all attestations
           echo "Downloading attestations..."
           "${GITHUB_WORKSPACE}/bin/cosign" download attestation ${IMAGE_REF} > attestation.json || true
           
-          # Check if we got any attestations
           if [ -s attestation.json ]; then
             echo "✅ Attestations found and downloaded"
             cat attestation.json | jq . || echo "Failed to parse attestation JSON"
@@ -265,6 +271,7 @@ jobs:
           
           # Run container with properly formatted environment variables
           docker run -d \
+            --platform linux/amd64 \
             --name capella-search-test \
             -p 3000:3000 \
             --env-file .env \
