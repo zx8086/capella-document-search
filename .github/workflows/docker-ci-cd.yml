@@ -42,10 +42,11 @@ jobs:
       - name: Install verification tools
         shell: bash
         run: |
-          # Create temp directory in the workspace
-          TEMP_DIR="${GITHUB_WORKSPACE}/tmp"
-          mkdir -p "${TEMP_DIR}"
-          cd "${TEMP_DIR}"
+          # Create directories first
+          mkdir -p "${GITHUB_WORKSPACE}/bin"
+          mkdir -p "${GITHUB_WORKSPACE}/tmp"
+          
+          cd "${GITHUB_WORKSPACE}/tmp"
 
           # Install cosign
           curl -Lo cosign https://github.com/sigstore/cosign/releases/latest/download/cosign-linux-arm64
@@ -59,15 +60,15 @@ jobs:
           mv syft "${GITHUB_WORKSPACE}/bin/"
 
           # Add to PATH
-          mkdir -p "${GITHUB_WORKSPACE}/bin"
           echo "${GITHUB_WORKSPACE}/bin" >> $GITHUB_PATH
 
+          # Cleanup
           cd "${GITHUB_WORKSPACE}"
-          rm -rf "${TEMP_DIR}"
+          rm -rf "${GITHUB_WORKSPACE}/tmp"
 
           # Verify installations
-          cosign version || true
-          syft --version || true
+          "${GITHUB_WORKSPACE}/bin/cosign" version || true
+          "${GITHUB_WORKSPACE}/bin/syft" --version || true
 
       - name: Install additional security tools
         run: |
