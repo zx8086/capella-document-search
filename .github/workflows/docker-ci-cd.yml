@@ -42,23 +42,28 @@ jobs:
       - name: Install verification tools
         shell: bash
         run: |
-          # Create directories with sudo
-          sudo mkdir -p ~/tmp
-          sudo chown $USER:$USER ~/tmp
-          cd ~/tmp
+          # Create temp directory in the workspace
+          TEMP_DIR="${GITHUB_WORKSPACE}/tmp"
+          mkdir -p "${TEMP_DIR}"
+          cd "${TEMP_DIR}"
 
-          # Install cosign without sudo (downloaded to tmp first)
+          # Install cosign
           curl -Lo cosign https://github.com/sigstore/cosign/releases/latest/download/cosign-linux-arm64
           chmod +x cosign
-          sudo install cosign /usr/local/bin/
+          mv cosign "${GITHUB_WORKSPACE}/bin/"
 
-          # Install syft using direct download and install
+          # Install syft
           SYFT_RELEASE=$(curl -s https://api.github.com/repos/anchore/syft/releases/latest | grep -o '"tag_name": ".*"' | cut -d'"' -f4)
           curl -Lo syft.tar.gz "https://github.com/anchore/syft/releases/download/${SYFT_RELEASE}/syft_${SYFT_RELEASE#v}_linux_amd64.tar.gz"
           tar xzf syft.tar.gz syft
-          sudo install syft /usr/local/bin/
+          mv syft "${GITHUB_WORKSPACE}/bin/"
 
-          cd - && sudo rm -rf ~/tmp
+          # Add to PATH
+          mkdir -p "${GITHUB_WORKSPACE}/bin"
+          echo "${GITHUB_WORKSPACE}/bin" >> $GITHUB_PATH
+
+          cd "${GITHUB_WORKSPACE}"
+          rm -rf "${TEMP_DIR}"
 
           # Verify installations
           cosign version || true
