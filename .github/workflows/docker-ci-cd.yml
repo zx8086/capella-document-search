@@ -17,13 +17,56 @@ env:
   BUILDX_NO_DEFAULT_LOAD: true
   BUILDKIT_INLINE_CACHE: 1
   BUILDX_CACHE_TTL: "168h"
+  COSIGN_VERSION: "v2.2.2"
+  SYFT_VERSION: "v1.0.0"
+  COSIGN_YES: "true"  # Auto-confirm cosign operations
+  COSIGN_EXPERIMENTAL: "true"  # Enable experimental features
 
 jobs:
   build-and-deploy:
     runs-on: self-hosted
+    strategy:
+      matrix:
+        platform:
+          - linux/amd64
+          - linux/arm64
+        include:
+          - platform: linux/amd64
+            platform-name: amd64
+          - platform: linux/arm64
+            platform-name: arm64
 
     steps:
       - uses: actions/checkout@v4
+
+      # Add these new installation steps
+      - name: Install Cosign
+        uses: sigstore/cosign-installer@v3.3.0
+        with:
+          cosign-release: 'v2.2.2'
+
+      - name: Install Syft
+        run: |
+          curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh | sh -s -- -b /usr/local/bin
+          # Verify installation
+          syft --version
+
+      - name: Install additional security tools
+        run: |
+          # Install jq if not present
+          if ! command -v jq &> /dev/null; then
+            sudo apt-get update && sudo apt-get install -y jq
+          fi
+
+          # Verify installations
+          echo "Cosign version: $(cosign version)"
+          echo "Syft version: $(syft --version)"
+          echo "JQ version: $(jq --version)"
+
+          # Create directories for security artifacts
+          mkdir -p security-artifacts/attestations
+          mkdir -p security-artifacts/sbom
+          mkdir -p security-artifacts/signatures
 
       # Initial Setup
       - name: Set build timestamp
@@ -103,23 +146,80 @@ jobs:
       # Build and push section
       - name: Build and push Docker image
         uses: docker/build-push-action@v6
+        id: docker_build
         with:
           context: .
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          platforms: linux/amd64,linux/arm64
+          platforms: ${{ matrix.platform }}
+          builder: ${{ format('builder-{0}', matrix.platform-name) }}
           provenance: true
           sbom: true
-          cache-from: type=registry,ref=docker.io/zx8086/capella-document-search:buildcache
-          cache-to: type=registry,ref=docker.io/zx8086/capella-document-search:buildcache,mode=max
-          build-args: |
-            BUILDKIT_INLINE_CACHE=1
-            DOCKER_BUILDKIT=1
-            NODE_ENV=production
-            BUILD_DATE=${{ env.BUILD_TIMESTAMP }}
-            BUILD_VERSION=${{ github.ref_name || '0.0.1' }}
-            COMMIT_HASH=${{ github.sha }}
+          cache-from: |
+            type=registry,ref=docker.io/zx8086/capellaql:buildcache-${{ matrix.platform-name }}
+          cache-to: |
+            type=registry,ref=docker.io/zx8086/capellaql:buildcache-${{ matrix.platform-name }},mode=max
+
+      # Add these new steps after the build step
+      - name: Push image with digest
+        if: github.event_name != 'pull_request'
+        run: |
+          DIGEST="${{ steps.docker_build.outputs.digest }}"
+          docker buildx imagetools create \
+            --tag docker.io/zx8086/capellaql:latest \
+            --tag docker.io/zx8086/capellaql:${{ github.sha }} \
+            docker.io/zx8086/capellaql@${DIGEST}
+
+      - name: Validate image metadata
+        if: github.event_name != 'pull_request'
+        run: |
+          IMAGE_REF="docker.io/zx8086/capellaql:latest"
+          echo "Validating image metadata..."
+          docker buildx imagetools inspect ${IMAGE_REF} --format '{{json .}}' | jq .
+
+      - name: Verify image manifest
+        if: github.event_name != 'pull_request'
+        run: |
+          echo "Checking manifest..."
+          MANIFEST=$(docker buildx imagetools inspect docker.io/zx8086/capellaql:latest --raw)
+          echo "$MANIFEST" | jq .
+
+      - name: Verify image attestations
+        if: github.event_name != 'pull_request'
+        run: |
+          cosign verify-attestation \
+            --type slsaprovenance \
+            --certificate-identity-regexp=".*" \
+            --certificate-oidc-issuer="https://token.actions.githubusercontent.com" \
+            docker.io/zx8086/capellaql:latest
+
+      - name: Upload attestation results
+        if: github.event_name != 'pull_request'
+        uses: actions/upload-artifact@v4
+        with:
+          name: attestation-results-${{ matrix.platform-name }}
+          path: |
+            attestation.json
+            provenance.json
+          retention-days: 90
+
+      - name: Verify SBOM
+        if: github.event_name != 'pull_request'
+        run: |
+          mkdir -p sbom-output
+          syft docker.io/zx8086/capellaql:latest \
+            -o json=sbom-output/syft-sbom.json \
+            -o spdx-json=sbom-output/spdx-sbom.json \
+            -o cyclonedx-json=sbom-output/cyclonedx-sbom.json
+
+      - name: Upload SBOM Files
+        if: github.event_name != 'pull_request'
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom-files-${{ matrix.platform-name }}
+          path: sbom-output/
+          retention-days: 90
 
       # Testing section
       - name: Test container
@@ -217,4 +317,7 @@ jobs:
           docker volume prune -f
           docker builder prune -a -f
           rm -rf node_modules
+          rm -rf security-artifacts
+          rm -rf /usr/local/bin/syft
+          rm -rf ~/.sigstore
           echo "Cleanup completed"
