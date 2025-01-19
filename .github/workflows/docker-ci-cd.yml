@@ -326,3 +326,23 @@ jobs:
           rm -rf /usr/local/bin/syft
           rm -rf ~/.sigstore
           echo "Cleanup completed"
+
+      - name: Install verification tools
+        shell: bash
+        run: |
+          mkdir -p ~/tmp
+          cd ~/tmp
+
+          # Install cosign
+          curl -Lo cosign https://github.com/sigstore/cosign/releases/latest/download/cosign-linux-arm64
+          chmod +x cosign
+          sudo mv cosign /usr/local/bin/
+
+          # Install syft
+          curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh | sudo sh -s -- -b /usr/local/bin
+
+          cd - && rm -rf ~/tmp
+
+          # Verify installations
+          echo "Cosign version: $(cosign version)"
+          echo "Syft version: $(syft --version)"
