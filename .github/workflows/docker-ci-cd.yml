@@ -39,22 +39,32 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Install verification tools
+        shell: bash
+        run: |
+          mkdir -p ~/tmp
+          cd ~/tmp
+
+          # Install cosign
+          curl -Lo cosign https://github.com/sigstore/cosign/releases/latest/download/cosign-linux-arm64
+          chmod +x cosign
+          sudo mv cosign /usr/local/bin/
+
+          # Install syft
+          curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh | sudo sh -s -- -b /usr/local/bin
+
+          cd - && rm -rf ~/tmp
+
+          # Verify installations
+          echo "Cosign version: $(cosign version)"
+          echo "Syft version: $(syft --version)"
+
       - name: Install additional security tools
         run: |
           # Install jq if not present
           if ! command -v jq &> /dev/null; then
             sudo apt-get update && sudo apt-get install -y jq
           fi
-
-          # Verify installations
-          echo "Cosign version: $(cosign version)"
-          echo "Syft version: $(syft --version)"
-          echo "JQ version: $(jq --version)"
-
-          # Create directories for security artifacts
-          mkdir -p security-artifacts/attestations
-          mkdir -p security-artifacts/sbom
-          mkdir -p security-artifacts/signatures
 
       # Initial Setup
       - name: Set build timestamp
@@ -308,23 +318,3 @@ jobs:
           rm -rf /usr/local/bin/syft
           rm -rf ~/.sigstore
           echo "Cleanup completed"
-
-      - name: Install verification tools
-        shell: bash
-        run: |
-          mkdir -p ~/tmp
-          cd ~/tmp
-
-          # Install cosign
-          curl -Lo cosign https://github.com/sigstore/cosign/releases/latest/download/cosign-linux-arm64
-          chmod +x cosign
-          sudo mv cosign /usr/local/bin/
-
-          # Install syft
-          curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh | sudo sh -s -- -b /usr/local/bin
-
-          cd - && rm -rf ~/tmp
-
-          # Verify installations
-          echo "Cosign version: $(cosign version)"
-          echo "Syft version: $(syft --version)"
