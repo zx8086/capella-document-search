@@ -203,13 +203,13 @@ jobs:
         if: github.event_name != 'pull_request'
         continue-on-error: true
         run: |
-          echo "Checking attestations..."
-
-          # Create directory for attestation results with unique timestamp
+          # Set results directory name first
           TIMESTAMP=$(date +%Y%m%d_%H%M%S)
           RESULTS_DIR="attestation-results-${TIMESTAMP}"
+          echo "ATTESTATION_RESULTS_DIR=${RESULTS_DIR}" >> $GITHUB_ENV
+          
           mkdir -p "${RESULTS_DIR}"
-
+          
           # Get image digest and reference
           echo "Getting image digest..."
           IMAGE_REF="docker.io/zx8086/capella-document-search:latest"
@@ -293,7 +293,6 @@ jobs:
           } > "${RESULTS_DIR}/verification-report.md"
 
           # Set output directory for next step
-          echo "ATTESTATION_RESULTS_DIR=${RESULTS_DIR}" >> $GITHUB_ENV
           echo "VERIFICATION_SUCCESS=${VERIFICATION_SUCCESS}" >> $GITHUB_ENV
 
       - name: Upload attestation results
@@ -302,8 +301,8 @@ jobs:
         with:
           name: attestation-results-${{ matrix.platform-name }}
           path: |
-            attestation.json
-            provenance.json
+            ${{ env.ATTESTATION_RESULTS_DIR }}/*.json
+            ${{ env.ATTESTATION_RESULTS_DIR }}/*.md
           retention-days: 90
 
       - name: Verify SBOM
@@ -366,21 +365,21 @@ jobs:
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
         run: |
-          # Install Snyk CLI using bun
-          bun add -g snyk
+          # Install Snyk as a project dependency
+          bun add snyk
 
           # Run Snyk container test for the current platform
           echo "Running Snyk scan for ${{ matrix.platform }}..."
           
           if [[ "${{ matrix.platform }}" == "linux/amd64" ]]; then
-            snyk container test docker.io/zx8086/capella-document-search:latest \
+            bun run snyk container test docker.io/zx8086/capella-document-search:latest \
               --file=Dockerfile \
               --platform=linux/amd64 \
               --severity-threshold=high \
               --sarif-file-output=snyk-docker.sarif || true
               
             if [[ "${{ github.ref }}" == "refs/heads/master" ]]; then
-              snyk container monitor docker.io/zx8086/capella-document-search:latest \
+              bun run snyk container monitor docker.io/zx8086/capella-document-search:latest \
                 --file=Dockerfile \
                 --platform=linux/amd64 || true
             fi
