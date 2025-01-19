@@ -19,8 +19,8 @@ env:
   BUILDX_CACHE_TTL: "168h"
   COSIGN_VERSION: "v2.2.2"
   SYFT_VERSION: "v1.0.0"
-  COSIGN_YES: "true"  # Auto-confirm cosign operations
-  COSIGN_EXPERIMENTAL: "true"  # Enable experimental features
+  COSIGN_YES: "true"
+  COSIGN_EXPERIMENTAL: "true"
   BUILDKIT_PROGRESS: plain
   ACTIONS_RUNTIME_TOKEN: ${{ secrets.GITHUB_TOKEN }}
   DOCKER_BUILDX_CACHE_DIR: /home/pi/.buildx-cache
@@ -38,7 +38,6 @@ jobs:
             platform-name: amd64
           - platform: linux/arm64
             platform-name: arm64
-      # Add these for better build reliability
       fail-fast: false
       max-parallel: 1
 
@@ -95,11 +94,40 @@ jobs:
           echo "$ENV_PRODUCTION" > .env.production
           cp .env.production .env
 
+      - name: Set metadata variables
+        run: |
+          echo "IMAGE_DESCRIPTION=Capella Document Search is a web application that allows you to search for documents within Capella scopes and collections. Built with Bun, Svelte, and ELysiaJS." >> $GITHUB_ENV
+          echo "IMAGE_LICENSE=MIT" >> $GITHUB_ENV
+
       - name: Docker meta
         id: meta
         uses: docker/metadata-action@v5
         with:
           images: docker.io/zx8086/capella-document-search
+          labels: |
+            org.opencontainers.image.title=capella-document-search
+            org.opencontainers.image.description=${{ env.IMAGE_DESCRIPTION }}
+            org.opencontainers.image.created=${BUILD_TIMESTAMP}
+            org.opencontainers.image.version=${GITHUB_REF_NAME:-2.0.0}
+            org.opencontainers.image.revision=${GITHUB_SHA}
+            org.opencontainers.image.authors=Simon Owusu <simonowusupvh@gmail.com>
+            org.opencontainers.image.vendor=Siobytes
+            org.opencontainers.image.licenses=${{ env.IMAGE_LICENSE }}
+            org.opencontainers.image.url=https://github.com/zx8086/capella-document-search
+            org.opencontainers.image.source=https://github.com/zx8086/capella-document-search
+            org.opencontainers.image.documentation=https://github.com/zx8086/capella-document-search/README.md
+            org.opencontainers.image.base.name=oven/bun:canary-alpine
+            org.opencontainers.image.source.repository=github.com/zx8086/capella-document-search
+            org.opencontainers.image.source.branch=${GITHUB_REF_NAME:-master}
+            org.opencontainers.image.source.commit=${GITHUB_SHA}
+            com.capellaql.maintainer=Simon Owusu <simonowusupvh@gmail.com>
+            com.capellaql.release-date=${BUILD_TIMESTAMP}
+            com.capellaql.version.is-production=true
+            org.opencontainers.image.ref.name=${GITHUB_REF_NAME:-master}
+            org.opencontainers.image.version.semver=${GITHUB_REF_NAME:-2.0.0}
+            org.opencontainers.image.version.major=2
+            org.opencontainers.image.version.minor=0
+            org.opencontainers.image.version.patch=0
           tags: |
             type=raw,value=latest,enable={{is_default_branch}}
             type=sha,format=long
@@ -434,3 +462,30 @@ jobs:
           rm -rf /usr/local/bin/syft
           rm -rf ~/.sigstore
           echo "Cleanup completed"
+
+      - name: Verify metadata
+        run: |
+          echo "Verifying metadata output..."
+          
+          # Check if metadata environment variables are set
+          REQUIRED_LABELS=(
+            "org.opencontainers.image.description"
+            "org.opencontainers.image.licenses"
+            "org.opencontainers.image.title"
+            "org.opencontainers.image.version"
+            "org.opencontainers.image.revision"
+          )
+          
+          METADATA_JSON=$(echo "${{ steps.meta.outputs.json }}" | jq -r '.labels')
+          
+          for label in "${REQUIRED_LABELS[@]}"; do
+            VALUE=$(echo "$METADATA_JSON" | jq -r ".[\"$label\"]")
+            if [ -z "$VALUE" ] || [ "$VALUE" = "null" ]; then
+              echo "::error::Missing or empty metadata: $label"
+              exit 1
+            else
+              echo "✅ $label: $VALUE"
+            fi
+          done
+          
+          echo "All required metadata fields are present and filled"
