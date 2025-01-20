@@ -491,6 +491,7 @@ jobs:
 
       - name: Verify metadata
         continue-on-error: true
+        shell: bash
         run: |
           echo "Verifying metadata output..."
           
@@ -503,14 +504,15 @@ jobs:
             "org.opencontainers.image.revision"
           )
           
-          # Parse metadata JSON safely
-          METADATA_JSON='${{ steps.meta.outputs.json }}'
-          if [ -n "$METADATA_JSON" ]; then
+          # Store metadata JSON in a file to avoid shell interpretation issues
+          echo '${{ steps.meta.outputs.json }}' > metadata.json
+          
+          if [ -s metadata.json ]; then
             echo "Processing metadata..."
             
             # Extract labels using jq
             for label in "${REQUIRED_LABELS[@]}"; do
-              VALUE=$(echo "$METADATA_JSON" | jq -r ".labels[\"$label\"] // \"\"")
+              VALUE=$(jq -r ".labels[\"$label\"] // \"\"" metadata.json)
               if [ -z "$VALUE" ] || [ "$VALUE" = "null" ]; then
                 echo "⚠️ Warning: Missing or empty metadata: $label"
               else
@@ -520,7 +522,10 @@ jobs:
             
             # Print all available labels for debugging
             echo -e "\nAll available labels:"
-            echo "$METADATA_JSON" | jq -r '.labels | keys[]' || echo "No labels found"
+            jq -r '.labels | keys[]' metadata.json 2>/dev/null || echo "No labels found"
+            
+            # Cleanup
+            rm metadata.json
           else
             echo "⚠️ Warning: No metadata JSON output found"
             
