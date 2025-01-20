@@ -189,6 +189,7 @@ jobs:
 
       # Build and push section
       - name: Build and push Docker image
+        id: docker_build
         uses: docker/build-push-action@v6
         with:
           context: .
@@ -201,16 +202,27 @@ jobs:
           cache-to: |
             type=registry,ref=docker.io/zx8086/capella-document-search:buildcache-${{ matrix.platform-name }},mode=max
           outputs: ${{ github.event_name == 'pull_request' && 'type=cacheonly' || 'type=registry' }}
+          provenance: false
 
-      # Add these new steps after the build step
       - name: Push image with digest
         if: github.event_name != 'pull_request'
         run: |
-          DIGEST="${{ steps.docker_build.outputs.digest }}"
-          docker buildx imagetools create \
-            --tag docker.io/zx8086/capella-document-search:latest \
-            --tag docker.io/zx8086/capella-document-search:${{ github.sha }} \
-            docker.io/zx8086/capella-document-search@${DIGEST}
+          echo "Waiting for image to be available..."
+          sleep 10
+          
+          # Get the image digest directly from Docker Hub
+          DIGEST=$(docker buildx imagetools inspect docker.io/zx8086/capella-document-search:latest --raw | jq -r '.manifests[0].digest')
+          
+          if [ -n "$DIGEST" ]; then
+            echo "Image digest: $DIGEST"
+            docker buildx imagetools create \
+              --tag docker.io/zx8086/capella-document-search:latest \
+              --tag docker.io/zx8086/capella-document-search:${{ github.sha }} \
+              docker.io/zx8086/capella-document-search@${DIGEST}
+          else
+            echo "No digest found, skipping digest push"
+            exit 0
+          fi
 
       - name: Validate image metadata
         if: github.event_name != 'pull_request'
