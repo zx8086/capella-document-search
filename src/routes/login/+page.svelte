@@ -3,6 +3,7 @@
     import { onMount } from 'svelte';
     import { goto } from '$app/navigation';
     import { initTracker } from '$lib/context/tracker';
+    import { debugTrackerConnection } from '$lib/context/tracker';
 
     let loginAttempts = 0;
 
@@ -15,9 +16,11 @@
             if (loginAttempts > 1) {
                 await auth.logout();
             }
+            debugTrackerConnection();
             await auth.login();
         } catch (error) {
             console.error('Login failed:', error?.message || error);
+            debugTrackerConnection();
         } finally {
             $isLoading = false;
         }
@@ -28,6 +31,7 @@
             // Initialize tracker first
             $trackerLoading = true;
             await initTracker();
+            debugTrackerConnection();
             
             // Then proceed with auth initialization
             await auth.initialize();
@@ -37,6 +41,7 @@
             }
         } catch (error) {
             console.error('Initialization error:', error);
+            debugTrackerConnection();
         } finally {
             $trackerLoading = false;
         }
