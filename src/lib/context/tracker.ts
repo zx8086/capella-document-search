@@ -85,7 +85,13 @@ export async function initTracker() {
                     failuresOnly: false,
                     ignoreHeaders: false,
                     captureHeaders: true,
-                    defaultHeaders: true
+                    defaultHeaders: true,
+                    headers: {
+                        'traceparent': true,
+                        'tracestate': true,
+                        'elastic-apm-traceparent': true,
+                        'x-openreplay-session-id': true
+                    }
                 },
                 verbose: true,
                 onStart: () => {

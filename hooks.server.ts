@@ -9,8 +9,8 @@ export const handle: Handle = async ({ event, resolve }) => {
             status: 204,
             headers: {
                 'Access-Control-Allow-Origin': '*',
-                'Access-Control-Allow-Methods': '*',
-                'Access-Control-Allow-Headers': '*',
+                'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+                'Access-Control-Allow-Headers': 'Content-Type, Authorization, traceparent, tracestate, elastic-apm-traceparent, x-openreplay-session-id',
                 'Access-Control-Max-Age': '86400',
                 'Access-Control-Expose-Headers': '*'
             }
@@ -21,8 +21,8 @@ export const handle: Handle = async ({ event, resolve }) => {
     
     // Set CORS headers for all responses
     response.headers.set('Access-Control-Allow-Origin', '*');
-    response.headers.set('Access-Control-Allow-Methods', '*');
-    response.headers.set('Access-Control-Allow-Headers', '*');
+    response.headers.set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+    response.headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization, traceparent, tracestate, elastic-apm-traceparent, x-openreplay-session-id');
     response.headers.set('Access-Control-Expose-Headers', '*');
 
     // Include both development and production endpoints regardless of environment
@@ -64,13 +64,18 @@ export const handle: Handle = async ({ event, resolve }) => {
             https://*.siobytes.com
             https://eu-b2b.apm.eu-central-1.aws.cloud.es.io
             https://apm.siobytes.com
-            https://api.openai.com;
+            https://api.openai.com
+            https://openreplay.prd.shared-services.eu.pvh.cloud
+            https://*.openreplay.com
+            wss://openreplay.prd.shared-services.eu.pvh.cloud
+            wss://*.openreplay.com;
         script-src 'self' 'unsafe-inline' 'unsafe-eval'
             https://vjs.zencdn.net 
             https://apm.siobytes.com 
             https://api.openreplay.com
             https://static.openreplay.com
-            https://openreplay.prd.shared-services.eu.pvh.cloud;
+            https://openreplay.prd.shared-services.eu.pvh.cloud
+            https://*.openreplay.com;
         style-src 'self' 'unsafe-inline' https://vjs.zencdn.net;
         img-src 'self' data: https: blob:
             https://graph.microsoft.com
@@ -89,15 +94,6 @@ export const handle: Handle = async ({ event, resolve }) => {
         worker-src 'self' blob: 
             https://openreplay.prd.shared-services.eu.pvh.cloud 
             https://*.openreplay.com;
-        script-src 'self' 'unsafe-inline' 'unsafe-eval'
-            https://openreplay.prd.shared-services.eu.pvh.cloud
-            https://*.openreplay.com;
-        connect-src 'self' 
-            https://openreplay.prd.shared-services.eu.pvh.cloud
-            https://*.openreplay.com
-            wss://openreplay.prd.shared-services.eu.pvh.cloud
-            wss://*.openreplay.com
-            ${connectSrcAdditions};
         frame-ancestors 'self';
         base-uri 'self';
         object-src 'none'

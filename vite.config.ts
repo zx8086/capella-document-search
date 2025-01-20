@@ -90,20 +90,20 @@ export default defineConfig(({ mode }): UserConfig => {
             configure: (proxy, _options) => {
               proxy.on('proxyReq', (proxyReq, req, _res) => {
                 try {
-                  // Handle preflight requests with full permissiveness
-                  if (req.method === 'OPTIONS') {
-                    proxyReq.setHeader('Access-Control-Allow-Origin', '*');
-                    proxyReq.setHeader('Access-Control-Allow-Methods', '*');
-                    proxyReq.setHeader('Access-Control-Allow-Headers', '*');
-                  }
-
-                  // Copy all original headers
+                  // Set specific headers for OpenReplay
+                  proxyReq.setHeader('Access-Control-Allow-Origin', '*');
+                  proxyReq.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+                  proxyReq.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, traceparent, tracestate, elastic-apm-traceparent, x-openreplay-session-id');
+                  proxyReq.setHeader('Access-Control-Expose-Headers', '*');
+                  
+                  // Copy original headers
                   if (req.headers) {
                     Object.keys(req.headers).forEach(key => {
-                      proxyReq.setHeader(key, req.headers[key]);
+                      if (key.toLowerCase() !== 'host') {
+                        proxyReq.setHeader(key, req.headers[key]);
+                      }
                     });
                   }
-
                 } catch (error) {
                   console.error('Error in proxy request:', error);
                 }
