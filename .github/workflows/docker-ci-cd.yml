@@ -28,16 +28,6 @@ env:
 jobs:
   build-and-deploy:
     runs-on: self-hosted
-    strategy:
-      matrix:
-        include:
-          - platform: linux/amd64
-            platform-name: amd64
-          - platform: linux/arm64
-            platform-name: arm64
-      fail-fast: false
-      max-parallel: 1
-
     steps:
       - uses: actions/checkout@v4
 
@@ -193,32 +183,13 @@ jobs:
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          platforms: ${{ matrix.platform }}
+          platforms: linux/amd64,linux/arm64
           cache-from: |
-            type=registry,ref=docker.io/zx8086/capella-document-search:buildcache-${{ matrix.platform-name }}
+            type=registry,ref=docker.io/zx8086/capella-document-search:buildcache
           cache-to: |
-            type=registry,ref=docker.io/zx8086/capella-document-search:buildcache-${{ matrix.platform-name }},mode=max
+            type=registry,ref=docker.io/zx8086/capella-document-search:buildcache,mode=max
           outputs: ${{ github.event_name == 'pull_request' && 'type=cacheonly' || 'type=registry' }}
           provenance: false
-
-      - name: Create and push multi-platform manifest
-        if: github.event_name != 'pull_request'
-        run: |
-          echo "Creating multi-platform manifest..."
-          # Wait for images to be available
-          sleep 15
-          
-          # Create multi-platform manifest
-          echo "Creating manifest..."
-          docker manifest create docker.io/zx8086/capella-document-search:latest \
-            --amend docker.io/zx8086/capella-document-search:latest
-          
-          # Push the manifest
-          docker manifest push docker.io/zx8086/capella-document-search:latest
-          
-          # Verify the manifest
-          echo "Verifying manifest..."
-          docker buildx imagetools inspect docker.io/zx8086/capella-document-search:latest
 
       - name: Push image with digest
         if: github.event_name != 'pull_request'
@@ -398,25 +369,13 @@ jobs:
         run: |
           # Get the runner's architecture
           RUNNER_ARCH=$(uname -m)
-          TARGET_ARCH="${{ matrix.platform-name }}"
-          
-          # Skip if architectures don't match
-          if [[ "$RUNNER_ARCH" == "x86_64" && "$TARGET_ARCH" != "amd64" ]] || \
-             [[ "$RUNNER_ARCH" == "aarch64" && "$TARGET_ARCH" != "arm64" ]]; then
-            echo "Skipping container test: Runner architecture ($RUNNER_ARCH) doesn't match target architecture ($TARGET_ARCH)"
-            exit 0
-          fi
-          
-          # Continue with container test if architectures match
-          echo "Testing container for $TARGET_ARCH on $RUNNER_ARCH..."
           
           # Stop existing containers using port 3000
           docker ps -q --filter publish=3000 | xargs -r docker stop
           docker rm -f capella-search-test 2>/dev/null || true
           
-          # Run container with properly formatted environment variables
+          # Run container (will automatically use correct architecture)
           docker run -d \
-            --platform ${{ matrix.platform }} \
             --name capella-search-test \
             -p 3000:3000 \
             --env-file .env \
@@ -452,24 +411,17 @@ jobs:
           # Install Snyk as a project dependency
           bun add snyk
 
-          # Run Snyk container test for the current platform
-          echo "Running Snyk scan for ${{ matrix.platform }}..."
-          
-          if [[ "${{ matrix.platform }}" == "linux/amd64" ]]; then
-            bun run snyk container test docker.io/zx8086/capella-document-search:latest \
-              --file=Dockerfile \
-              --platform=linux/amd64 \
-              --severity-threshold=high \
-              --sarif-file-output=snyk-docker.sarif \
-              --json > snyk-report.json || echo "Vulnerabilities found but continuing..."
-              
-            if [[ "${{ github.ref }}" == "refs/heads/master" ]]; then
-              bun run snyk container monitor docker.io/zx8086/capella-document-search:latest \
-                --file=Dockerfile \
-                --platform=linux/amd64 || echo "Monitor command failed but continuing..."
-            fi
-          else
-            echo "Skipping Snyk container scan for ${{ matrix.platform }} - only running on amd64"
+          # Run Snyk container test
+          echo "Running Snyk scan..."
+          bun run snyk container test docker.io/zx8086/capella-document-search:latest \
+            --file=Dockerfile \
+            --severity-threshold=high \
+            --sarif-file-output=snyk-docker.sarif \
+            --json > snyk-report.json || echo "Vulnerabilities found but continuing..."
+            
+          if [[ "${{ github.ref }}" == "refs/heads/master" ]]; then
+            bun run snyk container monitor docker.io/zx8086/capella-document-search:latest \
+              --file=Dockerfile || echo "Monitor command failed but continuing..."
           fi
 
       - name: Upload Docker Snyk scan results
