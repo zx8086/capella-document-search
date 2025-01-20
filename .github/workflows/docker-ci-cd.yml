@@ -208,19 +208,34 @@ jobs:
         if: github.event_name != 'pull_request'
         run: |
           echo "Waiting for image to be available..."
-          sleep 10
+          sleep 15  # Increased wait time
           
-          # Get the image digest directly from Docker Hub
-          DIGEST=$(docker buildx imagetools inspect docker.io/zx8086/capella-document-search:latest --raw | jq -r '.manifests[0].digest')
+          # Try multiple methods to get the digest
+          echo "Attempting to get digest..."
           
-          if [ -n "$DIGEST" ]; then
+          # Method 1: Direct inspect
+          DIGEST=$(docker buildx imagetools inspect docker.io/zx8086/capella-document-search:latest --raw 2>/dev/null | jq -r '.manifests[0].digest' 2>/dev/null || echo "")
+          
+          # Method 2: Pull and inspect if Method 1 fails
+          if [ -z "$DIGEST" ] || [ "$DIGEST" = "null" ]; then
+            echo "Trying alternative method..."
+            docker pull docker.io/zx8086/capella-document-search:latest 2>/dev/null
+            DIGEST=$(docker inspect docker.io/zx8086/capella-document-search:latest --format='{{index .RepoDigests 0}}' 2>/dev/null | cut -d'@' -f2 || echo "")
+          fi
+          
+          # Verify digest before using
+          if [ -n "$DIGEST" ] && [ "$DIGEST" != "null" ]; then
             echo "Image digest: $DIGEST"
+            echo "Creating tagged images..."
             docker buildx imagetools create \
               --tag docker.io/zx8086/capella-document-search:latest \
               --tag docker.io/zx8086/capella-document-search:${{ github.sha }} \
               docker.io/zx8086/capella-document-search@${DIGEST}
           else
-            echo "No digest found, skipping digest push"
+            echo "Warning: Could not obtain valid digest, skipping digest push"
+            # List available images for debugging
+            echo "Available images:"
+            docker images | grep capella-document-search
             exit 0
           fi
 
