@@ -191,13 +191,17 @@ jobs:
           outputs: ${{ github.event_name == 'pull_request' && 'type=cacheonly' || 'type=registry' }}
           provenance: false
 
-      - name: Create and push multi-platform manifest
+      - name: Create multi-arch manifest
         if: github.event_name != 'pull_request'
         run: |
-          echo "Creating multi-platform manifest..."
-          docker buildx imagetools create -t docker.io/zx8086/capella-document-search:latest \
-            docker.io/zx8086/capella-document-search:latest
+          # Wait for images to be available
+          sleep 15
           
+          # Create and push the manifest for latest tag
+          docker buildx imagetools create \
+            -t docker.io/zx8086/capella-document-search:latest \
+            docker.io/zx8086/capella-document-search:master
+
           # Verify the manifest
           echo "Verifying manifest..."
           docker buildx imagetools inspect docker.io/zx8086/capella-document-search:latest
