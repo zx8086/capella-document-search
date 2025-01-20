@@ -386,7 +386,7 @@ jobs:
           
           # Run container with properly formatted environment variables
           docker run -d \
-            --platform linux/amd64 \
+            --platform ${{ matrix.platform }} \
             --name capella-search-test \
             -p 3000:3000 \
             --env-file .env \
