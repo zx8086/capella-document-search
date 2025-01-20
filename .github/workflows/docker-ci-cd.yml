@@ -179,21 +179,24 @@ jobs:
         with:
           context: .
           push: ${{ github.event_name != 'pull_request' }}
-          tags: docker.io/zx8086/capella-document-search:latest
+          tags: |
+            docker.io/zx8086/capella-document-search:latest
+            docker.io/zx8086/capella-document-search:${{ github.sha }}
           labels: ${{ steps.meta.outputs.labels }}
           platforms: linux/amd64,linux/arm64
           cache-from: type=registry,ref=docker.io/zx8086/capella-document-search:buildcache
           cache-to: type=registry,ref=docker.io/zx8086/capella-document-search:buildcache,mode=max
           provenance: false
+          outputs: type=registry
 
-      - name: Verify multi-arch image
+      - name: Verify image
         if: github.event_name != 'pull_request'
         run: |
           # Wait for image to be available
           sleep 15
           
-          # Verify the manifest
-          echo "Verifying manifest..."
+          # Verify the image and its architectures
+          echo "Verifying image manifest..."
           docker buildx imagetools inspect docker.io/zx8086/capella-document-search:latest
 
       - name: Create multi-arch manifest
