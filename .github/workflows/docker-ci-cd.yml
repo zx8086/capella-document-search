@@ -184,10 +184,8 @@ jobs:
         uses: docker/setup-buildx-action@v3
         with:
           driver: cloud
-          endpoint: "zx8086/capella-document-search"
+          endpoint: "zx8086/cldbuild"
           install: true
-          platforms: linux/amd64,linux/arm64
-          buildkitd-flags: --debug
 
       # Build and push section
       - name: Build and push Docker image
