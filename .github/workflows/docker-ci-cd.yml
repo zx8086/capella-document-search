@@ -389,6 +389,20 @@ jobs:
       - name: Test container
         if: github.event_name != 'pull_request'
         run: |
+          # Get the runner's architecture
+          RUNNER_ARCH=$(uname -m)
+          TARGET_ARCH="${{ matrix.platform-name }}"
+          
+          # Skip if architectures don't match
+          if [[ "$RUNNER_ARCH" == "x86_64" && "$TARGET_ARCH" != "amd64" ]] || \
+             [[ "$RUNNER_ARCH" == "aarch64" && "$TARGET_ARCH" != "arm64" ]]; then
+            echo "Skipping container test: Runner architecture ($RUNNER_ARCH) doesn't match target architecture ($TARGET_ARCH)"
+            exit 0
+          fi
+          
+          # Continue with container test if architectures match
+          echo "Testing container for $TARGET_ARCH on $RUNNER_ARCH..."
+          
           # Stop existing containers using port 3000
           docker ps -q --filter publish=3000 | xargs -r docker stop
           docker rm -f capella-search-test 2>/dev/null || true
