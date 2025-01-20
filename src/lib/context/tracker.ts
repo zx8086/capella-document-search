@@ -48,12 +48,9 @@ function getCurrentApmTransaction() {
 }
 
 const getIngestPoint = () => {
-    const baseUrl = import.meta.env.DEV 
-        ? 'https://api.openreplay.com'
-        : 'https://openreplay.prd.shared-services.eu.pvh.cloud';
-    
-    // Ensure we don't double the ingest path
-    return baseUrl;
+    return import.meta.env.DEV 
+        ? '/openreplay'  // Use the proxy path in development
+        : frontendConfig.openreplay.INGEST_POINT;
 };
 
 const getResourceBaseHref = () => {
@@ -79,25 +76,21 @@ export async function initTracker() {
             console.log("🔍 Initializing OpenReplay tracker...");
             
             const tracker = new Tracker({
-                projectKey: import.meta.env.PUBLIC_OPENREPLAY_PROJECT_KEY,
+                projectKey: frontendConfig.openreplay.PROJECT_KEY,
                 ingestPoint: getIngestPoint(),
-                __DISABLE_SECURE_MODE: true,
+                __DISABLE_SECURE_MODE: import.meta.env.DEV,
                 resourceBaseHref: getResourceBaseHref(),
                 network: {
                     enabled: true,
                     capturePayload: true,
                     failuresOnly: false,
-                    ignoreHeaders: false,
-                    captureHeaders: true,
-                    defaultHeaders: true,
-                    headers: {
-                        'traceparent': true,
-                        'tracestate': true,
-                        'elastic-apm-traceparent': true,
-                        'x-openreplay-session-id': true,
-                        'content-type': true,
-                        'authorization': true
-                    }
+                    ignoreHeaders: [
+                        'Cookie', 
+                        'Set-Cookie',
+                        'traceparent',
+                        'elastic-apm-traceparent'
+                    ],
+                    sessionTokenHeader: false
                 },
                 verbose: true,
                 onStart: () => {
@@ -484,7 +477,7 @@ export function debugTrackerConnection() {
         ingestPoint: getIngestPoint(),
         baseHref: getResourceBaseHref(),
         isDev: import.meta.env.DEV,
-        projectKey: import.meta.env.PUBLIC_OPENREPLAY_PROJECT_KEY?.substring(0, 5) + '...'
+        projectKey: frontendConfig.openreplay.PROJECT_KEY?.substring(0, 5) + '...'
     });
 
     // 2. Check tracker state
