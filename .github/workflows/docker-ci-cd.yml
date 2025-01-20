@@ -503,20 +503,30 @@ jobs:
             "org.opencontainers.image.revision"
           )
           
-          # Safely handle JSON parsing
-          if [ -n "${{ steps.meta.outputs.json }}" ]; then
-            METADATA_JSON=$(echo '${{ steps.meta.outputs.json }}' | jq -r '.labels // {}')
+          # Parse metadata JSON safely
+          METADATA_JSON='${{ steps.meta.outputs.json }}'
+          if [ -n "$METADATA_JSON" ]; then
+            echo "Processing metadata..."
             
+            # Extract labels using jq
             for label in "${REQUIRED_LABELS[@]}"; do
-              VALUE=$(echo "$METADATA_JSON" | jq -r ".[\"$label\"] // \"\"")
+              VALUE=$(echo "$METADATA_JSON" | jq -r ".labels[\"$label\"] // \"\"")
               if [ -z "$VALUE" ] || [ "$VALUE" = "null" ]; then
                 echo "⚠️ Warning: Missing or empty metadata: $label"
               else
                 echo "✅ $label: $VALUE"
               fi
             done
+            
+            # Print all available labels for debugging
+            echo -e "\nAll available labels:"
+            echo "$METADATA_JSON" | jq -r '.labels | keys[]' || echo "No labels found"
           else
             echo "⚠️ Warning: No metadata JSON output found"
+            
+            # Print environment variables for debugging
+            echo -e "\nAvailable environment variables:"
+            env | grep -i "DOCKER_METADATA" || echo "No metadata environment variables found"
           fi
           
           echo "Metadata verification completed"
