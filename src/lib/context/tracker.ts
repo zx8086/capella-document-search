@@ -48,8 +48,12 @@ function getCurrentApmTransaction() {
 }
 
 const getIngestPoint = () => {
-    // Use the existing environment variables that worked before
-    return import.meta.env.PUBLIC_OPENREPLAY_INGEST_POINT;
+    const baseUrl = import.meta.env.DEV 
+        ? 'https://api.openreplay.com'
+        : 'https://openreplay.prd.shared-services.eu.pvh.cloud';
+    
+    // Ensure we don't double the ingest path
+    return baseUrl;
 };
 
 const getResourceBaseHref = () => {
@@ -90,7 +94,9 @@ export async function initTracker() {
                         'traceparent': true,
                         'tracestate': true,
                         'elastic-apm-traceparent': true,
-                        'x-openreplay-session-id': true
+                        'x-openreplay-session-id': true,
+                        'content-type': true,
+                        'authorization': true
                     }
                 },
                 verbose: true,

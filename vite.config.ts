@@ -80,32 +80,38 @@ export default defineConfig(({ mode }): UserConfig => {
           timeout: 5000
         },
         proxy: {
-          '^/ingest/v1/web/': {
+          '/ingest/v1/web/': {
             target: import.meta.env.DEV 
                 ? 'https://api.openreplay.com'
                 : 'https://openreplay.prd.shared-services.eu.pvh.cloud',
             changeOrigin: true,
             secure: true,
-            rewrite: (path) => path,
+            ws: true,
+            rewrite: (path) => path.replace(/^\/ingest/, ''),
             configure: (proxy, _options) => {
               proxy.on('proxyReq', (proxyReq, req, _res) => {
-                try {
-                  // Set specific headers for OpenReplay
-                  proxyReq.setHeader('Access-Control-Allow-Origin', '*');
-                  proxyReq.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-                  proxyReq.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, traceparent, tracestate, elastic-apm-traceparent, x-openreplay-session-id');
-                  proxyReq.setHeader('Access-Control-Expose-Headers', '*');
-                  
-                  // Copy original headers
-                  if (req.headers) {
-                    Object.keys(req.headers).forEach(key => {
-                      if (key.toLowerCase() !== 'host') {
-                        proxyReq.setHeader(key, req.headers[key]);
-                      }
-                    });
-                  }
-                } catch (error) {
-                  console.error('Error in proxy request:', error);
+                proxyReq.setHeader('Access-Control-Allow-Origin', '*');
+                proxyReq.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+                proxyReq.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, traceparent, tracestate, elastic-apm-traceparent, x-openreplay-session-id');
+                proxyReq.setHeader('Access-Control-Max-Age', '3600');
+                proxyReq.setHeader('Access-Control-Expose-Headers', '*');
+                
+                if (req.headers) {
+                  Object.keys(req.headers).forEach(key => {
+                    if (key.toLowerCase() !== 'host') {
+                      proxyReq.setHeader(key, req.headers[key]);
+                    }
+                  });
+                }
+              });
+
+              proxy.on('proxyRes', (proxyRes, req, res) => {
+                if (req.method === 'OPTIONS') {
+                  proxyRes.headers['Access-Control-Allow-Origin'] = '*';
+                  proxyRes.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS';
+                  proxyRes.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization, traceparent, tracestate, elastic-apm-traceparent, x-openreplay-session-id';
+                  proxyRes.headers['Access-Control-Max-Age'] = '3600';
+                  proxyRes.headers['Access-Control-Expose-Headers'] = '*';
                 }
               });
             }
