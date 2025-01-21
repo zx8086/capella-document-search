@@ -17,12 +17,12 @@ ENV NODE_ENV=${NODE_ENV}
 
 WORKDIR /app
 
-# Copy package files and install dependencies
+# Copy package files first for better cache utilization
 COPY package.json bun.lockb ./
 RUN --mount=type=cache,target=/root/.bun/install/cache \
     bun install --frozen-lockfile
 
-# Copy all files
+# Copy all files after dependency installation
 COPY . .
 
 # Build the application
@@ -51,7 +51,7 @@ WORKDIR /app
 # Copy everything from builder
 COPY --from=builder /app/ ./
 
-# Install production dependencies
+# Install production dependencies with cache
 RUN --mount=type=cache,target=/root/.bun/install/cache \
     bun install --production --frozen-lockfile && \
     mkdir -p src/data && \
