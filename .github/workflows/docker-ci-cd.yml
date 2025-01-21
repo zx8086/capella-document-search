@@ -118,9 +118,6 @@ jobs:
             org.opencontainers.image.version.patch=0
           tags: |
             type=raw,value=latest,enable={{is_default_branch}}
-            type=sha,format=long
-            type=ref,event=branch
-            type=ref,event=tag
 
       # Platform and runtime setup
       - name: Set up QEMU
