@@ -3,6 +3,7 @@
 # Base stage
 FROM oven/bun:canary-alpine AS builder
 
+# Set build arguments first since they rarely change
 ARG BUILD_VERSION=development
 ARG COMMIT_HASH=unknown
 ARG BUILD_DATE
@@ -14,12 +15,12 @@ ENV COMMIT_HASH=${COMMIT_HASH}
 ENV BUILD_DATE=${BUILD_DATE}
 ENV NODE_ENV=${NODE_ENV}
 
-# Set working directory
 WORKDIR /app
 
 # Copy package files and install dependencies
 COPY package.json bun.lockb ./
-RUN bun install --frozen-lockfile
+RUN --mount=type=cache,target=/root/.bun/install/cache \
+    bun install --frozen-lockfile
 
 # Copy all files
 COPY . .
@@ -51,7 +52,8 @@ WORKDIR /app
 COPY --from=builder /app/ ./
 
 # Install production dependencies
-RUN bun install --production --frozen-lockfile && \
+RUN --mount=type=cache,target=/root/.bun/install/cache \
+    bun install --production --frozen-lockfile && \
     mkdir -p src/data && \
     chown -R bun:bun /app
 
