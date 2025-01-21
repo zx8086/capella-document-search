@@ -167,14 +167,23 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
         with:
-          driver: ${{ github.event_name == 'pull_request' && 'cloud' || 'docker-container' }}
-          endpoint: ${{ github.event_name == 'pull_request' && 'zx8086/cldbuild' || '' }}
-          platforms: linux/amd64,linux/arm64
+          driver: cloud
+          endpoint: "zx8086/cldbuild"  # Your cloud builder endpoint
           install: true
+          driver-opts: |
+            network=host
+          buildkitd-flags: --debug
 
-      # Build and push section
+      # Add GitHub cache for Docker layers
+      - name: Cache Docker layers
+        uses: actions/cache@v4
+        with:
+          path: /tmp/.buildx-cache
+          key: ${{ runner.os }}-buildx-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-buildx-
+
       - name: Build and push Docker image
-        id: docker_build
         uses: docker/build-push-action@v6
         with:
           context: .
@@ -183,11 +192,25 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           platforms: linux/amd64,linux/arm64
           cache-from: |
+            type=local,src=/tmp/.buildx-cache
             type=registry,ref=docker.io/zx8086/capella-document-search:buildcache
           cache-to: |
+            type=local,dest=/tmp/.buildx-cache-new,mode=max
             type=registry,ref=docker.io/zx8086/capella-document-search:buildcache,mode=max
+          build-args: |
+            NODE_ENV=production
+            BUILD_VERSION=${{ github.ref_name || '0.0.1' }}
+            COMMIT_HASH=${{ github.sha }}
+            BUILD_DATE=${{ env.BUILD_TIMESTAMP }}
+          # Add outputs configuration for pull requests
           outputs: ${{ github.event_name == 'pull_request' && 'type=cacheonly' || 'type=registry' }}
-          provenance: false
+
+      # Temp fix for cache handling
+      - name: Move cache
+        if: always()
+        run: |
+          rm -rf /tmp/.buildx-cache
+          mv /tmp/.buildx-cache-new /tmp/.buildx-cache
 
       - name: Verify image
         if: github.event_name != 'pull_request'
