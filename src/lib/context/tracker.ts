@@ -48,9 +48,7 @@ function getCurrentApmTransaction() {
 }
 
 const getIngestPoint = () => {
-    return import.meta.env.DEV 
-        ? '/openreplay'  // Use the proxy path in development
-        : frontendConfig.openreplay.INGEST_POINT;
+    return frontendConfig.openreplay.INGEST_POINT;
 };
 
 const getResourceBaseHref = () => {
@@ -99,7 +97,6 @@ export async function initTracker() {
                         baseHref: getResourceBaseHref(),
                         projectKey: frontendConfig.openreplay.PROJECT_KEY
                     });
-                    debugTrackerConnection();
                 },
                 onError: (error) => {
                     console.error("OpenReplay error:", {
@@ -108,7 +105,6 @@ export async function initTracker() {
                         status: error.status,
                         url: error.url
                     });
-                    debugTrackerConnection();
                 },
                 respectDoNotTrack: false,
                 sanitizer: true,
@@ -166,9 +162,9 @@ export function getTracker() {
 }
 
 export function getSessionId(): string | null {
-  if (!trackerInstance || !isStarted) return null;
-  // @ts-ignore - accessing internal property
-  return trackerInstance.__sessionID || null;
+    if (!trackerInstance || !isStarted) return null;
+    // @ts-ignore - accessing internal property
+    return trackerInstance.__sessionID || null;
 }
 
 export function debugTrackerStatus() {
@@ -410,7 +406,7 @@ export function cleanupTracker() {
     initializationPromise = null;
 }
 
-// Add helper to check tracker status
+// Simplified status check
 export function isTrackerReady() {
     return trackerInstance !== null && isStarted;
 }
@@ -466,105 +462,4 @@ export function debugAssetAccess() {
         console.error('Debug Error:', error);
     }
     console.groupEnd();
-}
-
-// Add this debug function to your tracker.ts
-export function debugTrackerConnection() {
-    console.group('🔍 OpenReplay Connection Debug');
-    
-    // 1. Check environment configuration
-    console.log('Environment Config:', {
-        ingestPoint: getIngestPoint(),
-        baseHref: getResourceBaseHref(),
-        isDev: import.meta.env.DEV,
-        projectKey: frontendConfig.openreplay.PROJECT_KEY?.substring(0, 5) + '...'
-    });
-
-    // 2. Check tracker state
-    console.log('Tracker State:', {
-        isInitialized: !!trackerInstance,
-        isStarted,
-        isInitializing,
-        sessionId: getSessionId()
-    });
-
-    // 3. Test CORS headers with a preflight check
-    const testCorsHeaders = async () => {
-        try {
-            const response = await fetch(`${getIngestPoint()}/ingest/v1/web/start`, {
-                method: 'OPTIONS',
-                headers: {
-                    'Access-Control-Request-Method': 'POST',
-                    'Access-Control-Request-Headers': 'traceparent,tracestate,elastic-apm-traceparent,x-openreplay-session-id'
-                }
-            });
-            
-            console.log('CORS Preflight Response:', {
-                ok: response.ok,
-                status: response.status,
-                allowOrigin: response.headers.get('Access-Control-Allow-Origin'),
-                allowMethods: response.headers.get('Access-Control-Allow-Methods'),
-                allowHeaders: response.headers.get('Access-Control-Allow-Headers')
-            });
-        } catch (error) {
-            console.error('CORS Preflight Error:', error);
-        }
-    };
-
-    // 4. Test actual connection
-    const testConnection = async () => {
-        try {
-            const response = await fetch(`${getIngestPoint()}/ingest/v1/web/start`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'traceparent': '00-0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331-01',
-                    'x-openreplay-session-id': 'test-session'
-                },
-                body: JSON.stringify({ timestamp: Date.now() })
-            });
-            
-            console.log('Connection Test Response:', {
-                ok: response.ok,
-                status: response.status,
-                headers: Object.fromEntries(response.headers.entries())
-            });
-        } catch (error) {
-            console.error('Connection Test Error:', error);
-        }
-    };
-
-    // 5. Check CSP headers
-    const checkCspHeaders = async () => {
-        try {
-            const response = await fetch(window.location.href);
-            const csp = response.headers.get('Content-Security-Policy');
-            const corsHeaders = {
-                'Access-Control-Allow-Origin': response.headers.get('Access-Control-Allow-Origin'),
-                'Access-Control-Allow-Methods': response.headers.get('Access-Control-Allow-Methods'),
-                'Access-Control-Allow-Headers': response.headers.get('Access-Control-Allow-Headers')
-            };
-            
-            console.log('CSP and CORS Headers:', {
-                csp: csp ? 'Present' : 'Missing',
-                cspIncludes: {
-                    openreplayDomain: csp?.includes('openreplay'),
-                    connectSrc: csp?.includes('connect-src'),
-                    scriptSrc: csp?.includes('script-src')
-                },
-                corsHeaders
-            });
-        } catch (error) {
-            console.error('CSP Check Error:', error);
-        }
-    };
-
-    // Run all checks
-    Promise.all([
-        testCorsHeaders(),
-        testConnection(),
-        checkCspHeaders()
-    ]).finally(() => {
-        console.groupEnd();
-    });
 }

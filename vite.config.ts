@@ -57,24 +57,15 @@ export default defineConfig(({ mode }): UserConfig => {
         port: parseInt(env.PORT || "5173"),
         host: true,
         cors: {
-          origin: [
-            'http://localhost:5173',
-            'http://localhost:3000',
-            'https://*.pinecone.io',
-            'https://*.svc.*.pinecone.io',
-            'https://api.openreplay.com',
-            'https://openreplay.prd.shared-services.eu.pvh.cloud'
-          ],
-          methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+          origin: '*',
+          methods: ['POST', 'OPTIONS'],
           allowedHeaders: [
-            'Content-Type', 
+            'Content-Type',
             'Authorization',
-            'traceparent',
-            'tracestate',
-            'elastic-apm-traceparent',
-            'x-openreplay-session-id'
+            'Content-Encoding',
+            'X-OpenReplay-Batch'
           ],
-          credentials: true
+          credentials: false
         },
         hmr: {
           timeout: 5000
@@ -84,14 +75,13 @@ export default defineConfig(({ mode }): UserConfig => {
             target: env.PUBLIC_OPENREPLAY_INGEST_POINT || 'https://api.openreplay.com',
             changeOrigin: true,
             secure: true,
-            rewrite: (path) => path.replace(/^\/openreplay/, ''),
+            rewrite: (path) => path.replace(/^\/openreplay/, '/ingest'),
             configure: (proxy, _options) => {
               proxy.on('proxyReq', (proxyReq, req, _res) => {
-                ['traceparent', 'elastic-apm-traceparent', 'x-openreplay-session-id'].forEach(header => {
-                  if (req.headers[header]) {
-                    proxyReq.setHeader(header, req.headers[header]);
-                  }
-                });
+                // Set required OpenReplay headers
+                proxyReq.setHeader('Content-Type', 'application/json');
+                proxyReq.setHeader('X-Openreplay-Batch', '1');
+                proxyReq.setHeader('Content-Encoding', 'identity');
               });
             }
           }

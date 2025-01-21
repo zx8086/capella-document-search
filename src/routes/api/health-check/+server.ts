@@ -279,8 +279,8 @@ async function checkOpenReplayEndpoint(): Promise<CheckResult> {
             };
         }
 
-        // Attempt connection with OPTIONS request instead of HEAD
-      const response = await fetch(`${openReplayUrl}/healthz`, {
+        // Check the web start endpoint
+        const response = await fetch(`${openReplayUrl}/v1/web/start`, {
             method: "GET",
             headers: {
                 'Accept': '*/*',
@@ -290,26 +290,7 @@ async function checkOpenReplayEndpoint(): Promise<CheckResult> {
 
         const duration = Date.now() - startTime;
 
-        // Check if the response is 404 but the base URL might still be valid
-        if (response.status === 404) {
-            const baseResponse = await fetch(openReplayUrl, {
-                method: "GET",
-                headers: {
-                    'Accept': '*/*',
-                    'Content-Type': 'application/json'
-                }
-            });
-
-            if (baseResponse.ok || baseResponse.status === 405) {
-                return {
-                    status: "OK",
-                    message: "OpenReplay endpoint is accessible",
-                    responseTime: duration,
-                };
-            }
-        }
-
-        if (response.ok) {
+        if (response.ok || response.status === 405) { // 405 is acceptable as it may require POST
             return {
                 status: "OK",
                 message: "OpenReplay endpoint is responsive",
@@ -342,7 +323,6 @@ async function checkOpenReplayEndpoint(): Promise<CheckResult> {
                 status: "ERROR",
                 message: "SSL Certificate validation failed for OpenReplay endpoint",
                 responseTime: duration,
-                details: errorMessage
             };
         }
 
@@ -351,7 +331,6 @@ async function checkOpenReplayEndpoint(): Promise<CheckResult> {
                 status: "ERROR",
                 message: "Connection refused to OpenReplay endpoint",
                 responseTime: duration,
-                details: errorMessage
             };
         }
 
@@ -360,7 +339,6 @@ async function checkOpenReplayEndpoint(): Promise<CheckResult> {
                 status: "ERROR",
                 message: "Connection timed out to OpenReplay endpoint",
                 responseTime: duration,
-                details: errorMessage
             };
         }
 
@@ -374,7 +352,6 @@ async function checkOpenReplayEndpoint(): Promise<CheckResult> {
             status: "ERROR",
             message: "Failed to connect to OpenReplay endpoint",
             responseTime: duration,
-            details: errorMessage
         };
     }
 }

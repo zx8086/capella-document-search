@@ -3,16 +3,16 @@ import { redirect } from '@sveltejs/kit';
 import crypto from 'crypto';
 
 export const handle: Handle = async ({ event, resolve }) => {
-    // Handle preflight requests first
+    // Handle preflight requests
     if (event.request.method === 'OPTIONS') {
         return new Response(null, {
             status: 204,
             headers: {
                 'Access-Control-Allow-Origin': '*',
-                'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-                'Access-Control-Allow-Headers': 'Content-Type, Authorization, traceparent, tracestate, elastic-apm-traceparent, x-openreplay-session-id',
+                'Access-Control-Allow-Methods': 'POST, OPTIONS',
+                'Access-Control-Allow-Headers': 'Content-Type, Authorization, Content-Encoding, X-Openreplay-Batch',
                 'Access-Control-Max-Age': '86400',
-                'Access-Control-Expose-Headers': '*'
+                'Access-Control-Allow-Credentials': 'false'
             }
         });
     }
@@ -21,82 +21,26 @@ export const handle: Handle = async ({ event, resolve }) => {
     
     // Set CORS headers for all responses
     response.headers.set('Access-Control-Allow-Origin', '*');
-    response.headers.set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-    response.headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization, traceparent, tracestate, elastic-apm-traceparent, x-openreplay-session-id');
-    response.headers.set('Access-Control-Expose-Headers', '*');
+    response.headers.set('Access-Control-Allow-Methods', 'POST, OPTIONS');
+    response.headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization, Content-Encoding, X-Openreplay-Batch');
+    response.headers.set('Access-Control-Allow-Credentials', 'false');
 
-    // Include both development and production endpoints regardless of environment
-    const openReplayEndpoints = [
-        // Development endpoints
-        'https://api.openreplay.com',
-        'wss://api.openreplay.com',
-        'https://*.openreplay.com',
-        'wss://*.openreplay.com',
-        // Production endpoints
-        'https://openreplay.prd.shared-services.eu.pvh.cloud',
-        'https://*.openreplay.prd.shared-services.eu.pvh.cloud',
-        'wss://*.openreplay.prd.shared-services.eu.pvh.cloud',
-        // Local development
-        'http://localhost:*',
-        'ws://localhost:*',
-        'https://localhost:*',
-        'wss://localhost:*'
-    ];
-
-    const connectSrcAdditions = openReplayEndpoints.join(' ');
-    
+    // Official OpenReplay CSP configuration
     const csp = `
         default-src 'self';
-        connect-src 'self' 
-            https://login.microsoftonline.com 
-            https://*.microsoftonline.com 
-            https://graph.microsoft.com
-            https://*.graph.microsoft.com
-            ${connectSrcAdditions}
-            https://*.pinecone.io
-            https://*.svc.pinecone.io
-            https://*.shared-services.eu.pvh.cloud
-            https://*.prd.shared-services.eu.pvh.cloud
-            https://*.cloudfront.net
-            https://*.aws.cloud.es.io
-            https://*.aws.elastic-cloud.com
-            https://*.cloud.couchbase.com
-            https://*.siobytes.com
-            https://eu-b2b.apm.eu-central-1.aws.cloud.es.io
-            https://apm.siobytes.com
-            https://api.openai.com
-            https://openreplay.prd.shared-services.eu.pvh.cloud
-            https://*.openreplay.com
-            wss://openreplay.prd.shared-services.eu.pvh.cloud
-            wss://*.openreplay.com;
-        script-src 'self' 'unsafe-inline' 'unsafe-eval'
-            https://vjs.zencdn.net 
-            https://apm.siobytes.com 
-            https://api.openreplay.com
-            https://static.openreplay.com
-            https://openreplay.prd.shared-services.eu.pvh.cloud
-            https://*.openreplay.com;
-        style-src 'self' 'unsafe-inline' https://vjs.zencdn.net;
-        img-src 'self' data: https: blob:
-            https://graph.microsoft.com
-            https://*.graph.microsoft.com;
-        media-src 'self' blob: 
-            https://*.openreplay.com 
-            https://static.openreplay.com 
-            https://d2bgp0ri487o97.cloudfront.net;
-        frame-src 'self' 
-            https://login.microsoftonline.com 
-            https://*.microsoftonline.com;
-        form-action 'self' 
-            https://login.microsoftonline.com 
-            https://*.microsoftonline.com;
+        script-src 'self' 'unsafe-inline' 'unsafe-eval' 
+            https://static.openreplay.com;
+        style-src 'self' 'unsafe-inline';
+        img-src 'self' data: blob:;
         font-src 'self' data:;
-        worker-src 'self' blob: 
-            https://openreplay.prd.shared-services.eu.pvh.cloud 
-            https://*.openreplay.com;
-        frame-ancestors 'self';
-        base-uri 'self';
-        object-src 'none'
+        connect-src 'self' 
+            https://api.openreplay.com 
+            https://*.openreplay.com 
+            wss://*.openreplay.com;
+        frame-src 'self';
+        worker-src 'self' blob:;
+        child-src 'self' blob:;
+        media-src 'self' blob:;
     `.replace(/\s+/g, ' ').trim();
 
     response.headers.set('Content-Security-Policy', csp);
