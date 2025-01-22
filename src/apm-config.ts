@@ -14,36 +14,16 @@ const apm = initApm({
   logLevel: 'debug',
   distributedTracing: true,
   distributedTracingOrigins: [
-    // Development origins
-    'http://localhost:5173',
-    'http://localhost:3000',
-    // Production APM endpoints
-    'https://apm.siobytes.com',
+    // Only include origins we want to trace
     'https://eu-b2b.apm.eu-central-1.aws.cloud.es.io',
-    // Allow all microsoftonline domains
-    /^https:\/\/.*\.microsoftonline\.com$/,
-    // Allow all shared-services domains
-    /^https:\/\/.*\.shared-services\.eu\.pvh\.cloud$/,
-    // Exclude OpenReplay
-    '!https://api.openreplay.com',
-    '!https://openreplay.prd.shared-services.eu.pvh.cloud'
+    'https://capella-document-search.prd.shared-services.eu.pvh.cloud',
+    // Explicitly exclude OpenReplay
+    '!https://*.openreplay.com',
+    '!https://*.shared-services.eu.pvh.cloud/ingest'
   ],
-  // Use ignoreTransactions instead of ignoreUrls for more precise control
-  ignoreTransactions: [
-    // Ignore OpenReplay related transactions
-    /^OpenReplay/,
-    /^\/ingest\/v1\/web/,
-    // Ignore feature flags transactions
-    /^\/ingest\/v1\/web\/feature-flags/,
-    // Ignore specific paths
-    'tracker-initialized',
-    'tracker-start',
-    'tracker-stop'
-  ],
-  propagateTracestate: true,
-  breakdownMetrics: true,
-  instrument: true,
-  centralConfig: false
+  // Disable trace propagation completely for OpenReplay
+  ignoreTransactions: ['/ingest/v1/web/*'],
+  propagateTracestate: false  // Disable globally and handle per-request
 });
 
 console.log("APM Config:", {

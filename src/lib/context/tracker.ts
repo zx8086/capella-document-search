@@ -68,13 +68,16 @@ export async function initTracker() {
             trackerInstance = new Tracker({
                 projectKey: frontendConfig.openreplay.PROJECT_KEY,
                 ingestPoint: getIngestPoint(),
+                __DISABLE_SECURE_MODE: import.meta.env.DEV,
                 network: {
                     failuresOnly: false,
-                    ignoreHeaders: ['traceparent', 'tracestate'],
-                    capturePayload: true
+                    ignoreHeaders: [
+                        'traceparent',
+                        'tracestate',
+                        'elastic-apm-traceparent'
+                    ],
+                    captureTracing: false
                 },
-                // Add secure mode configuration based on environment
-                __DISABLE_SECURE_MODE: import.meta.env.DEV, // true for development, false for production
                 onStart: () => {
                     console.log('OpenReplay tracker started successfully');
                 },
@@ -82,6 +85,16 @@ export async function initTracker() {
                     console.error('OpenReplay tracker error:', error);
                 }
             });
+
+            // Disable APM for OpenReplay requests
+            if (apm?.addFilter) {
+                apm.addFilter(function (payload) {
+                    if (payload.context?.http?.url?.includes('openreplay')) {
+                        return false; // Drop the transaction
+                    }
+                    return payload;
+                });
+            }
 
             trackerInstance
                 .start()
