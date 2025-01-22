@@ -71,8 +71,8 @@ export async function initTracker() {
             trackerInstance = new Tracker({
                 projectKey: frontendConfig.openreplay.PROJECT_KEY,
                 ingestPoint: getIngestPoint(),
-                // Remove __DISABLE_SECURE_MODE in production
-                __DISABLE_SECURE_MODE: false,  // Changed from import.meta.env.DEV
+                __DISABLE_SECURE_MODE: false,
+                resourceBaseHref: getResourceBaseHref(),
                 network: {
                     failuresOnly: false,
                     ignoreHeaders: [
@@ -82,6 +82,12 @@ export async function initTracker() {
                     ],
                     captureTracing: false
                 },
+                // Add these options for better resource capturing
+                resourceUploadLimits: {
+                    maxCssResourceSize: 2 * 1024 * 1024, // 2MB
+                    maxOtherResourceSize: 2 * 1024 * 1024 // 2MB
+                },
+                captureResourceMetrics: true,
                 onStart: () => {
                     console.log('OpenReplay session started:', trackerInstance?.__sessionID);
                     // Identify user if available
@@ -438,4 +444,43 @@ export function setupAPMIntegration(tracker: Tracker) {
         // Don't include trace headers
         propagateTraceContext: false
     });
+}
+
+export function debugResourceLoading() {
+    const tracker = getTracker();
+    if (!tracker) {
+        console.warn("⚠️ Cannot debug resources: tracker not initialized");
+        return;
+    }
+
+    console.group('🔍 OpenReplay Resource Loading Debug');
+    try {
+        // Check all stylesheets
+        const styles = document.styleSheets;
+        console.log('Stylesheet Count:', styles.length);
+        
+        Array.from(styles).forEach((sheet, index) => {
+            console.log(`Stylesheet ${index}:`, {
+                href: sheet.href,
+                disabled: sheet.disabled,
+                media: sheet.media.mediaText,
+                rules: sheet.cssRules?.length
+            });
+        });
+
+        // Check if base href is correct
+        console.log('Base HREF:', document.baseURI);
+        console.log('Resource Base HREF:', getResourceBaseHref());
+        
+        // Log performance metrics
+        const perfEntries = performance.getEntriesByType('resource');
+        console.log('Resource Performance:', perfEntries.map(entry => ({
+            name: entry.name,
+            duration: entry.duration,
+            type: entry.initiatorType
+        })));
+    } catch (error) {
+        console.error('Debug Error:', error);
+    }
+    console.groupEnd();
 }

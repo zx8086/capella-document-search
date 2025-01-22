@@ -28,19 +28,20 @@ export const handle: Handle = async ({ event, resolve }) => {
     // Official OpenReplay CSP configuration
     const csp = `
         default-src 'self';
-        script-src 'self' 'unsafe-inline' 'unsafe-eval' 
-            https://static.openreplay.com;
-        style-src 'self' 'unsafe-inline';
-        img-src 'self' data: blob:;
+        script-src 'self' 'unsafe-inline' 'unsafe-eval' https://static.openreplay.com;
+        style-src 'self' 'unsafe-inline' https://static.openreplay.com;
+        img-src 'self' data: blob: https://*.openreplay.com;
         font-src 'self' data:;
         connect-src 'self' 
             https://api.openreplay.com 
             https://*.openreplay.com 
-            wss://*.openreplay.com;
+            wss://*.openreplay.com
+            https://capella-document-search.prd.shared-services.eu.pvh.cloud;
         frame-src 'self';
         worker-src 'self' blob:;
         child-src 'self' blob:;
         media-src 'self' blob:;
+        base-uri 'self';
     `.replace(/\s+/g, ' ').trim();
 
     response.headers.set('Content-Security-Policy', csp);
