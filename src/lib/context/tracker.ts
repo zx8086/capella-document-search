@@ -48,7 +48,10 @@ function getCurrentApmTransaction() {
 }
 
 const getIngestPoint = () => {
-    return frontendConfig.openreplay.INGEST_POINT;
+    // Make sure we're using the correct production endpoint
+    return import.meta.env.DEV 
+        ? 'https://api.openreplay.com/ingest'
+        : 'https://openreplay.prd.shared-services.eu.pvh.cloud/ingest';
 };
 
 const getResourceBaseHref = () => {
@@ -68,7 +71,8 @@ export async function initTracker() {
             trackerInstance = new Tracker({
                 projectKey: frontendConfig.openreplay.PROJECT_KEY,
                 ingestPoint: getIngestPoint(),
-                __DISABLE_SECURE_MODE: import.meta.env.DEV,
+                // Remove __DISABLE_SECURE_MODE in production
+                __DISABLE_SECURE_MODE: false,  // Changed from import.meta.env.DEV
                 network: {
                     failuresOnly: false,
                     ignoreHeaders: [
@@ -79,25 +83,16 @@ export async function initTracker() {
                     captureTracing: false
                 },
                 onStart: () => {
-                    console.log('OpenReplay tracker started successfully');
-                },
-                onError: (error) => {
-                    console.error('OpenReplay tracker error:', error);
+                    console.log('OpenReplay session started:', trackerInstance?.__sessionID);
+                    // Identify user if available
+                    const user = get(userAccount);
+                    if (user?.email) {
+                        identifyUser(user.email);
+                    }
                 }
             });
 
-            // Disable APM for OpenReplay requests
-            if (apm?.addFilter) {
-                apm.addFilter(function (payload) {
-                    if (payload.context?.http?.url?.includes('openreplay')) {
-                        return false; // Drop the transaction
-                    }
-                    return payload;
-                });
-            }
-
-            trackerInstance
-                .start()
+            trackerInstance.start()
                 .then(() => {
                     isStarted = true;
                     resolve(trackerInstance);
