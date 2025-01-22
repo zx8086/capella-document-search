@@ -23,7 +23,10 @@ const apm = initApm({
     // Allow all microsoftonline domains
     /^https:\/\/.*\.microsoftonline\.com$/,
     // Allow all shared-services domains
-    /^https:\/\/.*\.shared-services\.eu\.pvh\.cloud$/
+    /^https:\/\/.*\.shared-services\.eu\.pvh\.cloud$/,
+    // Exclude OpenReplay
+    '!https://api.openreplay.com',
+    '!https://openreplay.prd.shared-services.eu.pvh.cloud'
   ],
   // Use ignoreTransactions instead of ignoreUrls for more precise control
   ignoreTransactions: [

@@ -63,7 +63,7 @@ export default defineConfig(({ mode }): UserConfig => {
             'Content-Type',
             'Authorization',
             'Content-Encoding',
-            'X-OpenReplay-Batch'
+            'X-Openreplay-Batch'
           ],
           credentials: false
         },
@@ -72,16 +72,17 @@ export default defineConfig(({ mode }): UserConfig => {
         },
         proxy: {
           '/openreplay': {
-            target: env.PUBLIC_OPENREPLAY_INGEST_POINT || 'https://api.openreplay.com',
+            target: env.PUBLIC_OPENREPLAY_INGEST_POINT,
             changeOrigin: true,
             secure: true,
-            rewrite: (path) => path.replace(/^\/openreplay/, '/ingest'),
+            headers: {
+              traceparent: undefined,
+              tracestate: undefined
+            },
             configure: (proxy, _options) => {
-              proxy.on('proxyReq', (proxyReq, req, _res) => {
-                // Set required OpenReplay headers
-                proxyReq.setHeader('Content-Type', 'application/json');
-                proxyReq.setHeader('X-Openreplay-Batch', '1');
-                proxyReq.setHeader('Content-Encoding', 'identity');
+              proxy.on('proxyReq', (proxyReq) => {
+                proxyReq.removeHeader('traceparent');
+                proxyReq.removeHeader('tracestate');
               });
             }
           }

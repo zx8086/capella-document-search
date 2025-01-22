@@ -58,99 +58,49 @@ const getResourceBaseHref = () => {
 };
 
 export async function initTracker() {
-    if (trackerInstance && isStarted) {
-        console.log("📝 Tracker already initialized and started");
-        return trackerInstance;
-    }
-
-    if (initializationPromise) {
-        console.log("⏳ Waiting for existing tracker initialization...");
+    if (isInitializing || trackerInstance) {
         return initializationPromise;
     }
 
-    try {
-        isInitializing = true;
-        initializationPromise = (async () => {
-            console.log("🔍 Initializing OpenReplay tracker...");
-            
-            const tracker = new Tracker({
+    isInitializing = true;
+    initializationPromise = new Promise((resolve) => {
+        try {
+            trackerInstance = new Tracker({
                 projectKey: frontendConfig.openreplay.PROJECT_KEY,
                 ingestPoint: getIngestPoint(),
-                __DISABLE_SECURE_MODE: import.meta.env.DEV,
-                resourceBaseHref: getResourceBaseHref(),
                 network: {
-                    enabled: true,
-                    capturePayload: true,
                     failuresOnly: false,
-                    ignoreHeaders: [
-                        'Cookie', 
-                        'Set-Cookie',
-                        'traceparent',
-                        'elastic-apm-traceparent'
-                    ],
-                    sessionTokenHeader: false
+                    ignoreHeaders: ['traceparent', 'tracestate'],
+                    capturePayload: true
                 },
-                verbose: true,
+                // Add secure mode configuration based on environment
+                __DISABLE_SECURE_MODE: import.meta.env.DEV, // true for development, false for production
                 onStart: () => {
-                    console.log("✅ OpenReplay tracker started successfully", {
-                        ingestPoint: getIngestPoint(),
-                        baseHref: getResourceBaseHref(),
-                        projectKey: frontendConfig.openreplay.PROJECT_KEY
-                    });
+                    console.log('OpenReplay tracker started successfully');
                 },
                 onError: (error) => {
-                    console.error("OpenReplay error:", {
-                        error,
-                        headers: error.headers,
-                        status: error.status,
-                        url: error.url
-                    });
-                },
-                respectDoNotTrack: false,
-                sanitizer: true,
-                resourceUploadingEnabled: false,
-                defaultInputMode: 0,
+                    console.error('OpenReplay tracker error:', error);
+                }
             });
 
-            // Check browser compatibility before starting
-            if (!browser) {
-                throw new Error('OpenReplay requires a browser environment');
-            }
+            trackerInstance
+                .start()
+                .then(() => {
+                    isStarted = true;
+                    resolve(trackerInstance);
+                })
+                .catch((error) => {
+                    console.error('Failed to start tracker:', error);
+                    resolve(null);
+                });
 
-            // Check if DoNotTrack is enabled
-            const dnt = navigator.doNotTrack || window.doNotTrack;
-            if (dnt === "1" || dnt === "yes") {
-                console.warn("DoNotTrack is enabled, but continuing anyway as per configuration");
-            }
+        } catch (error) {
+            console.error('Failed to initialize tracker:', error);
+            resolve(null);
+        }
+    });
 
-            try {
-                await tracker.start();
-                trackerInstance = tracker;
-                isStarted = true;
-                console.log("✅ Tracker started successfully");
-
-                // Set user ID immediately after tracker starts if user exists
-                const user = get(userAccount);
-                if (user?.username) {
-                    tracker.setUserID(user.username);
-                    console.log("👤 User ID set for tracker on init:", user.username);
-                }
-
-                return tracker;
-            } catch (startError) {
-                console.error("Failed to start tracker:", startError);
-                throw startError;
-            }
-        })();
-
-        return await initializationPromise;
-    } catch (error) {
-        console.error('❌ Tracker initialization failed:', error);
-        return null;
-    } finally {
-        isInitializing = false;
-        initializationPromise = null;
-    }
+    return initializationPromise;
 }
 
 export function getTracker() {
@@ -462,4 +412,22 @@ export function debugAssetAccess() {
         console.error('Debug Error:', error);
     }
     console.groupEnd();
+}
+
+// If you have APM integration, update it:
+export function setupAPMIntegration(tracker: Tracker) {
+    if (!apm) return;
+
+    // Disable automatic tracing
+    apm.setConfig({
+        distributedTracing: false,
+        propagateTracestate: false
+    });
+
+    // Only setup minimal integration
+    tracker.setAPMIntegration?.({
+        captureTracing: false,
+        // Don't include trace headers
+        propagateTraceContext: false
+    });
 }
