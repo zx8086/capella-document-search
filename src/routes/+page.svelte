@@ -27,6 +27,8 @@
 
     import { debugTrackerStatus, trackEvent } from '$lib/context/tracker';
 
+    // import { trackClick } from '$utils/tracker';
+
     interface SearchResult {
         collection: string;
         data: any;
@@ -475,11 +477,7 @@
 
     let isLoading = $state(false);
 
-    function toggleCollection(collection: {
-        bucket: string;
-        scope_name: string;
-        collection_name: string;
-    }) {
+    function toggleCollection(collection: Collection) {
         const index = selectedCollections.findIndex(
             (c) =>
                 c.bucket === collection.bucket &&
@@ -488,12 +486,15 @@
         );
 
         if (index !== -1) {
-            selectedCollections = selectedCollections.filter(
-                (_, i) => i !== index,
-            );
+            selectedCollections = selectedCollections.filter((_, i) => i !== index);
         } else {
             selectedCollections = [...selectedCollections, collection];
         }
+        
+        console.log("Collection selection updated:", {
+            selected: selectedCollections.length,
+            total: allCollections.length
+        });
     }
 
     function selectAllCollections(): void {

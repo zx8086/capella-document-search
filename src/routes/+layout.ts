@@ -1,3 +1,5 @@
+// src/routes/+layout.ts
+
 import { auth, isLoading } from '$lib/stores/authStore';
 import type { LayoutLoad } from './$types';
 import { browser } from '$app/environment';

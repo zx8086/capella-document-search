@@ -71,7 +71,7 @@ export async function initTracker() {
             trackerInstance = new Tracker({
                 projectKey: frontendConfig.openreplay.PROJECT_KEY,
                 ingestPoint: getIngestPoint(),
-                __DISABLE_SECURE_MODE: false,
+                __DISABLE_SECURE_MODE: true,
                 resourceBaseHref: getResourceBaseHref(),
                 network: {
                     failuresOnly: false,

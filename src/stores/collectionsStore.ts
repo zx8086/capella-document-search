@@ -26,3 +26,11 @@ function createCollectionsStore() {
 }
 
 export const collections = createCollectionsStore();
+
+// Add this to see store updates
+collections.subscribe((value) => {
+  console.log("🔄 Collections store updated:", { 
+    count: value.length,
+    timestamp: new Date().toISOString()
+  });
+});

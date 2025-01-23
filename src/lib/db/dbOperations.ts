@@ -2,9 +2,7 @@
 
 import { backendConfig } from "$backendConfig";
 import { Database, type Statement } from "bun:sqlite";
-import { log, err } from "$utils/unifiedLogger";
-import path from "path";
-import fs from "fs";
+import { log, err, warn } from "$lib/utils/clientLogger";
 
 let db: Database | null = null;
 let insertScopeStmt: Statement | null = null;
@@ -17,30 +15,9 @@ let getAllCollectionsWithTooltipsStmt: Statement | null = null;
 
 export function initializeDatabase() {
   if (!db) {
-    log("Initializing database");
-
-    const dataDir = path.resolve(
-      process.cwd(),
-      backendConfig.application.DB_DATA_DIR,
-    );
-    const dbPath = path.join(dataDir, "capella-document-search.sqlite");
-
-    log(`Database directory: ${dataDir}`);
-    log(`Database path: ${dbPath}`);
-    log(`Current working directory: ${process.cwd()}`);
-    log(`Attempting to create database at: ${dbPath}`);
-
-    if (!fs.existsSync(dataDir)) {
-      try {
-        fs.mkdirSync(dataDir, { recursive: true });
-      } catch (error: any) {
-        err(`Failed to create SQLite database directory: ${error.message}`);
-        throw error;
-      }
-    }
-
-    db = new Database(dbPath, { create: true });
-
+    // Only change: Use in-memory database
+    db = new Database(":memory:");
+    
     db.exec(`
       CREATE TABLE IF NOT EXISTS scopes (
         bucket TEXT NOT NULL,
@@ -96,7 +73,7 @@ export function initializeDatabase() {
       JOIN scopes s ON c.bucket = s.bucket AND c.scope_name = s.scope_name
     `);
 
-    log("Database and prepared statements initialized");
+    console.log("Database and prepared statements initialized");
   }
   return db;
 }
@@ -113,7 +90,7 @@ export function insertScope(bucket: string, scopeName: string) {
     throw new Error("Database not initialized");
   }
   const result = insertScopeStmt.run(bucket, scopeName);
-  log(`Inserted scope: ${bucket}.${scopeName}, Result:`, { meta: { result } });
+  console.log(`Inserted scope: ${bucket}.${scopeName}, Result:`, { meta: { result } });
   return result;
 }
 
@@ -126,7 +103,7 @@ export function insertCollection(
     throw new Error("Database not initialized");
   }
   const result = insertCollectionStmt.run(bucket, scopeName, collectionName);
-  log(
+  console.log(
     `Inserted collection: ${bucket}.${scopeName}.${collectionName}, Result:`,
     { meta: { result } },
   );
@@ -138,7 +115,7 @@ export function getAllCollections() {
     throw new Error("Database not initialized");
   }
   const results = getAllCollectionsStmt.all();
-  log("Retrieved collections - function getAllCollections:", {
+  console.log("Retrieved collections - function getAllCollections:", {
     meta: { results },
   });
   return results;
@@ -153,7 +130,7 @@ export function getFormattedCollections() {
     scope: string;
     collection: string;
   }>;
-  log("Retrieved formatted collections - function getFormattedCollections:");
+  console.log("Retrieved formatted collections - function getFormattedCollections:");
   return results;
 }
 
@@ -172,7 +149,7 @@ export function insertTooltip(
     collectionName,
     tooltipContent,
   );
-  log(
+  console.log(
     `Inserted tooltip for: ${bucket}.${scopeName}.${collectionName}, Result:`,
     { meta: { result } },
   );
@@ -198,8 +175,16 @@ export function getAllCollectionsWithTooltips() {
     throw new Error("Database not initialized");
   }
   const results = getAllCollectionsWithTooltipsStmt.all();
-  log(
+  console.log(
     "Retrieved collections with tooltips - function getAllCollectionsWithTooltips:",
   );
   return results;
+}
+
+export function isDatabaseEmpty(): boolean {
+  if (!db) {
+    initializeDatabase();
+  }
+  const result = db!.prepare('SELECT COUNT(*) as count FROM collections').get() as { count: number };
+  return result.count === 0;
 }
