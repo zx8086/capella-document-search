@@ -62,7 +62,8 @@ const config = {
           "'self'",
           "'unsafe-inline'",
           "'unsafe-eval'",
-          "https://api.openreplay.com"
+          "https://api.openreplay.com",
+          "https://openreplay.prd.shared-services.eu.pvh.cloud"
         ],
         'style-src': ["'self'", "'unsafe-inline'"],
         'img-src': ["'self'", "data:", "blob:"],
