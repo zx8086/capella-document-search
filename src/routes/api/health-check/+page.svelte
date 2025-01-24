@@ -1,57 +1,65 @@
 <!-- src/routes/api/health-check/+page.svelte -->
 
 <script lang="ts">
+    import { featureFlags, flagsStatus, useFeatureFlags } from '$lib/stores/featureFlagStore';
     import { onMount } from "svelte";
     import type { PageData } from './$types';
     import { goto, pushState, replaceState } from '$app/navigation';
     import { navigating } from '$app/stores';
-    import { getFeatureFlag } from '$lib/context/tracker';
-
+    import { writable } from 'svelte/store';
+    
+    const { flags, getFlag } = useFeatureFlags();
     const { data } = $props<{ data: PageData }>();
     
     let healthStatus = $state(data.healthStatus);
     let loading = $state(false);
     let error = $state("");
-    let checkType: "Simple" | "Detailed" = $state(data.checkType);
+    let checkType: "Simple" | "Detailed" = $state("Simple");
     let isNavigating = $state(false);
-    let loadingType = $state<"Simple" | "Detailed">(data.checkType);
-    let showBuildInfo = $state(false);
+    let loadingType = $state<"Simple" | "Detailed">("Simple");
+    
+    let showBuildInfo = $derived(getFlag('build-information'));
+
+    onMount(() => {
+        // Initialize feature flags store
+        featureFlags.initialize();
+    });
 
     $effect(() => {
         isNavigating = Boolean($navigating);
         if (isNavigating) {
             loading = true;
+            checkType = "Simple";
+            loadingType = "Simple";
         }
     });
 
     async function toggleCheckType() {
         try {
-            loading = true;
-            error = "";
             const newType = checkType === "Simple" ? "Detailed" : "Simple";
             loadingType = newType;
+            
+            // Only show loading for Detailed checks
+            loading = newType === "Detailed";
+            error = "";
             
             console.log(`Starting ${newType} health check...`);
             const response = await fetch(`/api/health-check?type=${newType}`);
             
             if (!response.ok) {
-                console.error('Health check response not OK:', response.status, response.statusText);
                 throw new Error(`Health check failed: ${response.statusText}`);
             }
             
             const data = await response.json();
             console.log('Health check response:', data);
             
-            // Update state even if some checks failed
             checkType = newType;
             healthStatus = data;
             
-            // Show error message if there are failed checks but don't prevent display
             if (data.failedChecks?.length > 0) {
                 error = `Some checks failed: ${data.failedChecks.join(", ")}`;
             }
             
-            // Update the URL
             replaceState('', {
                 type: newType,
                 timestamp: Date.now()
@@ -67,7 +75,7 @@
     $effect(() => {
         if (data.healthStatus) {
             healthStatus = data.healthStatus;
-            checkType = data.healthStatus.checkType;
+            checkType = "Simple";  // Always reset to Simple when data loads
             if (!isNavigating) {
                 loading = false;
             }
@@ -77,26 +85,6 @@
     let transactionName = $derived(
         `API Health Check Page - ${checkType} Check`
     );
-
-    onMount(async () => {
-        // Add a small delay to ensure tracker is fully initialized
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        
-        showBuildInfo = await getFeatureFlag('build-information');
-        
-        console.debug('🏗️ Build Info Display:', {
-            isVisible: showBuildInfo,
-            flagKey: 'build-information',
-            component: 'health-check'
-        });
-    });
-
-    $effect(() => {
-        console.debug('🔄 Build Info Status Changed:', {
-            isVisible: showBuildInfo,
-            timestamp: new Date().toISOString()
-        });
-    });
 
     // Add helper function to get status color
     function getStatusColor(status: string): string {
@@ -137,7 +125,7 @@
 
     <div class="mb-6">
         <button
-            onclick={toggleCheckType}
+            onclick={() => toggleCheckType()}
             class="w-48 bg-[#00174f] hover:bg-[#00174f]/80 text-white font-bold py-2 px-4 rounded hover:ring-2 hover:ring-red-500 hover:ring-offset-2 transition-all duration-300"
             data-transaction-name={`Switch to ${checkType === "Simple" ? "Detailed" : "Simple"} Check`}
         >

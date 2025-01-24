@@ -1,4 +1,5 @@
 import type { PageLoad } from './$types';
+import { getFlag } from '$lib/stores/featureFlagStore';
 
 export const load: PageLoad = async ({ fetch, url, depends }) => {
     // Add a dependency on our custom identifier
@@ -8,8 +9,12 @@ export const load: PageLoad = async ({ fetch, url, depends }) => {
     const response = await fetch(`/api/health-check?type=${checkType}`);
     const initialData = await response.json();
     
+    // Check feature flag during load
+    const showBuildInfo = getFlag('build-information');
+    
     return {
         healthStatus: initialData,
-        checkType: checkType as 'Simple' | 'Detailed'
+        checkType: checkType as 'Simple' | 'Detailed',
+        showBuildInfo
     };
 }; 

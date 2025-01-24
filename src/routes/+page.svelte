@@ -27,6 +27,8 @@
 
     import { debugTrackerStatus, trackEvent } from '$lib/context/tracker';
 
+    import FeatureFlagDebug from '$lib/components/FeatureFlagDebug.svelte';
+
     // import { trackClick } from '$utils/tracker';
 
     interface SearchResult {
@@ -1150,4 +1152,9 @@ IMAGE_70_C51_LV04F1003GPDE</pre>
             </div>
         </div>
     </div>
+{/if}
+
+<!-- Add this anywhere in your page -->
+{#if import.meta.env.DEV}
+    <FeatureFlagDebug />
 {/if}

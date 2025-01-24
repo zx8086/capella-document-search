@@ -12,11 +12,22 @@ function createCollectionsStore() {
     update,
     fetchCollections: async () => {
       try {
+        // First check if database is empty
+        const checkResponse = await fetch("/api/collections");
+        const existingData = await checkResponse.json();
+        
+        // If empty, seed the database first
+        if (!existingData || existingData.length === 0) {
+            console.log("Database empty, seeding first");
+            await fetch("/api/collections", { method: "POST" });
+        }
+        
+        // Then fetch the collections
         const response = await fetch("/api/collections");
         if (!response.ok) {
-          throw new Error("Failed to fetch collections");
+            throw new Error("Failed to fetch collections");
         }
-        const collections: Collection[] = await response.json();
+        const collections = await response.json();
         set(collections);
       } catch (error) {
         console.error("Error fetching collections:", error);

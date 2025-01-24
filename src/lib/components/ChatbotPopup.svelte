@@ -8,6 +8,7 @@
   import { userAccount, isAuthenticated } from '$lib/stores/authStore';
   import { userPhotoUrl, fetchUserPhoto } from '$lib/stores/photoStore';
   import { getMsalInstance } from '$lib/config/authConfig';
+  import { getFlag } from '$lib/stores/featureFlagStore';
   
   const dispatch = createEventDispatcher();
   
@@ -16,12 +17,14 @@
   }
   
   const { isOpen = false } = $props<Props>();
-  let isFeatureEnabled = $state(false);
-  let isInitialized = $state(false);
-  let newMessage = $state('');
   let isLoading = $state(false);
-  let trackerReady = $state(false);
+  let newMessage = $state('');
   let userPhoto = $state($userPhotoUrl);
+  let trackerReady = $state(false);
+  let isInitialized = $state(false);
+  
+  // Initialize with the flag value from store
+  let isFeatureEnabled = $state(getFlag('rag-chat-assistant'));
   
   // Get first name from full name
   function getFirstName(fullName: string = ''): string {
@@ -52,6 +55,18 @@
     }
   });
   
+  $effect(() => {
+    console.debug('🤖 Chat Assistant Visibility Check:', {
+      flagValue: getFlag('rag-chat-assistant'),
+      isEnabled: isFeatureEnabled,
+      trackerReady,
+      timestamp: new Date().toISOString()
+    });
+    
+    // Update isFeatureEnabled based on flag value
+    isFeatureEnabled = getFlag('rag-chat-assistant');
+  });
+  
   onMount(async () => {
     try {
       // Wait for tracker to be ready
@@ -59,18 +74,18 @@
         await new Promise(resolve => setTimeout(resolve, 100));
       }
       trackerReady = true;
+      isInitialized = true;
+      
+      // Update feature flag after tracker is ready
+      isFeatureEnabled = getFlag('rag-chat-assistant');
       
       console.debug('🤖 Chat Assistant Init:', {
         trackerReady,
+        isFeatureEnabled,
         pathname: $page?.url?.pathname,
         isAuthenticated: $isAuthenticated,
         timestamp: new Date().toISOString()
       });
-
-      // Get feature flag value
-      const flagValue = await getFeatureFlag('rag-chat-assistant');
-      isFeatureEnabled = true;
-      isInitialized = true;
 
       // Fetch user photo if authenticated
       if ($isAuthenticated && $userAccount) {
@@ -119,8 +134,8 @@
     } catch (error) {
       console.warn('🤖 Chat Assistant: Initialization failed', error);
       trackerReady = true;
-      isFeatureEnabled = true;
       isInitialized = true;
+      isFeatureEnabled = true; // Keep chat enabled if initialization fails
     }
   });
   
@@ -331,7 +346,7 @@
   });
 </script>
 
-{#if isInitialized && isFeatureEnabled}
+{#if isFeatureEnabled && isInitialized}
   <button
     type="button"
     onclick={toggleChat}

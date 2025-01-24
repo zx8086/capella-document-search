@@ -20,6 +20,8 @@
     import { collections } from "../stores/collectionsStore";
     import { auth, isAuthenticated, userAccount, isLoading } from '$lib/stores/authStore';
     import { quotes } from '../stores/quotesStore';
+    import { featureFlags } from '$lib/stores/featureFlagStore';
+
     interface Props {
         children?: import('svelte').Snippet;
     }
@@ -165,6 +167,9 @@
                 debugTrackerStatus();
             }
         }
+
+        console.log('🚩 Layout mounted, initializing feature flags...');
+        await featureFlags.initialize();
 
         return () => {
             if (pollInterval) clearInterval(pollInterval);
