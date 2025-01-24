@@ -17,13 +17,23 @@ const apm = initApm({
     // Only include origins we want to trace
     'https://eu-b2b.apm.eu-central-1.aws.cloud.es.io',
     'https://capella-document-search.prd.shared-services.eu.pvh.cloud',
-    // Explicitly exclude OpenReplay
-    '!https://*.openreplay.com',
-    '!https://*.shared-services.eu.pvh.cloud/ingest'
+    // Explicitly allow OpenReplay WebSocket connections
+    'ws://api.openreplay.com/ws-assist/socket/*',
+    'wss://api.openreplay.com/ws-assist/socket/*',
+    'ws://openreplay.prd.shared-services.eu.pvh.cloud/ws-assist/socket/*',
+    'wss://openreplay.prd.shared-services.eu.pvh.cloud/ws-assist/socket/*'
   ],
-  // Disable trace propagation completely for OpenReplay
-  ignoreTransactions: ['/ingest/v1/web/*'],
-  propagateTracestate: false  // Disable globally and handle per-request
+  // Update ignore patterns to be more specific
+  ignoreTransactions: [
+    '/ingest/v1/web/*',
+    '!/ws-assist/socket/*'  // Don't ignore assist socket connections
+  ],
+  propagateTracestate: false,  // Keep this disabled globally
+  // Add explicit allowed origins for WebSocket
+  allowedOrigins: [
+    'api.openreplay.com',
+    'openreplay.prd.shared-services.eu.pvh.cloud'
+  ]
 });
 
 console.log("APM Config:", {

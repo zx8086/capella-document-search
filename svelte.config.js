@@ -30,84 +30,46 @@ const config = {
     csp: {
       mode: "auto",
       directives: {
-        "default-src": ["'self'"],
-        "connect-src": [
+        'default-src': ["'self'"],
+        'connect-src': [
           "'self'",
-          ...(dev ? ["http://localhost:*", "ws://localhost:*"] : []),
+          // OpenReplay minimal required configuration
+          "https://api.openreplay.com",
+          "wss://api.openreplay.com",
+          "ws://api.openreplay.com",
+          // Other necessary endpoints
           "https://login.microsoftonline.com",
           "https://*.microsoftonline.com",
-          "https://capella-document-search.prd.shared-services.eu.pvh.cloud",
-          "https://capellaql.prd.shared-services.eu.pvh.cloud",
-          "https://d2bgp0ri487o97.cloudfront.net",
-          "https://eu-b2b.apm.eu-central-1.aws.cloud.es.io",
-          "https://eu-b2b.apm.vpce.eu-central-1.aws.elastic-cloud.com",
-          "https://apm.vpce.eu-central-1.aws.elastic-cloud.com",
-          "https://apm.eu-central-1.aws.cloud.es.io",
-          "https://cloudapi.cloud.couchbase.com",
-          "https://openreplay.prd.shared-services.eu.pvh.cloud",
-          "http://collector.prd.shared-services.eu.pvh.cloud",
-          "https://apm.siobytes.com",
-          "https://api.openreplay.com",
+          "https://graph.microsoft.com",
+          "https://*.graph.microsoft.com",
+          "https://api.openai.com",
+          "https://*.pinecone.io",
+          "https://*.svc.pinecone.io",
           "https://*.shared-services.eu.pvh.cloud",
-          "https://openreplay.prd.shared-services.eu.pvh.cloud",
-          "wss://openreplay.prd.shared-services.eu.pvh.cloud",
-          "https://*.openreplay.prd.shared-services.eu.pvh.cloud",
-          "wss://*.openreplay.prd.shared-services.eu.pvh.cloud",
-          "https://*.openreplay.com",
-          "wss://*.openreplay.com",
-          "https://api.openreplay.com",
-          "https://openreplay.prd.shared-services.eu.pvh.cloud",
-          "wss://openreplay.prd.shared-services.eu.pvh.cloud",
-          "https://*.openreplay.prd.shared-services.eu.pvh.cloud",
-          "wss://*.openreplay.prd.shared-services.eu.pvh.cloud"
+          "https://*.cloudfront.net",
+          "https://*.aws.cloud.es.io",
+          "https://*.aws.elastic-cloud.com",
+          "https://*.cloud.couchbase.com",
+          "https://*.siobytes.com",
+          "https://eu-b2b.apm.eu-central-1.aws.cloud.es.io",
+          // Development endpoints
+          ...(dev ? ["ws://localhost:*", "http://localhost:*"] : [])
         ],
-        "script-src": [
+        'script-src': [
           "'self'",
           "'unsafe-inline'",
           "'unsafe-eval'",
-          "https://vjs.zencdn.net",
-          "blob:",
-          "https://openreplay.prd.shared-services.eu.pvh.cloud",
-          "https://api.openreplay.com",
-          "https://static.openreplay.com"
-        ],
-        "style-src": [
-          "'self'",
-          "'unsafe-inline'",
-          "https://vjs.zencdn.net",
-          "https://openreplay.prd.shared-services.eu.pvh.cloud",
           "https://api.openreplay.com"
         ],
-        "img-src": [
-          "'self'",
-          "data:",
-          "blob:",
-          "https:",
-          "https://d2bgp0ri487o97.cloudfront.net"
-        ],
-        "font-src": ["'self'", "data:"],
-        "object-src": ["'none'"],
-        "base-uri": ["'self'"],
-        "form-action": [
-          "'self'",
-          "https://login.microsoftonline.com",
-          "https://*.microsoftonline.com",
-          "https://capellaql.prd.shared-services.eu.pvh.cloud",
-          "https://capella-document-search.prd.shared-services.eu.pvh.cloud"
-        ],
-        "frame-src": [
+        'style-src': ["'self'", "'unsafe-inline'"],
+        'img-src': ["'self'", "data:", "blob:"],
+        'font-src': ["'self'", "data:"],
+        'frame-src': [
           "'self'",
           "https://login.microsoftonline.com",
           "https://*.microsoftonline.com"
         ],
-        "frame-ancestors": ["'self'"],
-        "worker-src": ["'self'", "blob:"],
-        "media-src": [
-          "'self'",
-          "blob:",
-          "https://d2bgp0ri487o97.cloudfront.net"
-        ],
-        "child-src": ["'self'", "blob:"]
+        'worker-src': ["'self'", "blob:"]
       }
     },
     csrf: {

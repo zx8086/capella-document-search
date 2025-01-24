@@ -71,16 +71,20 @@ export async function initTracker() {
             trackerInstance = new Tracker({
                 projectKey: frontendConfig.openreplay.PROJECT_KEY,
                 ingestPoint: getIngestPoint(),
-                __DISABLE_SECURE_MODE: true,
+                __DISABLE_SECURE_MODE: import.meta.env.DEV,
                 resourceBaseHref: getResourceBaseHref(),
                 network: {
                     failuresOnly: false,
                     ignoreHeaders: [
                         'traceparent',
                         'tracestate',
-                        'elastic-apm-traceparent'
+                        'elastic-apm-traceparent', 
+                        'Cookie', 
+                        'Set-Cookie', 
+                        'Authorization'
                     ],
-                    captureTracing: false
+                    captureTracing: false,
+                    captureAPM: false
                 },
                 // Add these options for better resource capturing
                 resourceUploadLimits: {
@@ -97,6 +101,60 @@ export async function initTracker() {
                     }
                 }
             });
+
+            // Disable APM integration for development
+            if (import.meta.env.DEV) {
+                setupAPMIntegration(trackerInstance);
+            }
+
+            // Add tracker assist plugin
+            trackerInstance.use(trackerAssist({
+                callConfirm: "Would you like to start a support call?",
+                controlConfirm: "Would you like to allow support to control your screen?",
+                onCallStart: () => {
+                    console.log("🎥 Support call started");
+                    toast.info("Support call started", {
+                        description: "You are now connected to a support session",
+                        duration: Infinity
+                    });
+                    return () => {
+                        console.log("📞 Support call ended");
+                        toast.info("Support call ended", {
+                            description: "Your support session has ended",
+                            duration: Infinity
+                        });
+                    };
+                },
+                onRemoteControlStart: () => {
+                    console.log("🖱️ Remote control started");
+                    toast.info("Remote control active", {
+                        description: "Support agent now has control of your screen",
+                        duration: Infinity
+                    });
+                    return () => {
+                        console.log("🔒 Remote control ended");
+                        toast.info("Remote control ended", {
+                            description: "Support agent no longer has control of your screen",
+                            duration: Infinity
+                        });
+                    };
+                },
+                onAgentConnect: (agentInfo: any = {}) => {
+                    const { email = '', name = '', query = '' } = agentInfo;
+                    console.log("👋 Agent connected:", { email, name, query });
+                    toast.info("Support agent connected", {
+                        description: `${name} (${email}) has joined the session`,
+                        duration: Infinity
+                    });
+                    return () => {
+                        console.log("👋 Agent disconnected");
+                        toast.info("Support agent disconnected", {
+                            description: "The support agent has left the session",
+                            duration: Infinity
+                        });
+                    };
+                }
+            }));
 
             trackerInstance.start()
                 .then(() => {
@@ -428,20 +486,12 @@ export function debugAssetAccess() {
     console.groupEnd();
 }
 
-// If you have APM integration, update it:
+// Update the APM integration setup
 export function setupAPMIntegration(tracker: Tracker) {
-    if (!apm) return;
+    if (!apm || import.meta.env.DEV) return;  // Skip in development
 
-    // Disable automatic tracing
-    apm.setConfig({
-        distributedTracing: false,
-        propagateTracestate: false
-    });
-
-    // Only setup minimal integration
     tracker.setAPMIntegration?.({
         captureTracing: false,
-        // Don't include trace headers
         propagateTraceContext: false
     });
 }
