@@ -69,7 +69,6 @@ jobs:
             sudo apt-get update && sudo apt-get install -y jq
           fi
 
-      # Initial Setup
       - name: Set build timestamp
         id: timestamp
         run: echo "BUILD_TIMESTAMP=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" >> $GITHUB_ENV
@@ -436,6 +435,7 @@ jobs:
           rm -rf /usr/local/bin/syft
           rm -rf ~/.sigstore
           echo "Cleanup completed"
+          
       - name: Verify metadata
         continue-on-error: true
         shell: bash

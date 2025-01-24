@@ -37,6 +37,9 @@ const config = {
           "https://api.openreplay.com",
           "wss://api.openreplay.com",
           "ws://api.openreplay.com",
+          "https://openreplay.prd.shared-services.eu.pvh.cloud",
+          "wss://openreplay.prd.shared-services.eu.pvh.cloud",
+          "ws://openreplay.prd.shared-services.eu.pvh.cloud",
           // Other necessary endpoints
           "https://login.microsoftonline.com",
           "https://*.microsoftonline.com",
