@@ -4,7 +4,7 @@
     import { featureFlags, flagsStatus, useFeatureFlags } from '$lib/stores/featureFlagStore';
     import { onMount } from "svelte";
     import type { PageData } from './$types';
-    import { goto, pushState, replaceState } from '$app/navigation';
+    import { goto } from '$app/navigation';
     import { navigating } from '$app/stores';
     import { writable } from 'svelte/store';
     
@@ -12,62 +12,34 @@
     const { data } = $props<{ data: PageData }>();
     
     let healthStatus = $state(data.healthStatus);
-    let loading = $state(false);
     let error = $state("");
-    let checkType: "Simple" | "Detailed" = $state("Simple");
-    let isNavigating = $state(false);
-    let loadingType = $state<"Simple" | "Detailed">("Simple");
+    let checkType: "Simple" | "Detailed" = $state(data.checkType);
+    let loading = $state(false);
+    let loadingType = $state(checkType);  // Initialize with current checkType
     
     let showBuildInfo = $derived(getFlag('build-information'));
 
     onMount(() => {
-        // Initialize feature flags store
         featureFlags.initialize();
-    });
-
-    $effect(() => {
-        isNavigating = Boolean($navigating);
-        if (isNavigating) {
-            loading = true;
-            checkType = "Simple";
-            loadingType = "Simple";
-        }
     });
 
     async function toggleCheckType() {
         try {
             const newType = checkType === "Simple" ? "Detailed" : "Simple";
-            loadingType = newType;
-            
-            // Only show loading for Detailed checks
-            loading = newType === "Detailed";
+            loading = true;
             error = "";
             
-            console.log(`Starting ${newType} health check...`);
-            const response = await fetch(`/api/health-check?type=${newType}`);
-            
-            if (!response.ok) {
-                throw new Error(`Health check failed: ${response.statusText}`);
-            }
-            
-            const data = await response.json();
-            console.log('Health check response:', data);
-            
+            // Update checkType immediately for UI feedback
             checkType = newType;
-            healthStatus = data;
             
-            if (data.failedChecks?.length > 0) {
-                error = `Some checks failed: ${data.failedChecks.join(", ")}`;
-            }
-            
-            replaceState('', {
-                type: newType,
-                timestamp: Date.now()
+            await goto(`/api/health-check?type=${newType}`, {
+                replaceState: true,
+                noScroll: true
             });
+            
         } catch (e) {
             console.error("Health check error details:", e);
             error = e instanceof Error ? e.message : String(e);
-        } finally {
             loading = false;
         }
     }
@@ -75,11 +47,16 @@
     $effect(() => {
         if (data.healthStatus) {
             healthStatus = data.healthStatus;
-            checkType = "Simple";  // Always reset to Simple when data loads
-            if (!isNavigating) {
-                loading = false;
+            checkType = data.checkType;
+            loadingType = data.checkType;  // Update loadingType when data changes
+            if (data.healthStatus.failedChecks?.length > 0) {
+                error = `Some checks failed: ${data.healthStatus.failedChecks.join(", ")}`;
             }
         }
+    });
+
+    $effect(() => {
+        loading = Boolean($navigating);
     });
 
     let transactionName = $derived(
@@ -141,7 +118,7 @@
     {#if loading}
         <div class="flex flex-col items-center justify-center gap-4">
             <p class="text-gray-600">
-                Loading {loadingType} health check...
+                Loading {checkType === "Simple" ? "Detailed" : "Simple"} health check...
             </p>
             <div class="animate-spin rounded-full h-12 w-12 border-2 border-gray-200 border-b-gray-900">
                 <span class="sr-only">Loading health check status...</span>

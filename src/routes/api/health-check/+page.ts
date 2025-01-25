@@ -7,13 +7,13 @@ export const load: PageLoad = async ({ fetch, url, depends }) => {
     
     const checkType = url.searchParams.get('type') || 'Simple';
     const response = await fetch(`/api/health-check?type=${checkType}`);
-    const initialData = await response.json();
+    const healthStatus = await response.json();
     
     // Check feature flag during load
     const showBuildInfo = getFlag('build-information');
     
     return {
-        healthStatus: initialData,
+        healthStatus,
         checkType: checkType as 'Simple' | 'Detailed',
         showBuildInfo
     };

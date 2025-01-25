@@ -31,6 +31,7 @@ const BUILD_DATE = process.env.BUILD_DATE || new Date().toISOString();
 async function checkOpenTelemetryEndpoint(
   url: string,
   name: string,
+  fetch: typeof global.fetch
 ): Promise<CheckResult> {
   const startTime = Date.now();
   try {
@@ -63,28 +64,31 @@ async function checkOpenTelemetryEndpoint(
   }
 }
 
-async function checkTracesEndpoint(): Promise<CheckResult> {
+async function checkTracesEndpoint(fetch: typeof global.fetch): Promise<CheckResult> {
   return checkOpenTelemetryEndpoint(
     backendConfig.openTelemetry.TRACES_ENDPOINT,
     "Traces",
+    fetch
   );
 }
 
-async function checkMetricsEndpoint(): Promise<CheckResult> {
+async function checkMetricsEndpoint(fetch: typeof global.fetch): Promise<CheckResult> {
   return checkOpenTelemetryEndpoint(
     backendConfig.openTelemetry.METRICS_ENDPOINT,
     "Metrics",
+    fetch
   );
 }
 
-async function checkLogsEndpoint(): Promise<CheckResult> {
+async function checkLogsEndpoint(fetch: typeof global.fetch): Promise<CheckResult> {
   return checkOpenTelemetryEndpoint(
     backendConfig.openTelemetry.LOGS_ENDPOINT,
     "Logs",
+    fetch
   );
 }
 
-async function checkElasticAPMEndpoint(): Promise<CheckResult> {
+async function checkElasticAPMEndpoint(fetch: typeof global.fetch): Promise<CheckResult> {
   const startTime = Date.now();
   const apmServerUrl = frontendConfig.elasticApm.SERVER_URL;
 
@@ -123,7 +127,7 @@ async function checkElasticAPMEndpoint(): Promise<CheckResult> {
   }
 }
 
-async function checkGraphQLEndpoint(): Promise<CheckResult> {
+async function checkGraphQLEndpoint(fetch: typeof global.fetch): Promise<CheckResult> {
   const startTime = Date.now();
   try {
     const client = new ApolloClient({
@@ -163,7 +167,7 @@ async function checkGraphQLEndpoint(): Promise<CheckResult> {
   }
 }
 
-async function checkCapellaAPI(): Promise<CheckResult> {
+async function checkCapellaAPI(fetch: typeof global.fetch): Promise<CheckResult> {
   const startTime = Date.now();
   try {
     log("Starting Capella API check...");
@@ -202,7 +206,7 @@ async function checkCapellaAPI(): Promise<CheckResult> {
   }
 }
 
-async function checkDatabase(): Promise<CheckResult> {
+async function checkDatabase(fetch: typeof global.fetch): Promise<CheckResult> {
   const startTime = Date.now();
   try {
     initializeDatabase();
@@ -224,7 +228,7 @@ async function checkDatabase(): Promise<CheckResult> {
   }
 }
 
-async function checkInternalAPI(fetch: Function): Promise<CheckResult> {
+async function checkInternalAPI(fetch: typeof global.fetch): Promise<CheckResult> {
   const startTime = Date.now();
   try {
     log("GET: /api/collections");
@@ -254,7 +258,7 @@ async function checkInternalAPI(fetch: Function): Promise<CheckResult> {
   }
 }
 
-async function checkOpenReplayEndpoint(): Promise<CheckResult> {
+async function checkOpenReplayEndpoint(fetch: typeof global.fetch): Promise<CheckResult> {
     const startTime = Date.now();
     const openReplayUrl = frontendConfig.openreplay.INGEST_POINT;
 
@@ -356,7 +360,7 @@ async function checkOpenReplayEndpoint(): Promise<CheckResult> {
     }
 }
 
-async function checkOpenAIEndpoint(): Promise<CheckResult> {
+async function checkOpenAIEndpoint(fetch: typeof global.fetch): Promise<CheckResult> {
     const startTime = Date.now();
     try {
         const openai = new OpenAI({
@@ -394,7 +398,7 @@ async function checkOpenAIEndpoint(): Promise<CheckResult> {
     }
 }
 
-async function checkPineconeEndpoint(): Promise<CheckResult> {
+async function checkPineconeEndpoint(fetch: typeof global.fetch): Promise<CheckResult> {
     const startTime = Date.now();
     try {
         const pc = new Pinecone({
@@ -450,20 +454,20 @@ export async function GET({ fetch, url }: RequestEvent) {
 
     const simpleChecks = [
       { name: "Internal Collections API", check: () => checkInternalAPI(fetch) },
-      { name: "SQLite Database", check: checkDatabase },
-      { name: "GraphQL Endpoint", check: checkGraphQLEndpoint },
+      { name: "SQLite Database", check: () => checkDatabase(fetch) },
+      { name: "GraphQL Endpoint", check: () => checkGraphQLEndpoint(fetch) },
     ].sort((a, b) => a.name.localeCompare(b.name));
 
     const detailedChecks = [
       ...simpleChecks,
-      { name: "Elastic APM Server", check: checkElasticAPMEndpoint },
-      { name: "External Capella Cloud API", check: checkCapellaAPI },
-      { name: "OpenReplay Endpoint", check: checkOpenReplayEndpoint },
-      { name: "OpenAI API", check: checkOpenAIEndpoint },
-      { name: "Pinecone API", check: checkPineconeEndpoint },
-      { name: "OpenTelemetry Logs Endpoint", check: checkLogsEndpoint },
-      { name: "OpenTelemetry Metrics Endpoint", check: checkMetricsEndpoint },
-      { name: "OpenTelemetry Traces Endpoint", check: checkTracesEndpoint },
+      { name: "Elastic APM Server", check: () => checkElasticAPMEndpoint(fetch) },
+      { name: "External Capella Cloud API", check: () => checkCapellaAPI(fetch) },
+      { name: "OpenReplay Endpoint", check: () => checkOpenReplayEndpoint(fetch) },
+      { name: "OpenAI API", check: () => checkOpenAIEndpoint(fetch) },
+      { name: "Pinecone API", check: () => checkPineconeEndpoint(fetch) },
+      { name: "OpenTelemetry Logs Endpoint", check: () => checkLogsEndpoint(fetch) },
+      { name: "OpenTelemetry Metrics Endpoint", check: () => checkMetricsEndpoint(fetch) },
+      { name: "OpenTelemetry Traces Endpoint", check: () => checkTracesEndpoint(fetch) },
     ].sort((a, b) => a.name.localeCompare(b.name));
     
     // Run all checks in parallel but handle each independently
