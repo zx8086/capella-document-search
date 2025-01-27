@@ -14,6 +14,9 @@ ENV BUILD_VERSION=${BUILD_VERSION}
 ENV COMMIT_HASH=${COMMIT_HASH}
 ENV BUILD_DATE=${BUILD_DATE}
 ENV NODE_ENV=${NODE_ENV}
+ENV LANG=C.UTF-8
+ENV LC_ALL=C.UTF-8
+ENV LC_CTYPE=C.UTF-8
 
 WORKDIR /app
 
@@ -25,11 +28,12 @@ RUN --mount=type=cache,target=/root/.bun/install/cache \
 # Copy all files after dependency installation
 COPY . .
 
-# Build the application
+# Build the application with proper encoding
 RUN --mount=type=cache,target=/root/.bun/install/cache \
-    export LANG=C.UTF-8 && \
-    export LC_ALL=C.UTF-8 && \
     bun run svelte-kit sync && \
+    LANG=C.UTF-8 \
+    LC_ALL=C.UTF-8 \
+    LC_CTYPE=C.UTF-8 \
     NODE_ENV=${NODE_ENV} \
     DISABLE_OPENTELEMETRY=true \
     bun run build:no-telemetry
@@ -48,6 +52,9 @@ ENV BUILD_VERSION=${BUILD_VERSION}
 ENV COMMIT_HASH=${COMMIT_HASH}
 ENV BUILD_DATE=${BUILD_DATE}
 ENV NODE_ENV=${NODE_ENV}
+ENV LANG=C.UTF-8
+ENV LC_ALL=C.UTF-8
+ENV LC_CTYPE=C.UTF-8
 
 WORKDIR /app
 

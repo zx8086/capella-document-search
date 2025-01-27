@@ -12,6 +12,7 @@ build                             # Build directory
 .svelte-kit                       # SvelteKit output
 /.svelte-kit
 /build
+dist
 
 # Development files
 .vscode                           # VSCode settings
@@ -39,3 +40,14 @@ debug*.png                       # Debug screenshots
 redirect*.png                    # Redirect screenshots
 test-failure*.png               # Test failure screenshots
 test-results/                    # Test results directory
+
+# Additional files
+.cache
+.docker
+.nyc_output
+*.md
+*.test.*
+__tests__
+test
+tests
+docs
