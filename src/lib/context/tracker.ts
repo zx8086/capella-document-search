@@ -92,16 +92,16 @@ export async function initTracker() {
                     maxOtherResourceSize: 2 * 1024 * 1024 // 2MB
                 },
                 captureResourceMetrics: true,
-                onStart: async () => {
+                onStart: () => {
                     console.log('OpenReplay session started:', trackerInstance?.__sessionID);
-                    // Get user synchronously to ensure it's available immediately
+                    // Initial user identification for replays
                     const user = get(userAccount);
                     if (user?.email) {
-                        await identifyUser(user.email, {
-                            name: user.name || user.email,
-                            email: user.email,
-                            // Add any other relevant user metadata
-                        });
+                        trackerInstance?.setUserID(user.email);
+                        if (user.name) {
+                            trackerInstance?.setMetadata('name', user.name);
+                        }
+                        trackerInstance?.setMetadata('email', user.email);
                     }
                 }
             });
@@ -111,7 +111,7 @@ export async function initTracker() {
                 setupAPMIntegration(trackerInstance);
             }
 
-            // Add tracker assist plugin with user identification handling
+            // Add tracker assist plugin with enhanced user identification
             trackerInstance.use(trackerAssist({
                 callConfirm: "Would you like to start a support call?",
                 controlConfirm: "Would you like to allow support to control your screen?",
@@ -146,8 +146,11 @@ export async function initTracker() {
                 onAgentConnect: (agentInfo: any = {}) => {
                     const user = get(userAccount);
                     if (user?.email && trackerInstance) {
-                        // Re-identify user when agent connects to ensure proper identification
-                        trackerInstance.setUserID(user.email);
+                        // Comprehensive user identification for assist
+                        identifyUser(user.email, {
+                            name: user.name || user.email,
+                            email: user.email,
+                        });
                     }
                     
                     const { email = '', name = '', query = '' } = agentInfo;
@@ -222,30 +225,19 @@ export async function identifyUser(userId: string, metadata?: Record<string, any
     try {
         console.log("👤 Identifying user:", { userId, metadata });
         
-        // Set the user ID first
-        await tracker.setUserID(userId);
+        // Set the user ID
+        tracker.setUserID(userId);
 
-        // Then set metadata with error handling
+        // Set metadata if provided
         if (metadata) {
-            try {
-                await Promise.all([
-                    tracker.setMetadata('name', metadata.name || ''),
-                    tracker.setMetadata('accountId', userId),
-                    tracker.setMetadata('email', metadata.email || ''),
-                    // Add any additional user metadata
-                    tracker.setMetadata('environment', import.meta.env.DEV ? 'development' : 'production'),
-                    tracker.setMetadata('timestamp', new Date().toISOString())
-                ]);
-            } catch (metadataError) {
-                console.error("Failed to set user metadata:", metadataError);
-            }
+            Object.entries(metadata).forEach(([key, value]) => {
+                if (value) {
+                    tracker.setMetadata(key, String(value));
+                }
+            });
         }
 
-        console.log("✅ User identification complete:", {
-            userId,
-            metadata,
-            timestamp: new Date().toISOString()
-        });
+        console.log("✅ User identification complete");
     } catch (error) {
         console.error("❌ Failed to identify user:", error);
     }
