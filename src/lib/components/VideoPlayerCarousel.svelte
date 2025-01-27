@@ -104,11 +104,13 @@
     <div
         class="fixed inset-0 z-50 bg-black flex items-center justify-center"
         transition:fade={{ duration: 2000 }}
+        data-openreplay-hidden
     >
         <div
             class="w-full h-full relative"
             data-transaction-name="Video Carousel"
             class:pointer-events-none={isExiting}
+            data-openreplay-hidden
         >
             <video
                 bind:this={videoElement}
@@ -117,6 +119,7 @@
                 playsinline
                 muted
                 onended={handleVideoEnded}
+                data-openreplay-hidden
             >
                 <source src={currentVideoUrl} type="video/mp4" />
                 Your browser does not support the video tag.

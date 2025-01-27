@@ -33,6 +33,11 @@ const config = {
         'default-src': ["'self'"],
         'connect-src': [
           "'self'",
+          "wss://api.openreplay.com",
+          "wss://openreplay.prd.shared-services.eu.pvh.cloud",
+          "ws://api.openreplay.com",
+          "https://api.openreplay.com",
+          "https://openreplay.prd.shared-services.eu.pvh.cloud",
           // OpenReplay minimal required configuration
           "https://api.openreplay.com",
           "wss://api.openreplay.com",
@@ -58,22 +63,38 @@ const config = {
           // Development endpoints
           ...(dev ? ["ws://localhost:*", "http://localhost:*"] : [])
         ],
+        'media-src': ["'self'", "https://*.cloudfront.net"],
         'script-src': [
           "'self'",
-          "'unsafe-inline'",
           "'unsafe-eval'",
           "https://api.openreplay.com",
+          "https://openreplay.prd.shared-services.eu.pvh.cloud",
+          "https://capella-document-search.prd.shared-services.eu.pvh.cloud"
+        ],
+        'style-src': [
+          "'self'", 
+          "'unsafe-inline'",
+          "https://capella-document-search.prd.shared-services.eu.pvh.cloud"
+        ],
+        'img-src': [
+          "'self'", 
+          "data:", 
+          "blob:",
+          "https://capella-document-search.prd.shared-services.eu.pvh.cloud",
           "https://openreplay.prd.shared-services.eu.pvh.cloud"
         ],
-        'style-src': ["'self'", "'unsafe-inline'"],
-        'img-src': ["'self'", "data:", "blob:"],
-        'font-src': ["'self'", "data:"],
+        'font-src': [
+          "'self'", 
+          "data:",
+          "https://capella-document-search.prd.shared-services.eu.pvh.cloud"
+        ],
         'frame-src': [
           "'self'",
           "https://login.microsoftonline.com",
           "https://*.microsoftonline.com"
         ],
-        'worker-src': ["'self'", "blob:"]
+        'worker-src': ["'self'", "blob:"],
+        'child-src': ["'self'", "blob:"]
       }
     },
     csrf: {

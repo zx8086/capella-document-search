@@ -92,12 +92,16 @@ export async function initTracker() {
                     maxOtherResourceSize: 2 * 1024 * 1024 // 2MB
                 },
                 captureResourceMetrics: true,
-                onStart: () => {
+                onStart: async () => {
                     console.log('OpenReplay session started:', trackerInstance?.__sessionID);
-                    // Identify user if available
+                    // Get user synchronously to ensure it's available immediately
                     const user = get(userAccount);
                     if (user?.email) {
-                        identifyUser(user.email);
+                        await identifyUser(user.email, {
+                            name: user.name || user.email,
+                            email: user.email,
+                            // Add any other relevant user metadata
+                        });
                     }
                 }
             });
@@ -107,7 +111,7 @@ export async function initTracker() {
                 setupAPMIntegration(trackerInstance);
             }
 
-            // Add tracker assist plugin
+            // Add tracker assist plugin with user identification handling
             trackerInstance.use(trackerAssist({
                 callConfirm: "Would you like to start a support call?",
                 controlConfirm: "Would you like to allow support to control your screen?",
@@ -140,6 +144,12 @@ export async function initTracker() {
                     };
                 },
                 onAgentConnect: (agentInfo: any = {}) => {
+                    const user = get(userAccount);
+                    if (user?.email && trackerInstance) {
+                        // Re-identify user when agent connects to ensure proper identification
+                        trackerInstance.setUserID(user.email);
+                    }
+                    
                     const { email = '', name = '', query = '' } = agentInfo;
                     console.log("👋 Agent connected:", { email, name, query });
                     toast.info("Support agent connected", {
