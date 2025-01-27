@@ -26,7 +26,10 @@ RUN --mount=type=cache,target=/root/.bun/install/cache \
 COPY . .
 
 # Build the application
-RUN bun run svelte-kit sync && \
+RUN --mount=type=cache,target=/root/.bun/install/cache \
+    export LANG=C.UTF-8 && \
+    export LC_ALL=C.UTF-8 && \
+    bun run svelte-kit sync && \
     NODE_ENV=${NODE_ENV} \
     DISABLE_OPENTELEMETRY=true \
     bun run build:no-telemetry

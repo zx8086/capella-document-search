@@ -15,7 +15,7 @@
     let error = $state("");
     let checkType: "Simple" | "Detailed" = $state(data.checkType);
     let loading = $state(false);
-    let loadingType = $state(checkType);  // Initialize with current checkType
+    let loadingType = $state(data.checkType);  // Initialize with data.checkType instead
     
     let showBuildInfo = $derived(getFlag('build-information'));
 

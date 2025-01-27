@@ -8,7 +8,7 @@
     "build": "NODE_ENV=production LOG_LEVEL=info bun run svelte-kit sync && DISABLE_OPENTELEMETRY=true bun --bun vite build",
     "build:docker": "bun run svelte-kit sync && DISABLE_OPENTELEMETRY=true NODE_ENV=production bun --bun vite build",
     "preview": "bun --bun vite preview --host",
-    "build:no-telemetry": "DISABLE_OPENTELEMETRY=true NODE_ENV=production bun --bun vite build",
+    "build:no-telemetry": "LANG=C.UTF-8 LC_ALL=C.UTF-8 DISABLE_OPENTELEMETRY=true NODE_ENV=production bun --bun vite build",
     "start": "NODE_PATH=. bun run --preload ./src/instrumentation.ts ./build/index.js",
     "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
     "check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
