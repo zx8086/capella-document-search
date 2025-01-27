@@ -57,7 +57,7 @@
     "vite": "^5.1.4"
   },
   "dependencies": {
-    "@apollo/client": "^3.12.6",
+    "@apollo/client": "3.11.0",
     "@azure/identity": "^4.6.0",
     "@azure/msal-browser": "^4.0.1",
     "@azure/msal-node": "^3.0.1",

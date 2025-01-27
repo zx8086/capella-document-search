@@ -93,6 +93,9 @@ export default defineConfig(({ mode }): UserConfig => {
         external: ['bun:sqlite']
       },
       build: {
+        target: "esnext",
+        minify: 'esbuild',
+        sourcemap: true,
         rollupOptions: {
           external: [
             'bun:sqlite',
@@ -107,14 +110,19 @@ export default defineConfig(({ mode }): UserConfig => {
             '@apollo/client'
           ]
         },
-        target: "esnext",
-        sourcemap: false,
         commonjsOptions: {
           include: [/@apollo\/client/, /node_modules/]
         }
       },
       optimizeDeps: {
-        exclude: enableOpenTelemetry ? ["src/utils/serverLogger"] : [],
+        exclude: ['@apollo/client'],
+        esbuildOptions: {
+          target: 'esnext',
+          supported: {
+            'top-level-await': true
+          },
+          charset: 'utf8'
+        },
         include: [
           'svelte',
           'svelte/internal',
