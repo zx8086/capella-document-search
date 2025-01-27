@@ -45,7 +45,6 @@ export default defineConfig(({ mode }): UserConfig => {
       CDN_ORIGIN
     ];
 
-    // Configuration object with error handling
     const config: UserConfig = {
       plugins: [sveltekit()],
       envPrefix: ["PUBLIC_"],
@@ -89,13 +88,10 @@ export default defineConfig(({ mode }): UserConfig => {
         }
       },
       ssr: {
-        noExternal: ['@apollo/client'],
+        noExternal: ["@apollo/client", "@openreplay/tracker"],
         external: ['bun:sqlite']
       },
       build: {
-        target: "esnext",
-        minify: 'esbuild',
-        sourcemap: true,
         rollupOptions: {
           external: [
             'bun:sqlite',
@@ -109,39 +105,25 @@ export default defineConfig(({ mode }): UserConfig => {
               : [])
           ]
         },
-        commonjsOptions: {
-          transformMixedEsModules: true,
-          include: [
-            /node_modules/,
-            /\/@apollo\/client/
-          ]
-        }
+        target: "esnext",
+        sourcemap: false,
       },
       optimizeDeps: {
+        exclude: enableOpenTelemetry ? ["src/utils/serverLogger"] : [],
         include: [
-          '@apollo/client',
-          '@apollo/client/core',
-          '@apollo/client/cache'
+          'svelte',
+          'svelte/internal',
+          'svelte/store',
+          'svelte/easing',
+          'bits-ui',
+          'tailwind-merge'
         ],
-        esbuildOptions: {
-          target: 'esnext',
-          supported: { 
-            'top-level-await': true 
-          },
-          format: 'esm'
-        }
       },
       define: {
         ...publicEnvVars,
       },
       esbuild: {
         target: "esnext",
-        charset: 'utf8',
-        tsconfigRaw: {
-          compilerOptions: {
-            preserveValueImports: true
-          }
-        }
       },
       css: {
         postcss: true,
