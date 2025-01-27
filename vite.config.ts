@@ -89,7 +89,7 @@ export default defineConfig(({ mode }): UserConfig => {
         }
       },
       ssr: {
-        noExternal: ["@apollo/client", "@openreplay/tracker"],
+        noExternal: ['@apollo/client'],
         external: ['bun:sqlite']
       },
       build: {
@@ -106,31 +106,30 @@ export default defineConfig(({ mode }): UserConfig => {
                   "@elastic/ecs-winston-format",
                   "@opentelemetry/winston-transport",
                 ]
-              : []),
-            '@apollo/client'
+              : [])
           ]
         },
         commonjsOptions: {
-          include: [/@apollo\/client/, /node_modules/]
+          transformMixedEsModules: true,
+          include: [
+            /node_modules/,
+            /\/@apollo\/client/
+          ]
         }
       },
       optimizeDeps: {
-        exclude: ['@apollo/client'],
+        include: [
+          '@apollo/client',
+          '@apollo/client/core',
+          '@apollo/client/cache'
+        ],
         esbuildOptions: {
           target: 'esnext',
-          supported: {
-            'top-level-await': true
+          supported: { 
+            'top-level-await': true 
           },
-          charset: 'utf8'
-        },
-        include: [
-          'svelte',
-          'svelte/internal',
-          'svelte/store',
-          'svelte/easing',
-          'bits-ui',
-          'tailwind-merge'
-        ],
+          format: 'esm'
+        }
       },
       define: {
         ...publicEnvVars,
