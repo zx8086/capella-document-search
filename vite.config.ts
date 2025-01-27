@@ -108,6 +108,9 @@ export default defineConfig(({ mode }): UserConfig => {
         },
         target: "esnext",
         sourcemap: false,
+        commonjsOptions: {
+          include: [/@apollo\/client/, /node_modules/]
+        }
       },
       optimizeDeps: {
         exclude: enableOpenTelemetry ? ["src/utils/serverLogger"] : [],
