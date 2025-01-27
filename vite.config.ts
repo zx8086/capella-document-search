@@ -103,7 +103,8 @@ export default defineConfig(({ mode }): UserConfig => {
                   "@elastic/ecs-winston-format",
                   "@opentelemetry/winston-transport",
                 ]
-              : [])
+              : []),
+            '@apollo/client'
           ]
         },
         target: "esnext",
@@ -128,6 +129,12 @@ export default defineConfig(({ mode }): UserConfig => {
       },
       esbuild: {
         target: "esnext",
+        charset: 'utf8',
+        tsconfigRaw: {
+          compilerOptions: {
+            preserveValueImports: true
+          }
+        }
       },
       css: {
         postcss: true,
