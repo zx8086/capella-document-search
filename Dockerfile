@@ -3,13 +3,13 @@
 # Base stage
 FROM oven/bun:canary-alpine AS builder
 
-# Set build arguments first since they rarely change
+# Set build arguments
 ARG BUILD_VERSION=development
 ARG COMMIT_HASH=unknown
 ARG BUILD_DATE
-ARG NODE_ENV=development
+ARG NODE_ENV=production
 
-# Set as environment variables for build process
+# Set environment variables
 ENV BUILD_VERSION=${BUILD_VERSION}
 ENV COMMIT_HASH=${COMMIT_HASH}
 ENV BUILD_DATE=${BUILD_DATE}
@@ -20,22 +20,15 @@ ENV LC_CTYPE=C.UTF-8
 
 WORKDIR /app
 
-# Copy package files first for better cache utilization
+# Copy package files and install dependencies
 COPY package.json bun.lockb ./
 RUN --mount=type=cache,target=/root/.bun/install/cache \
     bun install --frozen-lockfile
 
-# Copy all files after dependency installation
+# Copy all files and build the application
 COPY . .
-
-# Build the application with proper encoding
 RUN --mount=type=cache,target=/root/.bun/install/cache \
     bun run svelte-kit sync && \
-    LANG=C.UTF-8 \
-    LC_ALL=C.UTF-8 \
-    LC_CTYPE=C.UTF-8 \
-    NODE_ENV=${NODE_ENV} \
-    DISABLE_OPENTELEMETRY=true \
     bun run build:no-telemetry
 
 # Production image
@@ -47,7 +40,7 @@ ARG COMMIT_HASH
 ARG BUILD_DATE
 ARG NODE_ENV
 
-# Set as environment variables for runtime
+# Set environment variables for runtime
 ENV BUILD_VERSION=${BUILD_VERSION}
 ENV COMMIT_HASH=${COMMIT_HASH}
 ENV BUILD_DATE=${BUILD_DATE}
@@ -61,10 +54,9 @@ WORKDIR /app
 # Copy everything from builder
 COPY --from=builder /app/ ./
 
-# Install production dependencies with cache
+# Install production dependencies
 RUN --mount=type=cache,target=/root/.bun/install/cache \
     bun install --production --frozen-lockfile && \
-    mkdir -p src/data && \
     chown -R bun:bun /app
 
 USER bun
