@@ -27,6 +27,6 @@ export const frontendConfig: FrontendConfig = {
 } as const;
 
 // Debug log to verify values are loaded correctly
-console.log("Frontend Config:", frontendConfig);
+// console.log("Frontend Config:", frontendConfig);
 
 export type { FrontendConfig } from "./models/types";

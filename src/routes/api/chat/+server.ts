@@ -3,10 +3,10 @@ import { Pinecone } from "@pinecone-database/pinecone";
 import OpenAI from 'openai';
 import type { RequestHandler } from './$types';
 
-console.log('🔑 Environment Variables:', {
-    OPENAI_API_KEY: Bun.env.OPENAI_API_KEY,
-    PINECONE_API_KEY: Bun.env.PINECONE_API_KEY
-});
+// console.log('🔑 Environment Variables:', {
+//     OPENAI_API_KEY: Bun.env.OPENAI_API_KEY,
+//     PINECONE_API_KEY: Bun.env.PINECONE_API_KEY
+// });
 
 // Initialize OpenAI
 const openai = new OpenAI({
