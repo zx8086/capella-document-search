@@ -1,6 +1,6 @@
 /* src/instrumentation.ts */
 
-import { debug, log, warn, err } from "$utils/browserLogger";
+import { debug, log, warn, err } from "./utils/browserLogger";
 import { trace, context } from "@opentelemetry/api";
 
 log("Starting Application - Couchbase Capella GraphQL API Service");
