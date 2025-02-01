@@ -73,6 +73,7 @@ export async function initTracker() {
                 ingestPoint: getIngestPoint(),
                 __DISABLE_SECURE_MODE: import.meta.env.DEV,
                 resourceBaseHref: getResourceBaseHref(),
+                disableStringDict: true,
                 network: {
                     failuresOnly: false,
                     ignoreHeaders: [
@@ -92,6 +93,9 @@ export async function initTracker() {
                     maxOtherResourceSize: 2 * 1024 * 1024 // 2MB
                 },
                 captureResourceMetrics: true,
+                defaultInputMode: 0,
+                obscureTextEmails: false,
+                obscureTextNumbers: false,
                 onStart: () => {
                     console.log('OpenReplay session started:', trackerInstance?.__sessionID);
                     // Initial user identification for replays
@@ -463,11 +467,11 @@ export function debugAssetAccess() {
     try {
         // @ts-ignore - accessing internal property
         const sessionID = tracker.__sessionID;
-        
+
         // Log relevant info
         console.log('Session ID:', sessionID);
         console.log('Resource Base URL:', getResourceBaseHref());
-        
+
         // Log all stylesheets
         const styles = document.styleSheets;
         console.log('Active Stylesheets:', Array.from(styles).map(sheet => ({
@@ -488,16 +492,6 @@ export function debugAssetAccess() {
     console.groupEnd();
 }
 
-// Update the APM integration setup
-export function setupAPMIntegration(tracker: Tracker) {
-    if (!apm || import.meta.env.DEV) return;  // Skip in development
-
-    tracker.setAPMIntegration?.({
-        captureTracing: false,
-        propagateTraceContext: false
-    });
-}
-
 export function debugResourceLoading() {
     const tracker = getTracker();
     if (!tracker) {
@@ -510,7 +504,7 @@ export function debugResourceLoading() {
         // Check all stylesheets
         const styles = document.styleSheets;
         console.log('Stylesheet Count:', styles.length);
-        
+
         Array.from(styles).forEach((sheet, index) => {
             console.log(`Stylesheet ${index}:`, {
                 href: sheet.href,
@@ -523,7 +517,7 @@ export function debugResourceLoading() {
         // Check if base href is correct
         console.log('Base HREF:', document.baseURI);
         console.log('Resource Base HREF:', getResourceBaseHref());
-        
+
         // Log performance metrics
         const perfEntries = performance.getEntriesByType('resource');
         console.log('Resource Performance:', perfEntries.map(entry => ({
@@ -535,4 +529,14 @@ export function debugResourceLoading() {
         console.error('Debug Error:', error);
     }
     console.groupEnd();
+}
+
+// Update the APM integration setup
+export function setupAPMIntegration(tracker: Tracker) {
+    if (!apm || import.meta.env.DEV) return;  // Skip in development
+
+    tracker.setAPMIntegration?.({
+        captureTracing: false,
+        propagateTraceContext: false
+    });
 }

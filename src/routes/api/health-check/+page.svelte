@@ -98,7 +98,7 @@
 </svelte:head>
 
 <div class="container mx-auto px-4 py-8">
-    <h1 class="text-3xl font-bold mb-4">Status - API Health Check</h1>
+    <h1 class="text-3xl font-bold mb-4">Health Check Status</h1>
 
     <div class="mb-6">
         <button

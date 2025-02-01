@@ -23,17 +23,17 @@
         }
     }
 
+    // Initialize Tracker After Login
     onMount(async () => {
         try {
-            // Initialize tracker first
+            // Initialize tracker first, before auth
             $trackerLoading = true;
             await initTracker();
             
-            // Then proceed with auth initialization
+            // Then initialize auth
             await auth.initialize();
             if ($isAuthenticated) {
                 await goto('/', { replaceState: true });
-                return;
             }
         } catch (error) {
             console.error('Initialization error:', error);
@@ -41,6 +41,143 @@
             $trackerLoading = false;
         }
     });
+
+    onMount(() => {
+        // Debug CSS locations
+        const styleSheets = Array.from(document.styleSheets);
+        console.log('🎨 CSS Files:', styleSheets.map(sheet => ({
+            href: sheet.href,
+            ownerNode: sheet.ownerNode?.nodeName,
+            rules: sheet.cssRules?.length
+        })));
+
+        // Debug JS files that might contain CSS
+        const scripts = Array.from(document.scripts);
+        console.log('📜 Script Files:', scripts.map(script => ({
+            src: script.src,
+            type: script.type,
+            module: script.type === 'module'
+        })));
+
+        // Log all asset URLs from /_app/immutable
+        const immutableAssets = Array.from(document.querySelectorAll('link[href*="/_app/immutable"], script[src*="/_app/immutable"]'));
+        console.log('🔒 Immutable Assets:', immutableAssets.map(el => ({
+            type: el.nodeName,
+            url: el.getAttribute('href') || el.getAttribute('src')
+        })));
+
+        // Debug all <link> and <style> tags
+        console.log('📝 Style Elements:', Array.from(document.querySelectorAll('link[rel="stylesheet"], style')).map(el => ({
+            type: el.nodeName,
+            href: el.getAttribute('href'),
+            textLength: el.textContent?.length || 0,
+            firstRules: el.textContent?.slice(0, 100) + '...'
+        })));
+
+        // More comprehensive CSS loading checks
+        const checkStyles = () => {
+            // 1. Check all stylesheets
+            const styleSheets = Array.from(document.styleSheets).map(sheet => ({
+                href: sheet.href,
+                rules: sheet.cssRules?.length,
+                loaded: !!sheet.cssRules?.length,
+                type: sheet.ownerNode?.nodeName,
+                media: sheet.media.mediaText
+            }));
+
+            // 2. Check critical Tailwind classes
+            const criticalClasses = [
+                'bg-[#00174f]',
+                'text-white',
+                'container',
+                'rounded-lg'
+            ];
+
+            const computedStyles = criticalClasses.map(className => {
+                const testDiv = document.createElement('div');
+                testDiv.className = className;
+                document.body.appendChild(testDiv);
+                const styles = window.getComputedStyle(testDiv);
+                const computed = {
+                    className,
+                    backgroundColor: styles.backgroundColor,
+                    color: styles.color,
+                    display: styles.display
+                };
+                document.body.removeChild(testDiv);
+                return computed;
+            });
+
+            // 3. Check if styles are actually applying
+            const styleCheck = {
+                totalStylesheets: styleSheets.length,
+                loadedStylesheets: styleSheets.filter(s => s.loaded).length,
+                tailwindLoaded: styleSheets.some(s => 
+                    s.rules && Array.from(s.rules).some(rule => 
+                        rule.cssText?.includes('@tailwind') || 
+                        rule.cssText?.includes('--tw-') ||
+                        rule.cssText?.includes('container') ||
+                        rule.cssText?.includes('text-white') ||
+                        rule.cssText?.includes('bg-[#00174f]')
+                    )
+                ),
+                criticalStylesApplied: computedStyles.every(style => 
+                    style.backgroundColor !== 'rgba(0, 0, 0, 0)' || 
+                    style.color !== 'rgb(0, 0, 0)' ||
+                    style.className === 'container'
+                ),
+                styleValues: computedStyles.reduce((acc, style) => ({
+                    ...acc,
+                    [style.className]: {
+                        backgroundColor: style.backgroundColor,
+                        color: style.color,
+                        display: style.display
+                    }
+                }), {}),
+                details: {
+                    styleSheets,
+                    computedStyles
+                }
+            };
+
+            console.log('🎨 OpenReplay Style Check:', styleCheck);
+
+            // 4. Alert if there are issues
+            if (!styleCheck.criticalStylesApplied) {
+                console.error('⚠️ Critical styles not applying:', styleCheck.styleValues);
+            }
+        };
+
+        // Check immediately and after a delay to catch any async loading
+        checkStyles();
+        setTimeout(checkStyles, 2000);
+        
+        // Also check when window loads
+        window.addEventListener('load', checkStyles);
+        
+        // Check if styles change
+        const observer = new MutationObserver((mutations) => {
+            const hasStyleChanges = mutations.some(mutation => 
+                mutation.target.nodeName === 'STYLE' || 
+                mutation.target.nodeName === 'LINK'
+            );
+            if (hasStyleChanges) {
+                console.log('🔄 Style changes detected, rechecking...');
+                checkStyles();
+            }
+        });
+
+        observer.observe(document.head, {
+            childList: true,
+            subtree: true
+        });
+
+        return () => {
+            observer.disconnect();
+            window.removeEventListener('load', checkStyles);
+        };
+    });
+
 </script>
 <svelte:head>
     <title>Capella Document Search</title>
