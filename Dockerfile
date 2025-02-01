@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1.4
 
 # Base stage
-FROM oven/bun:1.2.0-alpine AS builder
+FROM oven/bun:canary-alpine AS builder
 
 # Set build arguments first since they rarely change
 ARG BUILD_VERSION=development
@@ -34,7 +34,7 @@ RUN DISABLE_OPENTELEMETRY=true \
     bun run build:no-telemetry
 
 # Production image
-FROM oven/bun:1.2.0-alpine
+FROM oven/bun:canary-alpine
 
 # Copy build args to production stage
 ARG BUILD_VERSION
