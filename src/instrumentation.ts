@@ -45,11 +45,14 @@ import { backendConfig } from "./backend-config";
 log("Staring Instrumentation............");
 
 const INSTRUMENTATION_ENABLED =
-  (Bun.env["ENABLE_OPENTELEMETRY"] as string) === "true";
+  (Bun.env["ENABLE_OPENTELEMETRY"] as string) === "true" && 
+  Bun.env["DISABLE_OPENTELEMETRY"] !== "true";
+
 log("OpenTelemetry Instrumentation Status", { INSTRUMENTATION_ENABLED });
 
 log("OpenTelemetry Environment Variables", {
   ENABLE_OPENTELEMETRY: Bun.env["ENABLE_OPENTELEMETRY"],
+  DISABLE_OPENTELEMETRY: Bun.env["DISABLE_OPENTELEMETRY"],
   PARSED_INSTRUMENTATION_ENABLED: INSTRUMENTATION_ENABLED,
 });
 

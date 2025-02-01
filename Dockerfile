@@ -26,9 +26,11 @@ RUN --mount=type=cache,target=/root/.bun/install/cache \
 COPY . .
 
 # Build the application
-RUN bun run svelte-kit sync && \
-    NODE_ENV=${NODE_ENV} \
+COPY bunfig.build.toml bunfig.toml
+RUN DISABLE_OPENTELEMETRY=true \
+    bun run svelte-kit sync && \
     DISABLE_OPENTELEMETRY=true \
+    NODE_ENV=${NODE_ENV} \
     bun run build:no-telemetry
 
 # Production image
