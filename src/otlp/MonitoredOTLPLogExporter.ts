@@ -5,7 +5,7 @@ import { OTLPLogExporter } from "@opentelemetry/exporter-logs-otlp-http";
 import type { ReadableLogRecord } from "@opentelemetry/sdk-logs";
 import { type ExportResult, ExportResultCode } from "@opentelemetry/core";
 import type { OTLPExporterNodeConfigBase } from "@opentelemetry/otlp-exporter-base";
-import { backendConfig } from "$backendConfig";
+import { backendConfig } from "../backend-config";
 // import { debug } from "$utils/logger";
 
 export class MonitoredOTLPLogExporter extends MonitoredOTLPExporter<

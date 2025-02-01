@@ -5,8 +5,8 @@ import { isIP } from "node:net";
 import { loadavg, totalmem, freemem, hostname } from "node:os";
 import type { OTLPExporterNodeConfigBase } from "@opentelemetry/otlp-exporter-base";
 import type { ExportResult } from "@opentelemetry/core";
-import { backendConfig } from "$backendConfig"; // Keeping your original config import
-import { log, warn, err, debug } from "$utils/browserLogger"; // Keeping your original logger
+import { backendConfig } from "../backend-config"; // Changed from $backendConfig
+import { log, warn, err, debug } from "../utils/browserLogger"; // Changed from $utils/browserLogger
 import { otlpConfig } from "./otlpConfig";
 
 // Import Bun DNS with type checking

@@ -5,8 +5,8 @@ import { OTLPMetricExporter } from "@opentelemetry/exporter-metrics-otlp-http";
 import type { ResourceMetrics } from "@opentelemetry/sdk-metrics";
 import { type ExportResult, ExportResultCode } from "@opentelemetry/core";
 import type { OTLPExporterNodeConfigBase } from "@opentelemetry/otlp-exporter-base";
-import { backendConfig } from "$backendConfig";
-import { log, warn, err } from "$utils/browserLogger";
+import { backendConfig } from "../backend-config";
+import { log, warn, err } from "../utils/browserLogger";
 
 export class MonitoredOTLPMetricExporter extends MonitoredOTLPExporter<ResourceMetrics> {
   protected readonly exporterType: string = "Metrics";
