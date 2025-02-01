@@ -1,6 +1,6 @@
 /* src/checkEnvVars.ts */
 
-import { getPrivateEnv, getPublicEnv } from "$lib/env";
+import { getPrivateEnv, getPublicEnv } from "./lib/env";
 
 function isString(value: unknown): value is string {
   return typeof value === "string";
