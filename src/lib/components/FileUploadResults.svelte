@@ -214,30 +214,54 @@
                 <span class="font-bold">Total Found: {foundCount}</span>
                 <button
                     onclick={() => downloadCSV('found')}
-                    class="p-2 rounded-full bg-green-100 hover:bg-green-200 transition-colors duration-200"
-                    title="Download Found Keys"
+                    class="p-2 rounded-full bg-green-100 hover:bg-green-200 transition-colors duration-200 focus:ring-2 focus:ring-offset-2 focus:ring-tommy-red"
                     aria-label="Download Found Document Keys"
                     data-transaction-name="Download Found Document Keys"
                 >
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-green-600" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                        <path fill-rule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clip-rule="evenodd" />
+                    <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke-width="1.5"
+                        stroke="currentColor"
+                        class="w-6 h-6 text-green-600"
+                        aria-hidden="true"
+                        role="img"
+                    >
+                        <title>Download Found Keys</title>
+                        <path
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                            d="M12 9.75v6.75m0 0-3-3m3 3 3-3m-8.25 6a4.5 4.5 0 0 1-1.41-8.775 5.25 5.25 0 0 1 10.233-2.33 3 3 0 0 1 3.758 3.848A3.752 3.752 0 0 1 18 19.5H6.75Z"
+                        />
                     </svg>
-                    <span class="sr-only">Download Found Document Keys</span>
                 </button>
             </div>
             <div class="flex items-center space-x-2">
                 <span class="font-bold">Total Not Found: {notFoundCount}</span>
                 <button
                     onclick={() => downloadCSV('notFound')}
-                    class="p-2 rounded-full bg-red-100 hover:bg-red-200 transition-colors duration-200"
-                    title="Download Not Found Keys"
+                    class="p-2 rounded-full bg-red-100 hover:bg-red-200 transition-colors duration-200 focus:ring-2 focus:ring-offset-2 focus:ring-tommy-red"
                     aria-label="Download Not Found Document Keys"
                     data-transaction-name="Download Not Found Document Keys"
                 >
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-red-600" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                        <path fill-rule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clip-rule="evenodd" />
+                    <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke-width="1.5"
+                        stroke="currentColor"
+                        class="w-6 h-6 text-red-600"
+                        aria-hidden="true"
+                        role="img"
+                    >
+                        <title>Download Not Found Keys</title>
+                        <path
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                            d="M12 9.75v6.75m0 0-3-3m3 3 3-3m-8.25 6a4.5 4.5 0 0 1-1.41-8.775 5.25 5.25 0 0 1 10.233-2.33 3 3 0 0 1 3.758 3.848A3.752 3.752 0 0 1 18 19.5H6.75Z"
+                        />
                     </svg>
-                    <span class="sr-only">Download Not Found Document Keys</span>
                 </button>
             </div>
         </div>
