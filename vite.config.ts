@@ -48,6 +48,14 @@ export default defineConfig(({ mode }): UserConfig => {
     const config: UserConfig = {
       plugins: [sveltekit()],
       envPrefix: ["PUBLIC_"],
+      resolve: {
+        alias: {
+          '$app': './.svelte-kit/runtime/app',
+          '$app/environment': './.svelte-kit/runtime/app/environment',
+          '$app/navigation': './.svelte-kit/runtime/app/navigation',
+          '$app/stores': './.svelte-kit/runtime/app/stores'
+        }
+      },
       server: {
         fs: {
           allow: ['.', 'static'],

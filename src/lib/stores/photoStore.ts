@@ -1,4 +1,4 @@
-import { writable } from 'svelte/store';
+import { writable, get } from 'svelte/store';
 import { 
   Client,
   GraphError, 
@@ -32,6 +32,30 @@ if (browser) {
     } catch (error) {
       console.warn('Failed to parse photo cache:', error);
     }
+  }
+}
+
+// Add a loading state to prevent multiple fetches
+const isPhotoLoading = writable(false);
+
+export async function ensureUserPhoto(accessToken: string, userId: string) {
+  // If already loading, wait for current fetch
+  if (get(isPhotoLoading)) {
+    return get(userPhotoUrl);
+  }
+
+  // If we already have a non-default photo, use it
+  const currentPhoto = get(userPhotoUrl);
+  if (currentPhoto !== DEFAULT_AVATAR) {
+    return currentPhoto;
+  }
+
+  try {
+    isPhotoLoading.set(true);
+    const photoUrl = await fetchUserPhoto(accessToken, userId);
+    return photoUrl;
+  } finally {
+    isPhotoLoading.set(false);
   }
 }
 

@@ -1,0 +1,7 @@
+[run]
+bun = true
+
+[env]
+NODE_ENV = "development"
+DISABLE_OPENTELEMETRY = "true"
+ENABLE_OPENTELEMETRY = "false" 

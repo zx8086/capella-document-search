@@ -6,7 +6,7 @@
   import { key } from "$lib/context/tracker";
   import { getFeatureFlag, trackEvent, waitForTracker, isTrackerReady } from "$lib/context/tracker";
   import { userAccount, isAuthenticated } from '$lib/stores/authStore';
-  import { userPhotoUrl, fetchUserPhoto } from '$lib/stores/photoStore';
+  import { userPhotoUrl, fetchUserPhoto, ensureUserPhoto } from '$lib/stores/photoStore';
   import { getMsalInstance } from '$lib/config/authConfig';
   import { getFlag } from '$lib/stores/featureFlagStore';
   
@@ -89,44 +89,17 @@
 
       // Fetch user photo if authenticated
       if ($isAuthenticated && $userAccount) {
-        console.log('👤 Attempting to fetch user photo...', {
-          userId: $userAccount.localAccountId,
-          timestamp: new Date().toISOString()
-        });
-        
         const msalInstance = await getMsalInstance();
         if (msalInstance) {
           try {
             const tokenResponse = await msalInstance.acquireTokenSilent({
-              scopes: [
-                  'User.Read',
-                  'User.ReadBasic.All',
-                  'user.read.all',
-                  'user.read'
-              ]
+              scopes: ['User.Read', 'User.ReadBasic.All', 'user.read.all', 'user.read']
             });
             
-            console.log('🎫 Token acquired for photo fetch:', {
-              success: !!tokenResponse.accessToken,
-              timestamp: new Date().toISOString()
-            });
-            
-            const photoUrl = await fetchUserPhoto(
-              tokenResponse.accessToken, 
-              $userAccount.localAccountId
-            );
-            
-            console.log('📸 User photo fetch result:', {
-              success: !!photoUrl,
-              isDefault: photoUrl === '/default-avatar.png',
-              timestamp: new Date().toISOString()
-            });
+            await ensureUserPhoto(tokenResponse.accessToken, $userAccount.localAccountId);
             
           } catch (error) {
-            console.warn('❌ Failed to fetch user photo:', {
-              error: error instanceof Error ? error.message : 'Unknown error',
-              timestamp: new Date().toISOString()
-            });
+            console.warn('Failed to fetch user photo:', error);
           }
         }
       }

@@ -13,6 +13,11 @@ const config = {
     adapter: adapter({
       dynamic_origin: true,
       precompress: false,
+      runtime: 'bun',
+      serverBunOptions: {
+        target: 'bun',
+        platform: 'bun'
+      }
     }),
     files: {
       assets: 'static',
@@ -28,7 +33,10 @@ const config = {
       $backendConfig: path.resolve("./src/backend-config.ts"),
       "$env/static/private": path.resolve("./src/env/static/private.ts"),
       "$env/static/public": path.resolve("./src/env/static/public.ts"),
-      '$app': '.svelte-kit/runtime/app'
+      '$app': path.resolve('./.svelte-kit/runtime/app'),
+      '$app/environment': path.resolve('./.svelte-kit/runtime/app/environment'),
+      '$app/navigation': path.resolve('./.svelte-kit/runtime/app/navigation'),
+      '$app/stores': path.resolve('./.svelte-kit/runtime/app/stores')
     },
     env: {
       dir: process.cwd(),
