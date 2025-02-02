@@ -8,6 +8,8 @@ import type { ExportResult } from "@opentelemetry/core";
 import { backendConfig } from "../backend-config"; // Changed from $backendConfig
 import { log, warn, err, debug } from "../utils/browserLogger"; // Changed from $utils/browserLogger
 import { otlpConfig } from "./otlpConfig";
+import { safeDnsPrefetch, getDnsCacheStats } from "$lib/utils/dnsUtils";
+import { getDnsPrefetchTargets } from "$lib/config/dnsConfig";
 
 // Import Bun DNS with type checking
 let bunDns: any;
@@ -102,12 +104,17 @@ export abstract class MonitoredOTLPExporter<T> {
 
   private async initializeDNSPrefetch(): Promise<void> {
     try {
-      const initialStats = bunDns.getCacheStats();
-      debug("Initial DNS cache stats:", initialStats);
+      const initialStats = getDnsCacheStats();
+      if (initialStats) {
+        debug("Initial DNS cache stats:", initialStats);
+      }
 
-      bunDns.prefetch(this.hostName);
+      // Add the current hostname to monitoring targets
+      const targets = [...getDnsPrefetchTargets(['monitoring']), this.hostName];
+      await safeDnsPrefetch(targets);
+      
       this.dnsPrefetchInitiated = true;
-      debug(`DNS prefetch initiated for ${this.hostName} (port ${this.port})`);
+      debug(`DNS prefetch initiated for ${targets.join(', ')}`);
 
       await this.verifyDNSPrefetch();
     } catch (error) {

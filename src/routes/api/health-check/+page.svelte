@@ -98,9 +98,14 @@
 </svelte:head>
 
 <div class="container mx-auto px-4 py-8">
-    <h1 class="text-3xl font-bold mb-4">Health Check Status</h1>
+    <h1 class="text-3xl font-bold mb-4">Health Check</h1>
 
     <div class="mb-6">
+        <p class="text-sm text-gray-600 mt-2 mb-4">
+            {checkType === "Simple"
+                ? "Simple check tests the SQL Database, Internal API & GraphQL endpoint."
+                : "Detailed check covering all dependencies."}
+        </p>
         <button
             onclick={() => toggleCheckType()}
             class="w-48 bg-[#00174f] hover:bg-[#00174f]/80 text-white font-bold py-2 px-4 rounded hover:ring-2 hover:ring-red-500 hover:ring-offset-2 transition-all duration-300"
@@ -108,11 +113,6 @@
         >
             Switch to {checkType === "Simple" ? "Detailed" : "Simple"}
         </button>
-        <p class="text-sm text-gray-600 mt-2">
-            {checkType === "Simple"
-                ? "Simple check tests the SQL Database, Internal API & GraphQL endpoint."
-                : "Detailed check including all API endpoints."}
-        </p>
     </div>
 
     {#if loading}

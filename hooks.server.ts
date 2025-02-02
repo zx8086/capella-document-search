@@ -2,6 +2,7 @@
 
 import type { Handle } from '@sveltejs/kit';
 import { redirect } from '@sveltejs/kit';
+import { dns } from "bun";
 
 // Define paths that should be public
 const PUBLIC_PATHS = [
@@ -52,6 +53,25 @@ export const handle: Handle = async ({ event, resolve }) => {
     response.headers.set('X-Content-Type-Options', 'nosniff');
     response.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
     response.headers.set('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
+
+    const prefetchAuthenticatedEndpoints = () => {
+        const endpoints = [
+            new URL(Bun.env.GRAPHQL_ENDPOINT || '').hostname,
+            new URL(Bun.env.API_BASE_URL || '').hostname
+        ];
+
+        endpoints.forEach(hostname => {
+            try {
+                dns.prefetch(hostname);
+            } catch (error) {
+                console.warn(`Auth endpoints DNS prefetch failed for ${hostname}:`, error);
+            }
+        });
+    };
+
+    if (authCookie) {
+        prefetchAuthenticatedEndpoints();
+    }
 
     return response;
 }; 

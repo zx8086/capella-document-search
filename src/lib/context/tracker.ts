@@ -115,60 +115,40 @@ export async function initTracker() {
                 setupAPMIntegration(trackerInstance);
             }
 
-            // Add tracker assist plugin with enhanced user identification
+            // Update Assist plugin configuration with more robust options
             trackerInstance.use(trackerAssist({
                 callConfirm: "Would you like to start a support call?",
                 controlConfirm: "Would you like to allow support to control your screen?",
                 onCallStart: () => {
                     console.log("🎥 Support call started");
-                    toast.info("Support call started", {
+                    toast.success("Support call started", {
                         description: "You are now connected to a support session",
-                        duration: Infinity
+                        duration: 5000
                     });
                     return () => {
                         console.log("📞 Support call ended");
-                        toast.info("Support call ended", {
-                            description: "Your support session has ended",
-                            duration: Infinity
-                        });
+                        toast.info("Support call ended");
                     };
                 },
                 onRemoteControlStart: () => {
                     console.log("🖱️ Remote control started");
-                    toast.info("Remote control active", {
+                    toast.warning("Remote control active", {
                         description: "Support agent now has control of your screen",
-                        duration: Infinity
+                        duration: 5000
                     });
                     return () => {
                         console.log("🔒 Remote control ended");
-                        toast.info("Remote control ended", {
-                            description: "Support agent no longer has control of your screen",
-                            duration: Infinity
-                        });
+                        toast.info("Remote control ended");
                     };
                 },
                 onAgentConnect: (agentInfo: any = {}) => {
-                    const user = get(userAccount);
-                    if (user?.email && trackerInstance) {
-                        // Comprehensive user identification for assist
-                        identifyUser(user.email, {
-                            name: user.name || user.email,
-                            email: user.email,
-                        });
-                    }
-                    
-                    const { email = '', name = '', query = '' } = agentInfo;
-                    console.log("👋 Agent connected:", { email, name, query });
-                    toast.info("Support agent connected", {
-                        description: `${name} (${email}) has joined the session`,
-                        duration: Infinity
+                    const { email = '', name = '' } = agentInfo;
+                    console.log("👋 Agent connected:", { email, name });
+                    toast.success(`Support agent ${name} connected`, {
+                        duration: 5000
                     });
                     return () => {
-                        console.log("👋 Agent disconnected");
-                        toast.info("Support agent disconnected", {
-                            description: "The support agent has left the session",
-                            duration: Infinity
-                        });
+                        toast.info("Support agent disconnected");
                     };
                 }
             }));

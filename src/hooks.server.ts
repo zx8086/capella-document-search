@@ -1,6 +1,10 @@
 import type { Handle } from '@sveltejs/kit';
+import { prefetchDnsForCategories } from "$lib/config/dnsConfig";
 
 export const handle: Handle = async ({ event, resolve }) => {
+    // Prefetch DNS for CDN and API endpoints on startup
+    await prefetchDnsForCategories(['cdn', 'api']);
+    
     const response = await resolve(event);
     
     // Add security headers (excluding CSP which is handled by svelte.config.js)
