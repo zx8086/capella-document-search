@@ -1,4 +1,4 @@
-import { log, warn } from "$utils/unifiedLogger";
+import { log, warn } from "../../utils/unifiedLogger";
 
 // Type definition for Bun's DNS cache stats
 interface DnsCacheStats {
