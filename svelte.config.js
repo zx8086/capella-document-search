@@ -28,6 +28,7 @@ const config = {
       $backendConfig: path.resolve("./src/backend-config.ts"),
       "$env/static/private": path.resolve("./src/env/static/private.ts"),
       "$env/static/public": path.resolve("./src/env/static/public.ts"),
+      '$app': '.svelte-kit/runtime/app'
     },
     env: {
       dir: process.cwd(),

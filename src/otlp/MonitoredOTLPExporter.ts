@@ -5,11 +5,11 @@ import { isIP } from "node:net";
 import { loadavg, totalmem, freemem, hostname } from "node:os";
 import type { OTLPExporterNodeConfigBase } from "@opentelemetry/otlp-exporter-base";
 import type { ExportResult } from "@opentelemetry/core";
-import { backendConfig } from "../backend-config"; // Changed from $backendConfig
-import { log, warn, err, debug } from "../utils/browserLogger"; // Changed from $utils/browserLogger
+import { backendConfig } from "../backend-config";
+import { log, warn, err, debug } from "../utils/browserLogger";
 import { otlpConfig } from "./otlpConfig";
-import { safeDnsPrefetch, getDnsCacheStats } from "$lib/utils/dnsUtils";
-import { getDnsPrefetchTargets } from "$lib/config/dnsConfig";
+import { safeDnsPrefetch, getDnsCacheStats } from "../lib/utils/dnsUtils";
+import { getDnsPrefetchTargets } from "../lib/config/dnsConfig";
 
 // Import Bun DNS with type checking
 let bunDns: any;
