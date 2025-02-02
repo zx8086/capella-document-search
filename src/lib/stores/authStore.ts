@@ -4,6 +4,7 @@ import { getMsalInstance } from '$lib/config/authConfig';
 import { goto } from '$app/navigation';
 import { trackEvent, cleanupTracker, setTrackerUser } from '$lib/context/tracker';
 import { debugUserClaims } from '$lib/utils/claimsUtils';
+import { cleanupPhotoCache } from '$lib/stores/photoStore';
 
 export const isAuthenticated = writable(false);
 export const isLoading = writable(true);
@@ -161,6 +162,7 @@ export const auth = {
             isLoading.set(true);
             const instance = await getMsalInstance();
             cleanupTracker();
+            cleanupPhotoCache();
             await instance.logoutRedirect();
             isAuthenticated.set(false);
             userAccount.set(null);

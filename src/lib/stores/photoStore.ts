@@ -8,139 +8,91 @@ import { browser } from '$app/environment';
 import { getMsalInstance, photoRequest } from '$lib/config/authConfig';
 
 const DEFAULT_AVATAR = '/default-avatar.png';
+const PHOTO_CACHE_KEY = 'user_photo_cache';
+const PHOTO_CACHE_EXPIRY = 24 * 60 * 60 * 1000; // 24 hours
+
+interface PhotoCache {
+  url: string;
+  timestamp: number;
+}
+
 export const userPhotoUrl = writable<string>(DEFAULT_AVATAR);
 
-export async function fetchUserPhoto(userId: string) {
-  if (!browser) return;
+// Initialize from cache if available
+if (browser) {
+  const cached = localStorage.getItem(PHOTO_CACHE_KEY);
+  if (cached) {
+    try {
+      const { url, timestamp }: PhotoCache = JSON.parse(cached);
+      if (Date.now() - timestamp < PHOTO_CACHE_EXPIRY) {
+        userPhotoUrl.set(url);
+      } else {
+        localStorage.removeItem(PHOTO_CACHE_KEY);
+      }
+    } catch (error) {
+      console.warn('Failed to parse photo cache:', error);
+    }
+  }
+}
+
+export async function fetchUserPhoto(accessToken: string, userId: string) {
+  if (!browser) return DEFAULT_AVATAR;
 
   try {
-    console.group('📸 Photo Fetch Process');
-    
-    const instance = await getMsalInstance();
-    const account = instance?.getAllAccounts()[0];
-    
-    const response = await instance?.acquireTokenSilent({
-      scopes: photoRequest.scopes,
-      account: account
-    });
-
-    if (!response?.accessToken) {
-      throw new Error('No access token available');
+    // Check cache first
+    const cached = localStorage.getItem(PHOTO_CACHE_KEY);
+    if (cached) {
+      const { url, timestamp }: PhotoCache = JSON.parse(cached);
+      if (Date.now() - timestamp < PHOTO_CACHE_EXPIRY) {
+        userPhotoUrl.set(url);
+        return url;
+      }
     }
 
     const graphClient = Client.init({
-      authProvider: async (done) => {
-        done(null, response.accessToken);
-      },
-      defaultVersion: 'v1.0'
+      authProvider: done => done(null, accessToken)
     });
 
-    try {
-      console.group('🔍 Photo Fetch Attempt');
-      
-      console.log('Checking photo metadata...');
-      const metadata = await graphClient
-        .api('/me/photos/96x96')
+    const metadata = await graphClient
+      .api('/me/photos/96x96')
+      .get();
+
+    if (metadata) {
+      const photoResponse = await graphClient
+        .api('/me/photos/96x96/$value')
+        .responseType(ResponseType.ARRAYBUFFER)
         .get();
-      
-      console.log('Photo metadata:', metadata);
 
-      if (metadata) {
-        console.log('Fetching photo binary...');
-        const photoResponse = await graphClient
-          .api('/me/photos/96x96/$value')
-          .responseType(ResponseType.ARRAYBUFFER)
-          .get();
+      if (photoResponse) {
+        const blob = new Blob([photoResponse], { 
+          type: metadata['@odata.mediaContentType'] || 'image/jpeg' 
+        });
+        const photoUrl = URL.createObjectURL(blob);
 
-        if (photoResponse) {
-          const contentType = metadata['@odata.mediaContentType'] || 'image/jpeg';
-          const blob = new Blob([photoResponse], { type: contentType });
-          const photoUrl = URL.createObjectURL(blob);
-          
-          const cleanup = () => {
-            URL.revokeObjectURL(photoUrl);
-            console.log('Photo URL revoked:', photoUrl);
-          };
-
-          userPhotoUrl.set(photoUrl);
-          return {
-            success: true,
-            isDefault: false,
-            cleanup
-          };
-        }
-      }
-    } catch (error) {
-      if (error?.statusCode === 404) {
-        console.group('📸 Photo Not Found Details');
-        console.log('Status Code:', error.statusCode);
+        // Cache the photo URL
+        const cacheData: PhotoCache = {
+          url: photoUrl,
+          timestamp: Date.now()
+        };
+        localStorage.setItem(PHOTO_CACHE_KEY, JSON.stringify(cacheData));
         
-        let errorDetails;
-        try {
-          const errorText = error.body instanceof ArrayBuffer 
-            ? new TextDecoder().decode(error.body)
-            : typeof error.body === 'string' 
-              ? error.body 
-              : JSON.stringify(error.body);
-          
-          errorDetails = JSON.parse(errorText);
-          
-          console.log('Full Error Response:', {
-            raw: errorText,
-            parsed: errorDetails,
-            code: errorDetails?.error?.code,
-            message: errorDetails?.error?.message,
-            innerError: errorDetails?.error?.innerError
-          });
-          
-          const errorCode = errorDetails?.error?.code;
-          const errorMessage = errorDetails?.error?.message;
-          
-          userPhotoUrl.set(DEFAULT_AVATAR);
-          console.groupEnd();
-          return { 
-            success: true, 
-            isDefault: true,
-            reason: errorCode === 'ErrorNonExistentStorage' 
-              ? 'No profile photo has been set up in Microsoft 365'
-              : 'No photo found',
-            errorCode,
-            errorMessage,
-            details: errorDetails?.error
-          };
-        } catch (parseError) {
-          console.log('Error parsing response:', {
-            parseError,
-            originalError: error,
-            body: error.body
-          });
-        }
-        console.groupEnd();
+        userPhotoUrl.set(photoUrl);
+        return photoUrl;
       }
-      throw error;
     }
-  } catch (error) {
-    console.error('❌ Error fetching photo:', {
-      status: error?.statusCode,
-      message: error?.message,
-      body: error.body,
-      raw: typeof error.body === 'string' 
-        ? error.body 
-        : error.body instanceof ArrayBuffer 
-          ? new TextDecoder().decode(error.body)
-          : JSON.stringify(error.body),
-      requestId: error?.requestId,
-      clientRequestId: error?.clientRequestId
-    });
-    console.groupEnd();
     
+    return DEFAULT_AVATAR;
+  } catch (error) {
+    console.warn('Failed to fetch user photo:', error);
     userPhotoUrl.set(DEFAULT_AVATAR);
-    return { 
-      success: false, 
-      isDefault: true,
-      error: error?.message || 'Unknown error',
-      details: error.body,
-      fallbackUrl: DEFAULT_AVATAR
-    };
+    return DEFAULT_AVATAR;
+  }
+}
+
+// Add cleanup function
+export function cleanupPhotoCache() {
+  if (browser) {
+    localStorage.removeItem(PHOTO_CACHE_KEY);
+    userPhotoUrl.set(DEFAULT_AVATAR);
   }
 } 
