@@ -171,6 +171,16 @@ jobs:
           endpoint: "zx8086/cldbuild"
           install: true
 
+      - name: Install dependencies and generate lockfile
+        run: |
+          bun install
+          # Verify lockfile exists
+          if [ -f "bun.lockb" ]; then
+            echo "Lockfile generated successfully"
+          else
+            echo "Warning: Lockfile not generated"
+          fi
+
       - name: Build and push Docker image
         uses: docker/build-push-action@v6
         with:
