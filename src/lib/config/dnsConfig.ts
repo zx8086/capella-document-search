@@ -1,6 +1,6 @@
-import { backendConfig } from "$backendConfig";
-import { frontendConfig } from "$frontendConfig";
-import { safeDnsPrefetch } from "$lib/utils/dnsUtils";
+import { backendConfig } from "../../backend-config";
+import { frontendConfig } from "../../frontend-config";
+import { safeDnsPrefetch } from "../../lib/utils/dnsUtils";
 
 // Helper to safely extract hostname from URL string
 const getHostname = (url: string): string | null => {
