@@ -18,7 +18,7 @@ ENV NODE_ENV=${NODE_ENV}
 WORKDIR /app
 
 # Copy package files first for better cache utilization
-COPY package.json bun.lockb ./
+COPY package.json ./
 RUN --mount=type=cache,target=/root/.bun/install/cache \
     bun install --frozen-lockfile
 
