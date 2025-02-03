@@ -675,7 +675,8 @@
                                     name="documentKey"
                                     data-transaction-name="Enter Document Key"
                                     bind:value={documentKey}
-                                    oninput={() => {
+                                    oninput={(e) => {
+                                        documentKey = e.target.value.trim();
                                         searchPerformed = false;
                                     }}
                                     onclick={handleInputClick}
