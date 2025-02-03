@@ -28,7 +28,8 @@
     function loadVideo(filename: string): string {
         if (!filename) return '';
         const cleanFilename = filename.replace(/^\/+/, '');
-        return `${videoBasePath}${cleanFilename}`;
+        const encodedFilename = encodeURIComponent(cleanFilename);
+        return `${videoBasePath}${encodedFilename}`;
     }
 
     async function handleVideoEnded() {
