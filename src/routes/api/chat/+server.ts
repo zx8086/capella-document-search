@@ -2,15 +2,71 @@ import { json } from '@sveltejs/kit';
 import { Pinecone } from "@pinecone-database/pinecone";
 import OpenAI from 'openai';
 import type { RequestHandler } from './$types';
+import { traceable } from "langsmith/traceable";
+import { wrapOpenAI } from "langsmith/wrappers";
 
 // console.log('🔑 Environment Variables:', {
 //     OPENAI_API_KEY: Bun.env.OPENAI_API_KEY,
 //     PINECONE_API_KEY: Bun.env.PINECONE_API_KEY
 // });
 
-// Initialize OpenAI
-const openai = new OpenAI({
+// Initialize OpenAI with LangSmith tracing
+const openai = wrapOpenAI(new OpenAI({
     apiKey: Bun.env.OPENAI_API_KEY
+}));
+
+// Wrap the RAG pipeline with tracing
+const ragPipeline = traceable(async (message: string) => {
+    // Initialize Pinecone
+    const pc = new Pinecone({
+        apiKey: Bun.env.PINECONE_API_KEY as string,
+    });
+
+    // Get index with specific namespace
+    const index = pc.index(Bun.env.PINECONE_INDEX_NAME as string)
+        .namespace(Bun.env.PINECONE_NAMESPACE as string);
+
+    // Generate embedding
+    console.log('🔄 Generating embedding...');
+    const embeddingResponse = await openai.embeddings.create({
+        model: "text-embedding-ada-002",
+        input: message
+    });
+
+    // Query Pinecone
+    const queryResponse = await index.query({
+        vector: embeddingResponse.data[0].embedding,
+        topK: 3,
+        includeMetadata: true
+    });
+
+    // Extract context
+    const context = queryResponse.matches
+        ?.map(match => ({
+            text: match.metadata?.text,
+            filename: match.metadata?.filename || 'Unknown source'
+        }))
+        .filter(item => item.text);
+
+    // Generate completion
+    const stream = await openai.chat.completions.create({
+        model: "gpt-4-turbo-preview",
+        messages: [
+            {
+                role: "system",
+                content: "You are a helpful assistant. Use the following context to answer the user's question. Always end your response with '\n\nReferences:' followed by the source filenames. If you cannot answer the question based on the context, say so."
+            },
+            {
+                role: "user",
+                content: `Context: ${context?.map(c => c.text).join('\n\n---\n\n')}\n\nSource files: ${context?.map(c => c.filename).join(', ')}\n\nQuestion: ${message}`
+            }
+        ],
+        temperature: 0.7,
+        max_tokens: 2000,
+        stream: true
+    });
+
+    return { stream, context };
 });
 
 // Keep existing GET handler
@@ -40,109 +96,23 @@ export const GET: RequestHandler = async () => {
     }
 };
 
-// Add POST handler for chat
+// Modify POST handler to use traced pipeline
 export const POST: RequestHandler = async ({ request }) => {
     const { message } = await request.json();
     
     try {
-        // Initialize Pinecone with correct host URL
-        const pc = new Pinecone({
-            apiKey: Bun.env.PINECONE_API_KEY as string,
-        });
+        const { stream, context } = await ragPipeline(message);
 
-        // Get index with specific namespace
-        const index = pc.index(Bun.env.PINECONE_INDEX_NAME as string).namespace(Bun.env.PINECONE_NAMESPACE as string);
-
-        // Generate embedding
-        console.log('🔄 Generating embedding...');
-        const embeddingResponse = await openai.embeddings.create({
-            model: "text-embedding-ada-002",
-            input: message
-        });
-        console.log('✅ Embedding details:', {
-            dimensions: embeddingResponse.data[0].embedding.length,
-            embedding: `${embeddingResponse.data[0].embedding.slice(0, 3)}...`
-        });
-
-        // Query within that namespace
-        console.log('🔄 Querying Pinecone...', {
-            indexName: "platform-engineering-rag",
-            namespace: "capella-document-search",
-            vectorDimensions: embeddingResponse.data[0].embedding.length
-        });
-
-        const queryResponse = await index.query({
-            vector: embeddingResponse.data[0].embedding,
-            topK: 3,
-            includeMetadata: true
-        });
-
-        console.log('📊 Pinecone matches:', {
-            totalMatches: queryResponse.matches?.length,
-            matches: queryResponse.matches?.map(m => ({
-                score: m.score,
-                metadata: m.metadata,
-                id: m.id
-            }))
-        });
-
-        if (!queryResponse.matches?.length) {
-            console.warn('⚠️ No matches found in Pinecone');
-            return json({
-                response: "I couldn't find any relevant information to answer your question."
-            });
-        }
-
-        // Extract context
-        const context = queryResponse.matches
-            .map(match => ({
-                text: match.metadata?.text,
-                filename: match.metadata?.filename || 'Unknown source'
-            }))
-            .filter(item => item.text);
-
-        console.log('📝 Context details:', {
-            contextLength: context.length,
-            matchCount: queryResponse.matches.length,
-            topMatchScores: queryResponse.matches.map(m => m.score)
-        });
-
-        console.log('🔍 Using RAG Context:', {
-            question: message,
-            retrievedContext: context.map(c => c.text).join('\n\n---\n\n'),
-            similarityScore: queryResponse.matches[0].score
-        });
-
-        const stream = await openai.chat.completions.create({
-            model: "gpt-4-turbo-preview",
-            messages: [
-                {
-                    role: "system",
-                    content: "You are a helpful assistant. Use the following context to answer the user's question. Always end your response with '\n\nReferences:' followed by the source filenames. If you cannot answer the question based on the context, say so."
-                },
-                {
-                    role: "user",
-                    content: `Context: ${context.map(c => c.text).join('\n\n---\n\n')}\n\nSource files: ${context.map(c => c.filename).join(', ')}\n\nQuestion: ${message}`
-                }
-            ],
-            temperature: 0.7,
-            max_tokens: 2000,
-            stream: true
-        });
-
-        // After the response, append the references if they're not already included
-        let fullResponse = '';
-
-        // Match the working implementation's response structure
         return new Response(
             new ReadableStream({
                 async start(controller) {
                     try {
+                        let fullResponse = '';
+                        
                         for await (const chunk of stream) {
                             const content = chunk.choices[0]?.delta?.content;
                             if (content) {
                                 fullResponse += content;
-                                // Send each chunk as a JSON string with newline delimiter
                                 controller.enqueue(
                                     new TextEncoder().encode(
                                         JSON.stringify({ content }) + '\n'
@@ -151,7 +121,6 @@ export const POST: RequestHandler = async ({ request }) => {
                             }
                         }
 
-                        // If response doesn't include references, append them
                         if (!fullResponse.includes('References:')) {
                             const references = `\n\nReferences:\n${context.map(c => c.filename).join('\n- ')}`;
                             controller.enqueue(
@@ -161,7 +130,6 @@ export const POST: RequestHandler = async ({ request }) => {
                             );
                         }
 
-                        // Send done signal
                         controller.enqueue(
                             new TextEncoder().encode(
                                 JSON.stringify({ done: true }) + '\n'

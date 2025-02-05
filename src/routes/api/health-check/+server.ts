@@ -439,18 +439,80 @@ async function checkPineconeEndpoint(fetch: typeof global.fetch): Promise<CheckR
     }
 }
 
+async function checkLangSmithEndpoint(fetch: typeof global.fetch): Promise<CheckResult> {
+    const startTime = Date.now();
+    const langsmithEndpoint = Bun.env.LANGSMITH_ENDPOINT;
+    const apiKey = Bun.env.LANGSMITH_API_KEY;
+
+    try {
+        if (!langsmithEndpoint || !apiKey) {
+            return {
+                status: "ERROR",
+                message: "LangSmith configuration is missing",
+                responseTime: 0,
+            };
+        }
+
+        // Test the LangSmith API by making a request to the /health endpoint
+        const response = await fetch(`${langsmithEndpoint}/health`, {
+            headers: {
+                'Authorization': `Bearer ${apiKey}`,
+                'Content-Type': 'application/json'
+            }
+        });
+
+        const duration = Date.now() - startTime;
+
+        if (response.ok) {
+            return {
+                status: "OK",
+                message: "LangSmith API is responsive",
+                responseTime: duration,
+            };
+        }
+
+        if (response.status === 401) {
+            return {
+                status: "ERROR",
+                message: "LangSmith API key is invalid",
+                responseTime: duration,
+            };
+        }
+
+        return {
+            status: "WARNING",
+            message: `LangSmith API responded with status: ${response.status}`,
+            responseTime: duration,
+        };
+
+    } catch (error) {
+        const duration = Date.now() - startTime;
+        const errorMessage = error instanceof Error ? error.message : String(error);
+
+        err("LangSmith endpoint health check failed:", {
+            error: errorMessage,
+            duration,
+            timestamp: new Date().toISOString()
+        });
+
+        return {
+            status: "ERROR",
+            message: "Failed to connect to LangSmith API",
+            responseTime: duration,
+        };
+    }
+}
+
 async function prefetchHealthCheckEndpoints() {
     await prefetchDnsForCategories(['api', 'monitoring']);
 }
 
 export async function GET({ fetch, url }: RequestEvent) {
     try {
-        // Add request timeout
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), GLOBAL_CHECK_TIMEOUT);
 
         const response = await Promise.race([
-            // Your existing health check logic
             (async () => {
                 try {
                     log("Health check started", {
@@ -461,10 +523,7 @@ export async function GET({ fetch, url }: RequestEvent) {
                     const checkType = url.searchParams.get("type") || "Simple";
                     const isSimpleCheck = checkType === "Simple";
                     
-                    log(`Processing ${checkType} check`);
-                    
                     const healthStatus: Record<string, CheckResult> = {};
-                    let currentCheck = "";
                     let failedChecks: string[] = [];
 
                     const simpleChecks = [
@@ -480,6 +539,7 @@ export async function GET({ fetch, url }: RequestEvent) {
                         { name: "OpenReplay Endpoint", check: () => checkOpenReplayEndpoint(fetch) },
                         { name: "OpenAI API", check: () => checkOpenAIEndpoint(fetch) },
                         { name: "Pinecone API", check: () => checkPineconeEndpoint(fetch) },
+                        { name: "LangSmith API", check: () => checkLangSmithEndpoint(fetch) },
                         { name: "OpenTelemetry Logs Endpoint", check: () => checkLogsEndpoint(fetch) },
                         { name: "OpenTelemetry Metrics Endpoint", check: () => checkMetricsEndpoint(fetch) },
                         { name: "OpenTelemetry Traces Endpoint", check: () => checkTracesEndpoint(fetch) },
@@ -488,11 +548,10 @@ export async function GET({ fetch, url }: RequestEvent) {
                     // Call before health checks
                     await prefetchHealthCheckEndpoints();
 
-                    // Run all checks in parallel but handle each independently
-                    await Promise.all((isSimpleCheck ? simpleChecks : detailedChecks)
+                    // Modify the Promise.all to ensure individual check failures don't stop other checks
+                    await Promise.allSettled((isSimpleCheck ? simpleChecks : detailedChecks)
                         .map(async ({ name, check }) => {
                             try {
-                                currentCheck = name;
                                 log(`Starting check: ${name}`);
                                 
                                 const result = await Promise.race([
@@ -521,20 +580,24 @@ export async function GET({ fetch, url }: RequestEvent) {
                                 const errorMessage = error instanceof Error ? error.message : String(error);
                                 err(`Health check failed for ${name}:`, {
                                     error: errorMessage,
-                                    currentCheck,
                                     timestamp: new Date().toISOString()
                                 });
+                                
+                                // Ensure we still record a result even on error
                                 healthStatus[name] = {
                                     status: "ERROR",
-                                    message: errorMessage,
+                                    message: `Check failed: ${errorMessage}`,
                                     responseTime: 0
                                 };
                                 failedChecks.push(name);
                             }
                         }));
 
-                    // Log final results with detailed information
-                    const finalStatus = Object.values(healthStatus).every((s) => s.status === "OK") ? "OK" : "WARNING";
+                    // Determine overall status - only mark as ERROR if all checks failed
+                    const allChecksFailed = Object.values(healthStatus).every(s => s.status === "ERROR");
+                    const finalStatus = allChecksFailed ? "ERROR" : 
+                        (failedChecks.length > 0 ? "WARNING" : "OK");
+
                     log("Health check completed", {
                         status: finalStatus,
                         checkType,
@@ -560,10 +623,22 @@ export async function GET({ fetch, url }: RequestEvent) {
                         failedChecks: failedChecks.length > 0 ? failedChecks : undefined
                     });
                 } catch (error) {
-                    throw error;
+                    // Log the error but return a partial response
+                    err("Error during health check execution:", error);
+                    return json({
+                        status: "WARNING",
+                        message: "Some health checks could not be completed",
+                        version: {
+                            build: BUILD_VERSION,
+                            commit: COMMIT_HASH,
+                            buildDate: BUILD_DATE
+                        },
+                        checks: healthStatus || {},
+                        checkType: url.searchParams.get("type") || "Simple",
+                        failedChecks
+                    });
                 }
             })(),
-            // Timeout promise
             new Promise((_, reject) => 
                 setTimeout(() => reject(new Error('Health check timed out')), GLOBAL_CHECK_TIMEOUT)
             )
@@ -580,19 +655,17 @@ export async function GET({ fetch, url }: RequestEvent) {
             timestamp: new Date().toISOString()
         });
 
-        // Return a more detailed error response
+        // Return a more graceful error response
         return json({
-            status: "ERROR",
-            message: errorMessage,
-            checks: {},
-            checkType: url.searchParams.get("type") || "Simple",
+            status: "WARNING",
+            message: "Health check encountered issues",
             error: {
                 message: errorMessage,
                 stack: process.env.NODE_ENV === 'development' ? 
                     (error instanceof Error ? error.stack : undefined) : undefined
             }
         }, { 
-            status: 502, // Match the actual error status
+            status: 200, // Return 200 instead of 500 to prevent cascading failures
             headers: {
                 'Cache-Control': 'no-store',
                 'Content-Type': 'application/json'

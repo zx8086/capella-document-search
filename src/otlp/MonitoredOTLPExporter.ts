@@ -78,6 +78,8 @@ export abstract class MonitoredOTLPExporter<T> {
     this.logTimer = setInterval(() => {
       this.logStatistics();
     }, this.logIntervalMs);
+
+    this.startHealthChecks();
   }
 
   private async verifyDNSPrefetch(): Promise<void> {
@@ -257,4 +259,27 @@ export abstract class MonitoredOTLPExporter<T> {
     items: T,
     resultCallback: (result: ExportResult) => void,
   ): Promise<void>;
+
+  protected async validateEndpoint(): Promise<void> {
+    try {
+      const response = await fetch(this.url, {
+        method: 'OPTIONS',
+        timeout: 5000
+      });
+      
+      if (!response.ok) {
+        warn(`OpenTelemetry endpoint ${this.url} returned status ${response.status}`);
+      }
+    } catch (error) {
+      err(`Failed to validate OpenTelemetry endpoint ${this.url}:`, error);
+    }
+  }
+
+  private startHealthChecks(): void {
+    setInterval(() => {
+      this.validateEndpoint();
+      this.checkNetworkConnectivity();
+      this.logSystemResources();
+    }, this.logIntervalMs);
+  }
 }
