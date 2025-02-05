@@ -147,12 +147,34 @@
         messages = [...messages, { type: 'user', text: userMessage }];
         messages = [...messages, { type: 'bot', text: '', isLoading: true }];
 
+        const sessionStartTime = new Date().toISOString();
         const response = await fetch('/api/chat', {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/json',
+                'Content-Type': 'application/json'
             },
-            body: JSON.stringify({ message: userMessage })
+            body: JSON.stringify({ 
+                message: userMessage,
+                user: $userAccount ? {
+                    id: $userAccount.localAccountId || $userAccount.homeAccountId,
+                    name: $userAccount.name,
+                    username: $userAccount.username,
+                    email: $userAccount.username,  // Usually contains email
+                    tenantId: $userAccount.tenantId,
+                    environment: $userAccount.environment,
+                    isAuthenticated: $isAuthenticated,
+                    // Add session/interaction context
+                    sessionStartTime: sessionStartTime, // You can track this in the component
+                    messageCount: messages.length,
+                    clientTimestamp: new Date().toISOString(),
+                    pathname: $page?.url?.pathname,
+                    // Add any feature flags or settings
+                    featureFlags: {
+                        isFeatureEnabled: getFlag('rag-chat-assistant'),
+                        // Add other relevant feature flags
+                    }
+                } : null
+            })
         });
 
         if (!response.ok) {
