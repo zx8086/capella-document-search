@@ -26,13 +26,14 @@
     // Initialize Tracker After Login
     onMount(async () => {
         try {
-            // Initialize tracker first, before auth
             $trackerLoading = true;
-            await initTracker();
             
-            // Then initialize auth
+            // Initialize auth first
             await auth.initialize();
+            
+            // Then initialize tracker with user data
             if ($isAuthenticated) {
+                await initTracker();
                 await goto('/', { replaceState: true });
             }
         } catch (error) {
