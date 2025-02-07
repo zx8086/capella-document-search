@@ -6,6 +6,14 @@ import { fontFamily, screens } from "tailwindcss/defaultTheme";
 const config = {
   darkMode: ["class"],
   content: ["./src/**/*.{html,js,svelte,ts}"],
+  safelist: [
+    'bg-green-50',
+    'bg-yellow-50',
+    'bg-red-50',
+    'border-green-200',
+    'border-yellow-200',
+    'border-red-200'
+  ],
   theme: {
     screens: {
       ...screens,

@@ -82,6 +82,7 @@ export default defineConfig(({ mode }): UserConfig => {
             target: env.PUBLIC_OPENREPLAY_INGEST_POINT,
             changeOrigin: true,
             secure: true,
+            ws: true,
             headers: {
               traceparent: undefined,
               tracestate: undefined
@@ -90,6 +91,13 @@ export default defineConfig(({ mode }): UserConfig => {
               proxy.on('proxyReq', (proxyReq) => {
                 proxyReq.removeHeader('traceparent');
                 proxyReq.removeHeader('tracestate');
+              });
+              proxy.on('error', (err, req) => {
+                console.error('OpenReplay proxy error:', {
+                  error: err.message,
+                  path: req.path,
+                  method: req.method
+                });
               });
             }
           }

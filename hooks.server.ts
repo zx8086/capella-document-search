@@ -48,11 +48,15 @@ export const handle: Handle = async ({ event, resolve }) => {
 
     const response = await resolve(event);
     
-    // Security headers
+    // Security headers - removing any that might conflict with CSP
     response.headers.set('X-Frame-Options', 'DENY');
     response.headers.set('X-Content-Type-Options', 'nosniff');
     response.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
     response.headers.set('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
+    
+    // Remove any existing CSP headers to prevent conflicts
+    response.headers.delete('Content-Security-Policy');
+    response.headers.delete('Content-Security-Policy-Report-Only');
 
     const prefetchAuthenticatedEndpoints = () => {
         const endpoints = [

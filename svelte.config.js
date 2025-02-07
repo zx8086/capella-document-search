@@ -60,8 +60,11 @@ const config = {
           "https://openreplay.prd.shared-services.eu.pvh.cloud",
           "wss://openreplay.prd.shared-services.eu.pvh.cloud",
           "ws://openreplay.prd.shared-services.eu.pvh.cloud",
+          // Add these new entries for metadata/logging
+          "https://*.openreplay.com",
+          "https://openreplay.prd.shared-services.eu.pvh.cloud/*",
           // Other necessary endpoints
-           "https://capella-document-search.prd.shared-services.eu.pvh.cloud",
+          "https://capella-document-search.prd.shared-services.eu.pvh.cloud",
           "https://login.microsoftonline.com",
           "https://*.microsoftonline.com",
           "https://graph.microsoft.com",
@@ -83,13 +86,12 @@ const config = {
         'script-src': [
           "'self'",
           "'unsafe-eval'",
-          "'unsafe-inline'",
           "https://api.openreplay.com",
           "https://openreplay.prd.shared-services.eu.pvh.cloud",
           "https://capella-document-search.prd.shared-services.eu.pvh.cloud"
         ],
         'style-src': [
-          "'self'", 
+          "'self'",
           "'unsafe-inline'",
           "https://capella-document-search.prd.shared-services.eu.pvh.cloud",
           "https://openreplay.prd.shared-services.eu.pvh.cloud"

@@ -85,8 +85,16 @@ export async function initTracker() {
                         'Set-Cookie', 
                         'Authorization'
                     ],
+                    capturePayload: true,
                     captureTracing: false,
-                    captureAPM: false
+                    captureAPM: false,
+                    sessionTokenKey: "x-openreplay-session-id",
+                    failuresOnly: false,
+                    // Add this to capture all console logs
+                    console: {
+                        enabled: true,
+                        levels: ['log', 'info', 'warn', 'error']
+                    }
                 },
                 resourceUploadLimits: {
                     maxCssResourceSize: 2 * 1024 * 1024,
