@@ -126,6 +126,28 @@
     });
 
     onMount(async () => {
+        if (browser) {
+            try {
+                // Initialize tracker first
+                const tracker = await initTracker();
+                if (tracker) {
+                    debugTrackerStatus();
+                    debugAssetAccess();
+                }
+
+                // Then initialize auth
+                await auth.initialize();
+                
+                // Initialize feature flags last
+                await featureFlags.initialize();
+            } catch (error) {
+                console.warn(
+                    "Failed to initialize:",
+                    error instanceof Error ? error.message : String(error),
+                );
+            }
+        }
+
         startAutoplay();
 
         // Add subscription to userAccount store
@@ -139,18 +161,6 @@
             }
         });
 
-        if (browser) {
-            try {
-                await initializeTracker();
-                debugTrackerStatus();
-            } catch (error) {
-                console.warn(
-                    "Failed to start OpenReplay:",
-                    error instanceof Error ? error.message : String(error),
-                );
-            }
-        }
-
         collections.fetchCollections();
         
         pollInterval = setInterval(
@@ -159,17 +169,6 @@
             },
             60 * 60 * 1000,
         );
-
-        if (browser) {
-            const tracker = await initTracker();
-            if (tracker) {
-                debugAssetAccess();
-                debugTrackerStatus();
-            }
-        }
-
-        console.log('🚩 Layout mounted, initializing feature flags...');
-        await featureFlags.initialize();
 
         return () => {
             if (pollInterval) clearInterval(pollInterval);

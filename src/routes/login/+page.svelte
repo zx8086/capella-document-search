@@ -1,8 +1,8 @@
 <script lang="ts">
-    import { auth, isLoading, isAuthenticated, trackerLoading } from '$lib/stores/authStore';
+    import { auth, isLoading, isAuthenticated, trackerLoading, userAccount } from '$lib/stores/authStore';
     import { onMount } from 'svelte';
     import { goto } from '$app/navigation';
-    import { initTracker } from '$lib/context/tracker';
+    import { initTracker, initTrackerWithUser } from '$lib/context/tracker';
 
     let loginAttempts = 0;
 
@@ -16,6 +16,11 @@
                 await auth.logout();
             }
             await auth.login();
+            
+            // Only initialize tracker after successful login
+            if ($isAuthenticated && $userAccount) {
+                await initTrackerWithUser($userAccount);
+            }
         } catch (error) {
             console.error('Login failed:', error?.message || error);
         } finally {
@@ -23,17 +28,15 @@
         }
     }
 
-    // Initialize Tracker After Login
+    // Modify the onMount to remove tracker initialization
     onMount(async () => {
         try {
             $trackerLoading = true;
-            
-            // Initialize auth first
             await auth.initialize();
             
-            // Then initialize tracker with user data
-            if ($isAuthenticated) {
-                await initTracker();
+            // If user is already authenticated
+            if ($isAuthenticated && $userAccount) {
+                await initTrackerWithUser($userAccount);
                 await goto('/', { replaceState: true });
             }
         } catch (error) {

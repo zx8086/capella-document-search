@@ -11,6 +11,7 @@ import type { IFeatureFlag } from '@openreplay/tracker';
 import apm from '../../apm-config';
 import { get } from 'svelte/store';
 import { userAccount } from '$lib/stores/authStore';
+import { storageAccess, debugStorageAccess } from '$lib/utils/storage';
 
 // Remove the direct import of userAccount
 // import { userAccount } from '$lib/stores/authStore';
@@ -87,10 +88,9 @@ export async function initTracker() {
                     captureTracing: false,
                     captureAPM: false
                 },
-                // Add these options for better resource capturing
                 resourceUploadLimits: {
-                    maxCssResourceSize: 2 * 1024 * 1024, // 2MB
-                    maxOtherResourceSize: 2 * 1024 * 1024 // 2MB
+                    maxCssResourceSize: 2 * 1024 * 1024,
+                    maxOtherResourceSize: 2 * 1024 * 1024
                 },
                 captureResourceMetrics: true,
                 defaultInputMode: 0,
@@ -187,16 +187,18 @@ export function getSessionId(): string | null {
 }
 
 export function debugTrackerStatus() {
-  console.group('🔍 OpenReplay Tracker Status');
-  console.log('Tracker instance exists:', !!trackerInstance);
-  console.log('Tracker started:', isStarted);
-  if (trackerInstance) {
+    console.group('🔍 OpenReplay Tracker Status');
+    console.log('Tracker instance exists:', !!trackerInstance);
+    console.log('Tracker started:', isStarted);
     console.log('Tracker configuration:', {
-      projectKey: frontendConfig.openreplay.PROJECT_KEY,
-      ingestPoint: getIngestPoint(),
+        projectKey: frontendConfig.openreplay.PROJECT_KEY,
+        ingestPoint: getIngestPoint()
     });
-  }
-  console.groupEnd();
+    
+    // Add storage access debug info
+    debugStorageAccess();
+    
+    console.groupEnd();
 }
 
 export async function identifyUser(userId: string, metadata?: Record<string, any>) {
@@ -519,4 +521,44 @@ export function setupAPMIntegration(tracker: Tracker) {
         captureTracing: false,
         propagateTraceContext: false
     });
+}
+
+// Add a new function to handle proper initialization sequence
+export async function initTrackerWithUser(user: any) {
+    // First ensure tracker is initialized
+    const tracker = await initTracker();
+    
+    // Then identify user
+    if (tracker && user?.username) {
+        // Set user ID
+        tracker.setUserID(user.username);
+        
+        // Set additional metadata
+        if (user.name) {
+            tracker.setMetadata('name', user.name);
+        }
+        if (user.email || user.username) {
+            tracker.setMetadata('email', user.email || user.username);
+        }
+        
+        // Add the automatic identification in onStart back
+        tracker.onStart(() => {
+            const currentUser = get(userAccount);
+            if (currentUser?.username) {
+                tracker.setUserID(currentUser.username);
+                if (currentUser.name) {
+                    tracker.setMetadata('name', currentUser.name);
+                }
+                tracker.setMetadata('email', currentUser.username);
+            }
+        });
+        
+        console.log('👤 User identified in tracker:', {
+            username: user.username,
+            sessionId: tracker.getSessionID(),
+            timestamp: new Date().toISOString()
+        });
+    }
+    
+    return tracker;
 }
