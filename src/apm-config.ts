@@ -29,11 +29,6 @@ const apm = initApm({
     '!/ws-assist/socket/*'  // Don't ignore assist socket connections
   ],
   propagateTracestate: false,  // Keep this disabled globally
-  // Add explicit allowed origins for WebSocket
-  allowedOrigins: [
-    'api.openreplay.com',
-    'openreplay.prd.shared-services.eu.pvh.cloud'
-  ]
 });
 
 console.log("APM Config:", {
