@@ -14,21 +14,17 @@ const apm = initApm({
   logLevel: 'debug',
   distributedTracing: true,
   distributedTracingOrigins: [
-    // Only include origins we want to trace
+    // Only include origins we specifically want to trace
     'https://eu-b2b.apm.eu-central-1.aws.cloud.es.io',
-    'https://capella-document-search.prd.shared-services.eu.pvh.cloud',
-    // Explicitly allow OpenReplay WebSocket connections
-    'ws://api.openreplay.com/ws-assist/socket/*',
-    'wss://api.openreplay.com/ws-assist/socket/*',
-    'ws://openreplay.prd.shared-services.eu.pvh.cloud/ws-assist/socket/*',
-    'wss://openreplay.prd.shared-services.eu.pvh.cloud/ws-assist/socket/*'
+    'https://capellaql.prd.shared-services.eu.pvh.cloud',
+    'http://collector.prd.shared-services.eu.pvh.cloud',
+    'https://cloudapi.cloud.couchbase.com',
+    'https://apm.siobytes.com',
+    'http://localhost:4000',
+    'http://localhost:5173'
   ],
-  // Update ignore patterns to be more specific
-  ignoreTransactions: [
-    '/ingest/v1/web/*',
-    '!/ws-assist/socket/*'  // Don't ignore assist socket connections
-  ],
-  propagateTracestate: false,  // Keep this disabled globally
+  // Remove ignoreTransactions as we're using a whitelist approach instead
+  propagateTracestate: false,
 });
 
 console.log("APM Config:", {
