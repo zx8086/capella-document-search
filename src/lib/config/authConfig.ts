@@ -1,14 +1,25 @@
+/* src/lib/config/authConfig.ts */
+
 import { PublicClientApplication, LogLevel, type Configuration } from '@azure/msal-browser';
 import { frontendConfig } from '$frontendConfig';
 import { browser } from '$app/environment';
 
 let msalInstance: PublicClientApplication | null = null;
 
+// Get the base URL safely
+const getBaseUrl = () => {
+    if (browser) {
+        return window.location.origin;
+    }
+    return frontendConfig.azure.REDIRECT_URI?.split('/')[0] || '';
+};
+
 export const msalConfig = {
     auth: {
         clientId: frontendConfig.azure.CLIENT_ID,
         authority: `https://login.microsoftonline.com/${frontendConfig.azure.TENANT_ID}`,
         redirectUri: frontendConfig.azure.REDIRECT_URI,
+        postLogoutRedirectUri: frontendConfig.azure.REDIRECT_URI,
         navigateToLoginRequestUrl: true,
         cookieOptions: {
             secure: true,
@@ -33,7 +44,8 @@ export const msalConfig = {
                     console.log(`MSAL - ${level}: ${message}`);
                 }
             },
-            piiLoggingEnabled: false
+            piiLoggingEnabled: false,
+            logLevel: LogLevel.Verbose
         }
     }
 };

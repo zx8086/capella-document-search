@@ -1,10 +1,13 @@
+/* src/lib/stores/authStore.ts */
+
 import { browser } from '$app/environment';
 import { writable, get } from 'svelte/store';
-import { getMsalInstance } from '$lib/config/authConfig';
+import { getMsalInstance, loginRequest } from '$lib/config/authConfig';
 import { goto } from '$app/navigation';
 import { trackEvent, cleanupTracker, setTrackerUser } from '$lib/context/tracker';
 import { debugUserClaims } from '$lib/utils/claimsUtils';
 import { cleanupPhotoCache } from '$lib/stores/photoStore';
+import { frontendConfig } from '$frontendConfig';
 
 export const isAuthenticated = writable(false);
 export const isLoading = writable(true);
@@ -44,6 +47,11 @@ export const auth = {
                         claims: account.idTokenClaims,
                         timestamp: new Date().toISOString()
                     });
+                    
+                    // Redirect to home page after successful login
+                    if (window.location.pathname === '/login') {
+                        window.location.href = '/';
+                    }
                     return true;
                 }
             }
@@ -58,6 +66,10 @@ export const auth = {
                     setTrackerUser(accounts[0].username);
                 }
                 
+                // Redirect to home page if already logged in
+                if (window.location.pathname === '/login') {
+                    window.location.href = '/';
+                }
                 return true;
             }
 
@@ -97,10 +109,10 @@ export const auth = {
                     environment: 'test',
                     tenantId: Bun.env.PUBLIC_AZURE_TENANT_ID,
                 };
-                
+
                 isAuthenticated.set(true);
                 userAccount.set(testUser);
-                
+
                 setTrackerUser(testUser.username, {
                     name: testUser.name,
                     accountId: testUser.homeAccountId,
@@ -108,10 +120,10 @@ export const auth = {
                     tenantId: testUser.tenantId,
                     isTestUser: true
                 });
-                
-                trackEvent('Auth_Flow', { 
+
+                trackEvent('Auth_Flow', {
                     step: 'login_success_test',
-                    method: 'test' 
+                    method: 'test'
                 });
                 isLoading.set(false);
                 return;
@@ -126,22 +138,16 @@ export const auth = {
                 return;
             }
 
+            // Handle any pending redirect first
+            await instance.handleRedirectPromise();
+
             trackEvent('Auth_Flow', { 
                 step: 'redirect_start',
                 method: 'microsoft' 
             });
             
-            await instance.loginRedirect({
-                scopes: [
-                    'User.Read',
-                    'User.ReadBasic.All',
-                    'email',
-                    'openid',
-                    'profile',
-                    'user.read.all',
-                    'user.read'
-                ]
-            });
+            // Use loginRequest from config to ensure consistent scopes
+            await instance.loginRedirect(loginRequest);
         } catch (error) {
             trackEvent('Auth_Flow', { 
                 step: 'login_error',
@@ -161,14 +167,45 @@ export const auth = {
         try {
             isLoading.set(true);
             const instance = await getMsalInstance();
-            cleanupTracker();
-            cleanupPhotoCache();
-            await instance.logoutRedirect();
-            isAuthenticated.set(false);
-            userAccount.set(null);
+            
+            if (instance) {
+                // Clear application state first
+                cleanupTracker();
+                cleanupPhotoCache();
+                isAuthenticated.set(false);
+                userAccount.set(null);
+
+                // Get active account
+                const activeAccount = instance.getActiveAccount();
+                
+                // Clear MSAL state
+                instance.setActiveAccount(null);
+                
+                // For Chrome, clear all browser storage first
+                if (navigator.userAgent.includes('Chrome')) {
+                    localStorage.clear();
+                    sessionStorage.clear();
+                    document.cookie.split(';').forEach(cookie => {
+                        document.cookie = cookie.replace(/^ +/, '').replace(/=.*/, `=;expires=${new Date().toUTCString()};path=/`);
+                    });
+                }
+
+                // Perform logout
+                await instance.logoutRedirect({
+                    account: activeAccount,
+                    postLogoutRedirectUri: window.location.origin + '/login'
+                });
+            } else {
+                window.location.href = '/login';
+            }
         } catch (error) {
             console.error('Logout error:', error);
-            window.location.href = '/login';
+            // Force a clean redirect for Chrome
+            if (navigator.userAgent.includes('Chrome')) {
+                window.location.replace('/login');
+            } else {
+                window.location.href = '/login';
+            }
         } finally {
             isLoading.set(false);
         }
