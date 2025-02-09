@@ -28,9 +28,8 @@ COPY . .
 # Build the application
 COPY bunfig.build.toml bunfig.toml
 RUN DISABLE_OPENTELEMETRY=true \
-    bun run svelte-kit sync && \
-    DISABLE_OPENTELEMETRY=true \
     NODE_ENV=${NODE_ENV} \
+    bun run svelte-kit sync && \
     bun run build:no-telemetry
 
 # Production image

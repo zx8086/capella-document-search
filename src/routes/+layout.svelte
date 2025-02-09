@@ -317,28 +317,7 @@
         <main
             class="flex-grow bg-white dark:bg-[#2C2C2C] transition-colors duration-300"
         >
-            <Toaster
-                expand
-                visibleToasts={5}
-                richColors
-                closeButton
-                position="bottom-left"
-                offset="60px"
-                gap="1.5rem"
-                toastOptions={{
-                    unstyled: true,
-                    classes: {
-                        toast: "bg-white dark:bg-gray-800 text-gray-900 dark:text-white !p-4 !min-w-[300px] !rounded-lg !shadow-lg !font-sans !ml-8 !-translate-x-6 relative !mb-4",
-                        title: "font-medium text-base",
-                        description: "text-sm",
-                        actionButton: "bg-[#00174f] text-white",
-                        cancelButton: "bg-gray-200 text-gray-900",
-                        closeButton: "text-gray-400",
-                    },
-                    className: "!mb-6",
-                }}
-            />
-            {@render children?.()}
+            {@render children()}
         </main>
 
         <!-- Chatbot Popup -->
@@ -530,3 +509,25 @@
         </footer>
     </div>
 {/if}
+
+<Toaster
+    expand
+    visibleToasts={5}
+    richColors
+    closeButton
+    position="bottom-left"
+    offset="60px"
+    gap="1.5rem"
+    toastOptions={{
+        unstyled: true,
+        classes: {
+            toast: "bg-white dark:bg-gray-800 text-gray-900 dark:text-white !p-4 !min-w-[300px] !rounded-lg !shadow-lg !font-sans !ml-8 !-translate-x-6 relative !mb-4",
+            title: "font-medium text-base",
+            description: "text-sm",
+            actionButton: "bg-[#00174f] text-white",
+            cancelButton: "bg-gray-200 text-gray-900",
+            closeButton: "text-gray-400",
+        },
+        className: "!mb-6",
+    }}
+/>

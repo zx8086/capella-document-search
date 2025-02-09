@@ -89,8 +89,6 @@ export async function initTracker() {
                     captureTracing: false,
                     captureAPM: false,
                     sessionTokenKey: "x-openreplay-session-id",
-                    failuresOnly: false,
-                    // Add this to capture all console logs
                     console: {
                         enabled: true,
                         levels: ['log', 'info', 'warn', 'error']
