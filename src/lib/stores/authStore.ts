@@ -2,12 +2,13 @@
 
 import { browser } from '$app/environment';
 import { writable, get } from 'svelte/store';
-import { getMsalInstance, loginRequest } from '$lib/config/authConfig';
+import { getMsalInstance, loginRequest, clearMsalCache, isSafari } from '$lib/config/authConfig';
 import { goto } from '$app/navigation';
 import { trackEvent, cleanupTracker, setTrackerUser } from '$lib/context/tracker';
 import { debugUserClaims } from '$lib/utils/claimsUtils';
 import { cleanupPhotoCache } from '$lib/stores/photoStore';
 import { frontendConfig } from '$frontendConfig';
+import { getTracker } from '$lib/context/tracker';
 
 export const isAuthenticated = writable(false);
 export const isLoading = writable(true);
@@ -25,56 +26,30 @@ export const auth = {
             const instance = await getMsalInstance();
             if (!instance) return false;
 
-            const response = await instance.handleRedirectPromise();
+            // Handle redirect promise with error handling
+            const response = await instance.handleRedirectPromise()
+                .catch(error => {
+                    console.warn('Redirect promise error:', error);
+                    return null;
+                });
             
             if (response) {
+                console.log('Successful response from redirect:', response);
                 const account = response.account;
-                if (account) {
-                    instance.setActiveAccount(account);
-                    isAuthenticated.set(true);
-                    userAccount.set(account);
-                    
-                    if (account?.username) {
-                        setTrackerUser(account.username);
-                    }
-                    
-                    debugUserClaims(account);
-                    
-                    console.log('🔐 User authenticated:', {
-                        id: account.localAccountId || account.homeAccountId,
-                        name: account.name,
-                        username: account.username,
-                        claims: account.idTokenClaims,
-                        timestamp: new Date().toISOString()
-                    });
-                    
-                    // Redirect to home page after successful login
-                    if (window.location.pathname === '/login') {
-                        window.location.href = '/';
-                    }
-                    return true;
-                }
-            }
-
-            const accounts = instance.getAllAccounts();
-            if (accounts.length > 0) {
-                instance.setActiveAccount(accounts[0]);
+                userAccount.set(account);
                 isAuthenticated.set(true);
-                userAccount.set(accounts[0]);
-                
-                if (accounts[0]?.username) {
-                    setTrackerUser(accounts[0].username);
-                }
-                
-                // Redirect to home page if already logged in
-                if (window.location.pathname === '/login') {
-                    window.location.href = '/';
-                }
                 return true;
             }
 
-            isAuthenticated.set(false);
-            userAccount.set(null);
+            // Check if we have an active account
+            const accounts = instance.getAllAccounts();
+            if (accounts.length > 0) {
+                console.log('Found existing account:', accounts[0]);
+                userAccount.set(accounts[0]);
+                isAuthenticated.set(true);
+                return true;
+            }
+
             return false;
         } catch (error) {
             console.error('Auth initialization failed:', error);
@@ -95,69 +70,58 @@ export const auth = {
         console.log('Auth store: Starting login process...');
         try {
             isLoading.set(true);
-            trackEvent('Auth_Flow', { 
-                step: 'login_start',
-                testMode 
-            });
             
-            if (testMode) {
-                console.log('Auth store: Test mode, bypassing MSAL');
-                const testUser = {
-                    name: 'Test User',
-                    username: 'test@example.com',
-                    homeAccountId: 'test-account',
-                    environment: 'test',
-                    tenantId: Bun.env.PUBLIC_AZURE_TENANT_ID,
-                };
-
-                isAuthenticated.set(true);
-                userAccount.set(testUser);
-
-                setTrackerUser(testUser.username, {
-                    name: testUser.name,
-                    accountId: testUser.homeAccountId,
-                    environment: testUser.environment,
-                    tenantId: testUser.tenantId,
-                    isTestUser: true
-                });
-
-                trackEvent('Auth_Flow', {
-                    step: 'login_success_test',
-                    method: 'test'
-                });
-                isLoading.set(false);
-                return;
-            }
-
             const instance = await getMsalInstance();
             if (!instance) {
+                throw new Error('MSAL instance not initialized');
+            }
+
+            // Clear any existing tokens
+            clearMsalCache();
+
+            // Handle Safari with fallback
+            if (isSafari()) {
+                console.log('Safari detected, using standard redirect flow...');
                 trackEvent('Auth_Flow', { 
-                    step: 'login_error',
-                    error: 'msal_instance_null' 
+                    step: 'redirect_start',
+                    method: 'standard' 
                 });
+                
+                const loginRequestWithState = {
+                    ...loginRequest,
+                    state: Date.now().toString(),
+                    prompt: 'select_account'
+                };
+
+                await instance.loginRedirect(loginRequestWithState);
                 return;
             }
 
-            // Handle any pending redirect first
-            await instance.handleRedirectPromise();
-
+            // Standard flow for other browsers
             trackEvent('Auth_Flow', { 
                 step: 'redirect_start',
-                method: 'microsoft' 
+                method: 'standard' 
             });
             
-            // Use loginRequest from config to ensure consistent scopes
-            await instance.loginRedirect(loginRequest);
+            const loginRequestWithState = {
+                ...loginRequest,
+                state: Date.now().toString(),
+                prompt: 'select_account'
+            };
+
+            await instance.loginRedirect(loginRequestWithState);
         } catch (error) {
-            trackEvent('Auth_Flow', { 
-                step: 'login_error',
-                error: error?.message || 'unknown_error' 
-            });
             console.error('Login failed:', error);
+            trackEvent('Auth_Flow', { 
+                step: 'error',
+                error: error?.message || 'unknown_error',
+                browser: isSafari() ? 'safari' : 'other'
+            });
             isAuthenticated.set(false);
             userAccount.set(null);
-            isLoading.set(false);
             throw error;
+        } finally {
+            isLoading.set(false);
         }
     },
 

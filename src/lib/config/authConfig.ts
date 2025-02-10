@@ -6,12 +6,16 @@ import { browser } from '$app/environment';
 
 let msalInstance: PublicClientApplication | null = null;
 
+// Helper to detect Safari
+export const isSafari = () => {
+    if (!browser) return false;
+    return /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+};
+
 // Get the base URL safely
 const getBaseUrl = () => {
-    if (browser) {
-        return window.location.origin;
-    }
-    return frontendConfig.azure.REDIRECT_URI?.split('/')[0] || '';
+    if (!browser) return '';
+    return window.location.origin;
 };
 
 export const msalConfig = {
@@ -21,26 +25,21 @@ export const msalConfig = {
         redirectUri: frontendConfig.azure.REDIRECT_URI,
         postLogoutRedirectUri: frontendConfig.azure.REDIRECT_URI,
         navigateToLoginRequestUrl: true,
-        cookieOptions: {
-            secure: true,
-            sameSite: "lax"
-        }
     },
     cache: {
         cacheLocation: "localStorage",
         storeAuthStateInCookie: true,
-        secureCookies: true
+        secureCookies: false
     },
     system: {
         allowRedirectInIframe: true,
         tokenRenewalOffsetSeconds: 300,
-        redirectNavigationTimeout: 10000,
-        telemetry: {
-            disabled: true
-        },
+        redirectNavigationTimeout: 30000,
+        windowHashTimeout: 60000,
+        iframeHashTimeout: 60000,
         loggerOptions: {
             loggerCallback: (level, message, containsPii) => {
-                if (!containsPii) {
+                if (!containsPii && browser) {
                     console.log(`MSAL - ${level}: ${message}`);
                 }
             },
@@ -57,7 +56,13 @@ export const loginRequest = {
         "profile",
         "openid",
         "email"
-    ]
+    ],
+    prompt: 'select_account',
+    redirectStartPage: browser ? window.location.href : '',
+    // Add Safari-specific parameters
+    extraQueryParameters: isSafari() ? {
+        response_mode: 'query'
+    } : {}
 };
 
 export const photoRequest = {
@@ -66,12 +71,32 @@ export const photoRequest = {
 
 export const getMsalInstance = async () => {
     if (!msalInstance && browser) {
-        msalInstance = new PublicClientApplication(msalConfig);
-        await msalInstance.initialize();
+        try {
+            msalInstance = new PublicClientApplication(msalConfig);
+            await msalInstance.initialize();
+        } catch (error) {
+            console.error('MSAL initialization failed:', error);
+            msalInstance = null;
+        }
     }
     return msalInstance;
 };
 
 export const graphConfig = {
     graphMeEndpoint: "https://graph.microsoft.com/v1.0/me"
+};
+
+export const clearMsalCache = () => {
+    if (browser) {
+        sessionStorage.clear();
+        localStorage.clear();
+        document.cookie.split(';').forEach(cookie => {
+            document.cookie = cookie.replace(/^ +/, '').replace(/=.*/, `=;expires=${new Date().toUTCString()};path=/`);
+        });
+    }
+};
+
+export const getRedirectUri = () => {
+    if (!browser) return frontendConfig.azure.REDIRECT_URI;
+    return `${window.location.origin}/`;
 }; 
