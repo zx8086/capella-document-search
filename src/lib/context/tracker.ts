@@ -55,17 +55,29 @@ const getResourceBaseHref = () => {
 };
 
 export async function initTracker() {
+    // Add check for existing session
     if (isInitializing || trackerInstance) {
+        console.debug('🔄 Tracker already initializing or exists:', {
+            isInitializing,
+            hasInstance: !!trackerInstance,
+            isStarted
+        });
         return initializationPromise;
     }
 
     isInitializing = true;
     initializationPromise = new Promise((resolve) => {
         try {
+            // Before creating new instance, ensure cleanup of any existing one
+            if (trackerInstance) {
+                trackerInstance.stop();
+                trackerInstance = null;
+            }
+
             trackerInstance = new Tracker({
                 projectKey: frontendConfig.openreplay.PROJECT_KEY,
                 ingestPoint: getIngestPoint(),
-                __DISABLE_SECURE_MODE: isSafari ? false : import.meta.env.DEV,
+                __DISABLE_SECURE_MODE: true,
                 resourceBaseHref: getResourceBaseHref(),
                 disableStringDict: true,
                 network: {
@@ -147,16 +159,26 @@ export async function initTracker() {
             trackerInstance.start()
                 .then(() => {
                     isStarted = true;
+                    console.debug('✅ Tracker started successfully:', {
+                        sessionId: trackerInstance?.__sessionID,
+                        timestamp: new Date().toISOString()
+                    });
                     resolve(trackerInstance);
                 })
                 .catch((error) => {
-                    console.error('Failed to start tracker:', error);
+                    console.error('❌ Failed to start tracker:', error);
+                    isStarted = false;
+                    trackerInstance = null;
                     resolve(null);
                 });
 
         } catch (error) {
             console.error('Failed to initialize tracker:', error);
+            isStarted = false;
+            trackerInstance = null;
             resolve(null);
+        } finally {
+            isInitializing = false;
         }
     });
 
@@ -396,15 +418,37 @@ export function debugElasticIntegration() {
     }
 }
 
-// Add cleanup function for logout
+// Add a function to check and potentially restart the tracker
+export async function ensureTrackerActive() {
+    const tracker = getTracker();
+    if (!tracker || !isStarted) {
+        console.debug('🔄 Restarting inactive tracker');
+        cleanupTracker();
+        return initTracker();
+    }
+    return tracker;
+}
+
+// Update cleanup to be more thorough
 export function cleanupTracker() {
+    if (trackerInstance) {
+        try {
+            trackerInstance.stop();
+        } catch (error) {
+            console.warn('Error stopping tracker:', error);
+        }
+    }
+    
     if (browser) {
         localStorage.removeItem(TRACKER_STATE_KEY);
+        sessionStorage.removeItem(TRACKER_SESSION_KEY);
     }
+    
     trackerInstance = null;
     isStarted = false;
     isInitializing = false;
     initializationPromise = null;
+    console.debug('🧹 Tracker cleanup completed');
 }
 
 // Simplified status check

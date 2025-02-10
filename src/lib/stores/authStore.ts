@@ -4,7 +4,7 @@ import { browser } from '$app/environment';
 import { writable, get } from 'svelte/store';
 import { getMsalInstance, loginRequest, clearMsalCache, isSafari } from '$lib/config/authConfig';
 import { goto } from '$app/navigation';
-import { trackEvent, cleanupTracker, setTrackerUser } from '$lib/context/tracker';
+import { trackEvent, cleanupTracker, setTrackerUser, ensureTrackerActive } from '$lib/context/tracker';
 import { debugUserClaims } from '$lib/utils/claimsUtils';
 import { cleanupPhotoCache } from '$lib/stores/photoStore';
 import { frontendConfig } from '$frontendConfig';
@@ -41,6 +41,7 @@ export const auth = {
                     
                     // Set user in tracker with additional metadata
                     if (account?.username) {
+                        await ensureTrackerActive();
                         setTrackerUser(account.username, {
                             name: account.name,
                             email: account.username,
@@ -63,6 +64,7 @@ export const auth = {
                 
                 // Set user in tracker for existing account
                 if (accounts[0]?.username) {
+                    await ensureTrackerActive();
                     setTrackerUser(accounts[0].username, {
                         name: accounts[0].name,
                         email: accounts[0].username,
