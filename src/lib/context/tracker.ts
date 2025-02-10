@@ -39,14 +39,7 @@ const TRACKER_STATE_KEY = 'openreplay_tracker_initialized';
 // Add session storage key for tracker state
 const TRACKER_SESSION_KEY = 'openreplay_session_active';
 
-function getCurrentApmTransaction() {
-    try {
-        return apm.apm?.getCurrentTransaction() || null;
-    } catch (error) {
-        console.warn('Failed to get current APM transaction:', error);
-        return null;
-    }
-}
+const isSafari = browser && /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
 
 const getIngestPoint = () => {
     // Make sure we're using the correct production endpoint
@@ -72,7 +65,7 @@ export async function initTracker() {
             trackerInstance = new Tracker({
                 projectKey: frontendConfig.openreplay.PROJECT_KEY,
                 ingestPoint: getIngestPoint(),
-                __DISABLE_SECURE_MODE: import.meta.env.DEV,
+                __DISABLE_SECURE_MODE: isSafari ? false : import.meta.env.DEV,
                 resourceBaseHref: getResourceBaseHref(),
                 disableStringDict: true,
                 network: {
@@ -104,15 +97,7 @@ export async function initTracker() {
                 obscureTextNumbers: false,
                 onStart: () => {
                     console.log('OpenReplay session started:', trackerInstance?.__sessionID);
-                    // Initial user identification for replays
-                    const user = get(userAccount);
-                    if (user?.email) {
-                        trackerInstance?.setUserID(user.email);
-                        if (user.name) {
-                            trackerInstance?.setMetadata('name', user.name);
-                        }
-                        trackerInstance?.setMetadata('email', user.email);
-                    }
+                    // Remove the user identification from here as we'll handle it in auth store
                 }
             });
 
@@ -427,8 +412,8 @@ export function isTrackerReady() {
     return trackerInstance !== null && isStarted;
 }
 
-// Export a function to set the user that can be called from authStore
-export function setTrackerUser(username: string) {
+// Update the setTrackerUser function to handle more metadata
+export function setTrackerUser(username: string, metadata?: Record<string, any>) {
     const tracker = getTracker();
     if (!tracker || !username) {
         console.warn("⚠️ Cannot set user: tracker not initialized or username empty");
@@ -437,7 +422,16 @@ export function setTrackerUser(username: string) {
 
     try {
         tracker.setUserID(username);
-        console.log("👤 User ID set for tracker on login:", username);
+        console.log("👤 User ID set for tracker:", username);
+
+        // Set additional metadata if provided
+        if (metadata) {
+            Object.entries(metadata).forEach(([key, value]) => {
+                if (value) {
+                    tracker.setMetadata(key, String(value));
+                }
+            });
+        }
     } catch (error) {
         console.error("❌ Failed to set user ID:", error);
     }

@@ -26,7 +26,6 @@ export const auth = {
             const instance = await getMsalInstance();
             if (!instance) return false;
 
-            // Handle redirect promise with error handling
             const response = await instance.handleRedirectPromise()
                 .catch(error => {
                     console.warn('Redirect promise error:', error);
@@ -34,19 +33,45 @@ export const auth = {
                 });
             
             if (response) {
-                console.log('Successful response from redirect:', response);
                 const account = response.account;
-                userAccount.set(account);
-                isAuthenticated.set(true);
-                return true;
+                if (account) {
+                    instance.setActiveAccount(account);
+                    isAuthenticated.set(true);
+                    userAccount.set(account);
+                    
+                    // Set user in tracker with additional metadata
+                    if (account?.username) {
+                        setTrackerUser(account.username, {
+                            name: account.name,
+                            email: account.username,
+                            accountId: account.localAccountId || account.homeAccountId,
+                            tenantId: account.tenantId,
+                            environment: import.meta.env.DEV ? 'development' : 'production'
+                        });
+                    }
+                    
+                    return true;
+                }
             }
 
-            // Check if we have an active account
+            // Check existing accounts
             const accounts = instance.getAllAccounts();
             if (accounts.length > 0) {
-                console.log('Found existing account:', accounts[0]);
-                userAccount.set(accounts[0]);
+                instance.setActiveAccount(accounts[0]);
                 isAuthenticated.set(true);
+                userAccount.set(accounts[0]);
+                
+                // Set user in tracker for existing account
+                if (accounts[0]?.username) {
+                    setTrackerUser(accounts[0].username, {
+                        name: accounts[0].name,
+                        email: accounts[0].username,
+                        accountId: accounts[0].localAccountId || accounts[0].homeAccountId,
+                        tenantId: accounts[0].tenantId,
+                        environment: import.meta.env.DEV ? 'development' : 'production'
+                    });
+                }
+                
                 return true;
             }
 
