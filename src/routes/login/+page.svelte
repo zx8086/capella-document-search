@@ -1,3 +1,5 @@
+<!-- src/routes/login/+page.svelte -->
+
 <script lang="ts">
     import { auth, isLoading, isAuthenticated, trackerLoading, userAccount } from '$lib/stores/authStore';
     import { onMount } from 'svelte';

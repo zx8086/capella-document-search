@@ -1,3 +1,5 @@
+/* src/stores/quotesStore.ts */
+
 import { writable } from 'svelte/store';
 
 interface Quote {

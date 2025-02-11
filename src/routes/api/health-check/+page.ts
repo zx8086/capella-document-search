@@ -1,3 +1,5 @@
+/* src/routes/api/health-check/+page.ts */
+
 import type { PageLoad } from './$types';
 import { getFlag } from '$lib/stores/featureFlagStore';
 

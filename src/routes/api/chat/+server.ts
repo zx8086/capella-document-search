@@ -1,3 +1,5 @@
+/* src/routes/api/chat/+server.ts */
+
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { createRAGProvider } from '$lib/rag/factory';

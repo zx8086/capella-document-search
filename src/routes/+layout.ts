@@ -1,4 +1,4 @@
-// src/routes/+layout.ts
+/* src/routes/+layout.ts */
 
 import { auth, isLoading } from '$lib/stores/authStore';
 import type { LayoutLoad } from './$types';

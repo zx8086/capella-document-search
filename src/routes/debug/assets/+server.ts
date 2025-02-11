@@ -1,3 +1,5 @@
+/* src/routes/debug/assets/+server.ts */
+
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { dev } from '$app/environment';
