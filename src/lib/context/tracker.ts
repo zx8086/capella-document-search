@@ -80,6 +80,7 @@ export async function initTracker() {
                 __DISABLE_SECURE_MODE: true,
                 resourceBaseHref: getResourceBaseHref(),
                 disableStringDict: true,
+                verbose: true,
                 network: {
                     failuresOnly: false,
                     ignoreHeaders: [
@@ -91,7 +92,6 @@ export async function initTracker() {
                         'Authorization'
                     ],
                     capturePayload: true,
-                    captureTracing: false,
                     captureAPM: false,
                     sessionTokenKey: "x-openreplay-session-id",
                     console: {
@@ -107,10 +107,11 @@ export async function initTracker() {
                 defaultInputMode: 0,
                 obscureTextEmails: false,
                 obscureTextNumbers: false,
+                consoleThrottling: 60,
+                respectDoNotTrack: true,
+                connAttemptCount: 20,
                 onStart: () => {
-                    console.log('OpenReplay session started:', trackerInstance?.__sessionID);
-                    // Remove the user identification from here as we'll handle it in auth store
-                }
+                    console.log('OpenReplay session started:', trackerInstance?.__sessionID);                }
             });
 
             // Disable APM integration for development

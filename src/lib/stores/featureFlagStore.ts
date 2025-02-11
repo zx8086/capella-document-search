@@ -37,6 +37,17 @@ interface FeatureFlagState {
     error: string | null;
 }
 
+// Add type for flag values
+type FlagValue = boolean | {
+    value: boolean;
+    [key: string]: any;
+};
+
+interface OpenReplayFlag {
+    key: string;
+    value: FlagValue;
+}
+
 // Create the store
 function createFeatureFlagStore() {
     const { subscribe, set, update } = writable<FeatureFlagState>({
@@ -183,10 +194,19 @@ function debugFlags() {
   console.groupEnd();
 }
 
+// Add targeting context support
+function setTargetingContext(context: Record<string, any>) {
+    const tracker = getTracker();
+    if (!tracker) return;
+    
+    tracker.setContext(context);
+}
+
 // Export store interface
 export const featureFlagsInterface = {
   initialize: featureFlags.initialize,
   getFlag: featureFlags.getFlag,
+  setTargetingContext,
   status: flagsStatus,
   debug: debugFlags
 };
@@ -197,4 +217,18 @@ export function useFeatureFlags() {
         flags: featureFlags,
         getFlag
     };
+}
+
+// Add periodic reload capability
+function setupAutoReload(intervalMs = 300000) { // 5 minutes
+    if (!browser) return;
+    
+    const interval = setInterval(() => {
+        const tracker = getTracker();
+        if (tracker) {
+            tracker.reloadFlags();
+        }
+    }, intervalMs);
+
+    return () => clearInterval(interval);
 } 
