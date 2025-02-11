@@ -1,3 +1,5 @@
+/* src/lib/rag/types.ts */
+
 import type { RunTracer } from "langsmith/traceable";
 
 export interface RAGContext {

@@ -1,3 +1,5 @@
+/* src/lib/server/db/dbOperations.ts */
+
 import { Database, type Statement } from "bun:sqlite";
 import { log, err } from "$utils/unifiedLogger";
 

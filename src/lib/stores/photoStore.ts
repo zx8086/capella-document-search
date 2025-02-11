@@ -1,3 +1,5 @@
+/* src/lib/stores/photoStore.ts */
+
 import { writable, get } from 'svelte/store';
 import { 
   Client,

@@ -1,3 +1,5 @@
+/* src/lib/config/video.config.ts */
+
 import { get } from 'svelte/store';
 import { videos as videoStore } from '../../stores/videoStore';
 

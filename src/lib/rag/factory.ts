@@ -1,3 +1,5 @@
+/* src/lib/rag/factory.ts */
+
 import type { RAGProvider } from './types';
 import { PineconeRAGProvider } from './providers/pinecone';
 import { VectorizeRAGProvider } from './providers/vectorize';

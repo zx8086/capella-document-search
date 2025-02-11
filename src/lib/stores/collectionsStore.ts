@@ -1,3 +1,5 @@
+/* src/lib/stores/collectionsStore.ts */
+
 import { writable } from 'svelte/store';
 import type { Collection } from '../models/collections';
 

@@ -1,3 +1,5 @@
+/* src/lib/rag/providers/pinecone.ts */
+
 import { Pinecone } from "@pinecone-database/pinecone";
 import OpenAI from 'openai';
 import type { RAGProvider, RAGResponse, RAGMetadata } from '../types';

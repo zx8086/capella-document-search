@@ -1,3 +1,5 @@
+/* src/lib/utils/storage.ts */
+
 import { browser } from '$app/environment';
 
 interface StorageOperation {

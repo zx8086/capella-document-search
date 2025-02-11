@@ -1,3 +1,5 @@
+/* src/lib/rag/verify.ts */
+
 import { createRAGProvider } from './factory';
 
 export async function verifyRAGSetup() {

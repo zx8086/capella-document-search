@@ -1,3 +1,5 @@
+/* src/lib/utils/apiUtils.ts */
+
 import { browser } from '$app/environment';
 import { getTracker } from '$lib/context/tracker';
 import apm from '../../apm-config';

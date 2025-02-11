@@ -1,3 +1,5 @@
+/* src/lib/utils/claimsUtils.ts */
+
 import type { AccountInfo, IdTokenClaims } from '@azure/msal-browser';
 import { log } from '$utils/unifiedLogger';
 

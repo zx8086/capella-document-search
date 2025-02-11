@@ -1,3 +1,5 @@
+/* src/lib/stores/featureFlagStore.ts */
+
 import { writable, derived, get } from 'svelte/store';
 import { browser } from '$app/environment';
 import type { IFeatureFlag } from '@openreplay/tracker';

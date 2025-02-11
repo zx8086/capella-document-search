@@ -1,3 +1,5 @@
+/* src/lib/db/sqlite.ts */
+
 export const createDatabase = () => {
   if (typeof process !== 'undefined' && process.versions && process.versions.bun) {
     // Bun environment

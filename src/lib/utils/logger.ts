@@ -1,3 +1,5 @@
+/* src/lib/utils/logger.ts */
+
 const isDevelopment = import.meta.env.MODE === 'development';
 
 export const log = {

@@ -1,3 +1,5 @@
+/* src/lib/config/dnsConfig.ts */
+
 import { backendConfig } from "../../backend-config";
 import { frontendConfig } from "../../frontend-config";
 import { safeDnsPrefetch } from "../../lib/utils/dnsUtils";

@@ -1,3 +1,5 @@
+/* src/lib/rag/providers/vectorize.ts */
+
 import OpenAI from 'openai';
 import type { RAGProvider, RAGResponse, RAGMetadata } from '../types';
 import { traceable } from "langsmith/traceable";

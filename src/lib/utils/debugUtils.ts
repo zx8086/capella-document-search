@@ -1,3 +1,5 @@
+/* src/lib/utils/debugUtils.ts */
+
 import { getAPIHeaders } from './apiUtils';
 import { getTracker } from '../context/tracker';
 import apm from '../../apm-config';
