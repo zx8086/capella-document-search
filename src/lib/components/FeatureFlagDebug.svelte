@@ -1,3 +1,5 @@
+<!-- src/lib/components/FeatureFlagDebug.svelte -->
+
 <script lang="ts">
     import { useFeatureFlags, flagsStatus } from '$lib/stores/featureFlagStore';
     import { getTracker } from '$lib/context/tracker';

@@ -1,3 +1,5 @@
+# bunfig.dev.toml
+
 [run]
 bun = true
 

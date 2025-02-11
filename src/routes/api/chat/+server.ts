@@ -1,216 +1,91 @@
 import { json } from '@sveltejs/kit';
-import { Pinecone } from "@pinecone-database/pinecone";
-import OpenAI from 'openai';
 import type { RequestHandler } from './$types';
-import { traceable } from "langsmith/traceable";
-import { wrapOpenAI } from "langsmith/wrappers";
-import { get } from 'svelte/store';
-import { userAccount, isAuthenticated } from '$lib/stores/authStore';
+import { createRAGProvider } from '$lib/rag/factory';
+import type { RAGMetadata } from '$lib/rag/types';
+import { verifyRAGSetup } from '$lib/rag/verify';
 
-// console.log('🔑 Environment Variables:', {
-//     OPENAI_API_KEY: Bun.env.OPENAI_API_KEY,
-//     PINECONE_API_KEY: Bun.env.PINECONE_API_KEY
-// });
+// Run verification at startup
+await verifyRAGSetup();
 
-// Initialize OpenAI with LangSmith tracing
-const openai = wrapOpenAI(new OpenAI({
-    apiKey: Bun.env.OPENAI_API_KEY
-}));
+// Then continue with normal initialization
+console.log('🌟 [Server] Starting RAG system initialization');
+const ragProvider = createRAGProvider();
+console.log('⚙️ [Server] Provider instance created:', {
+    type: ragProvider.constructor.name
+});
 
-// Wrap the RAG pipeline with tracing and metadata
-const createRagPipeline = () => {
-    return traceable(async (message: string) => {
-        // Get current user information
-        const user = get(userAccount);
-        
-        // Initialize Pinecone
-        const pc = new Pinecone({
-            apiKey: Bun.env.PINECONE_API_KEY as string,
-        });
+await ragProvider.initialize();
+console.log('✅ [Server] RAG system initialized:', {
+    provider: Bun.env.RAG_PIPELINE,
+    timestamp: new Date().toISOString()
+});
 
-        // Get index with specific namespace
-        const index = pc.index(Bun.env.PINECONE_INDEX_NAME as string)
-            .namespace(Bun.env.PINECONE_NAMESPACE as string);
+// Add immediate verification log
+console.log('🔍 [Server] Current RAG configuration:', {
+    provider: ragProvider.constructor.name,
+    pipeline: Bun.env.RAG_PIPELINE,
+    environment: Bun.env.NODE_ENV,
+    timestamp: new Date().toISOString()
+});
 
-        // Generate embedding
-        console.log('🔄 Generating embedding...');
-        const embeddingResponse = await openai.embeddings.create({
-            model: "text-embedding-ada-002",
-            input: message
-        });
-
-        // Query Pinecone
-        const queryResponse = await index.query({
-            vector: embeddingResponse.data[0].embedding,
-            topK: 3,
-            includeMetadata: true
-        });
-
-        // Extract context
-        const context = queryResponse.matches
-            ?.map(match => ({
-                text: match.metadata?.text,
-                filename: match.metadata?.filename || 'Unknown source'
-            }))
-            .filter(item => item.text);
-
-        // Generate completion
-        const stream = await openai.chat.completions.create({
-            model: "gpt-4-turbo-preview",
-            messages: [
-                {
-                    role: "system",
-                    content: "You are a helpful assistant. Use the following context to answer the user's question. Always end your response with '\n\nReferences:' followed by the source filenames. If you cannot answer the question based on the context, say so."
-                },
-                {
-                    role: "user",
-                    content: `Context: ${context?.map(c => c.text).join('\n\n---\n\n')}\n\nSource files: ${context?.map(c => c.filename).join(', ')}\n\nQuestion: ${message}`
-                }
-            ],
-            temperature: 0.7,
-            max_tokens: 2000,
-            stream: true
-        });
-
-        return { stream, context };
-    }, {
-        run_type: "chain",
-        name: "RAG Chat Query",
-        tags: ["rag-query", "chat"],
-        metadata: {
-            environment: import.meta.env.DEV ? 'development' : 'production',
-            userId: user?.localAccountId || user?.homeAccountId || 'unknown',
-            userEmail: user?.username || user?.email || 'unknown',
-            userName: user?.name || 'unknown',
-            timestamp: new Date().toISOString()
-        }
-    });
-};
-
-// Keep existing GET handler
-export const GET: RequestHandler = async () => {
-    try {
-        const pc = new Pinecone({
-            apiKey: Bun.env.PINECONE_API_KEY as string,
-        });
-
-        const indexes = await pc.listIndexes();
-        const index = pc.index(Bun.env.PINECONE_INDEX_NAME as string);
-        const stats = await index.describeIndexStats();
-
-        return json({
-            indexes: indexes.map(idx => idx.name),
-            currentIndex: {
-                name: "platform-engineering-rag",
-                stats: stats,
-                dimensions: stats.dimension,
-                totalVectors: stats.totalVectorCount,
-                namespaces: stats.namespaces
-            }
-        });
-    } catch (error) {
-        console.error('❌ RAG Status Error:', error);
-        return json({ error: 'Failed to get RAG status' }, { status: 500 });
-    }
-};
-
-// Modify POST handler to use traced pipeline
 export const POST: RequestHandler = async ({ request }) => {
-    const { message, user } = await request.json();
     const startTime = Date.now();
+    console.log('📥 [Server] Received request');
+    
+    const { message, user } = await request.json();
+    
+    console.log('📨 [Server] Processing chat request:', {
+        messageLength: message.length,
+        userId: user?.id,
+        provider: Bun.env.RAG_PIPELINE,
+        timestamp: new Date().toISOString()
+    });
     
     try {
         console.log('🔍 Server received user data:', user);
 
-        const ragPipeline = traceable(async (message: string) => {
-            // Initialize Pinecone
-            const pc = new Pinecone({
-                apiKey: Bun.env.PINECONE_API_KEY as string,
-            });
+        // Prepare metadata for tracing
+        const metadata: RAGMetadata = {
+            // User Information
+            userId: user?.id || 'anonymous',
+            userName: user?.name || 'anonymous',
+            userEmail: user?.email || 'anonymous',
+            tenantId: user?.tenantId || 'unknown',
+            isAuthenticated: user?.isAuthenticated || false,
 
-            // Get index with specific namespace
-            const index = pc.index(Bun.env.PINECONE_INDEX_NAME as string)
-                .namespace(Bun.env.PINECONE_NAMESPACE as string);
+            // Environment & Context
+            environment: import.meta.env.DEV ? 'development' : 'production',
+            pathname: user?.pathname || 'unknown',
+            
+            // Session Information
+            sessionStartTime: user?.sessionStartTime,
+            messageCount: user?.messageCount || 1,
+            
+            // Request Details
+            clientTimestamp: user?.clientTimestamp,
+            serverTimestamp: new Date().toISOString(),
+            
+            // Performance Metrics
+            processingStartTime: startTime,
+            
+            // Message Details
+            messageLength: message.length,
+            
+            // Feature Flags
+            featureFlags: user?.featureFlags || {}
+        };
 
-            // Generate embedding
-            console.log('🔄 Generating embedding...');
-            const embeddingResponse = await openai.embeddings.create({
-                model: "text-embedding-ada-002",
-                input: message
-            });
+        console.log('🔄 [Server] Executing RAG query');
+        const { stream, context } = await ragProvider.query(message, metadata);
 
-            // Query Pinecone
-            const queryResponse = await index.query({
-                vector: embeddingResponse.data[0].embedding,
-                topK: 3,
-                includeMetadata: true
-            });
-
-            // Extract context
-            const context = queryResponse.matches
-                ?.map(match => ({
-                    text: match.metadata?.text,
-                    filename: match.metadata?.filename || 'Unknown source'
-                }))
-                .filter(item => item.text);
-
-            // Generate completion
-            const stream = await openai.chat.completions.create({
-                model: "gpt-4-turbo-preview",
-                messages: [
-                    {
-                        role: "system",
-                        content: "You are a helpful assistant. Use the following context to answer the user's question. Always end your response with '\n\nReferences:' followed by the source filenames. If you cannot answer the question based on the context, say so."
-                    },
-                    {
-                        role: "user",
-                        content: `Context: ${context?.map(c => c.text).join('\n\n---\n\n')}\n\nSource files: ${context?.map(c => c.filename).join(', ')}\n\nQuestion: ${message}`
-                    }
-                ],
-                temperature: 0.7,
-                max_tokens: 2000,
-                stream: true
-            });
-
-            return { stream, context };
-        }, {
-            run_type: "chain",
-            name: "RAG Chat Query",
-            tags: ["rag", "chat", user?.environment || 'unknown'],
-            metadata: {
-                // User Information
-                userId: user?.id || 'anonymous',
-                userName: user?.name || 'anonymous',
-                userEmail: user?.email || 'anonymous',
-                tenantId: user?.tenantId || 'unknown',
-                isAuthenticated: user?.isAuthenticated || false,
-
-                // Environment & Context
-                environment: import.meta.env.DEV ? 'development' : 'production',
-                pathname: user?.pathname || 'unknown',
-                
-                // Session Information
-                sessionStartTime: user?.sessionStartTime,
-                messageCount: user?.messageCount || 1,
-                
-                // Request Details
-                clientTimestamp: user?.clientTimestamp,
-                serverTimestamp: new Date().toISOString(),
-                
-                // Performance Metrics
-                processingStartTime: startTime,
-                
-                // Message Details
-                messageLength: message.length,
-                
-                // Feature Flags
-                featureFlags: user?.featureFlags || {}
-            }
+        console.log('✅ [Server] Query completed:', {
+            contextSize: context?.length || 0,
+            processingTime: Date.now() - startTime,
+            provider: Bun.env.RAG_PIPELINE,
+            sourceFiles: context?.map(c => c.filename).join(', ')
         });
 
-        const { stream, context } = await ragPipeline(message);
-
-        // Now we can add context-related metrics to our logs
+        // Log context metrics
         console.log('📊 Query Context:', {
             contextSize: context?.length || 0,
             sourceFiles: context?.map(c => c.filename).join(', ')
@@ -266,12 +141,11 @@ export const POST: RequestHandler = async ({ request }) => {
         );
 
     } catch (error) {
-        // Add error tracking
-        console.error('❌ Chat API Error:', {
+        console.error('❌ [Server] Error in chat API:', {
             error: error.message,
             userId: user?.id,
-            timestamp: new Date().toISOString(),
-            message: message.substring(0, 100) // First 100 chars for context
+            provider: Bun.env.RAG_PIPELINE,
+            timestamp: new Date().toISOString()
         });
         throw error;
     }

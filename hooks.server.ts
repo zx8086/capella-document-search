@@ -1,4 +1,4 @@
-// hooks.server.ts
+/* hooks.server.ts */
 
 import type { Handle } from '@sveltejs/kit';
 import { redirect } from '@sveltejs/kit';

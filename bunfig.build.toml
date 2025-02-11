@@ -1,4 +1,5 @@
 # bunfig.build.toml
+
 logLevel = "debug"
 
 [run]
