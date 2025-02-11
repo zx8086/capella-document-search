@@ -48,6 +48,13 @@ export const handle: Handle = async ({ event, resolve }) => {
 
     const response = await resolve(event);
     
+    // Add these headers
+    response.headers.set('Access-Control-Allow-Origin', '*');
+    response.headers.set('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    response.headers.set('Access-Control-Allow-Headers', 'Content-Type');
+    response.headers.set('Cross-Origin-Resource-Policy', 'cross-origin');
+    response.headers.set('Cross-Origin-Embedder-Policy', 'require-corp');
+
     // Security headers - removing any that might conflict with CSP
     response.headers.set('X-Frame-Options', 'DENY');
     response.headers.set('X-Content-Type-Options', 'nosniff');

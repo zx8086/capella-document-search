@@ -48,6 +48,7 @@ const config = {
         'default-src': ["'self'"],
         'connect-src': [
           "'self'",
+          "blob:",
           "wss://api.openreplay.com",
           "wss://openreplay.prd.shared-services.eu.pvh.cloud",
           "ws://api.openreplay.com",

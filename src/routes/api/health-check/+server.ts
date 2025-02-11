@@ -668,7 +668,11 @@ export async function GET({ fetch, url }: RequestEvent) {
             status: 200, // Return 200 instead of 500 to prevent cascading failures
             headers: {
                 'Cache-Control': 'no-store',
-                'Content-Type': 'application/json'
+                'Content-Type': 'application/json',
+                'Access-Control-Allow-Origin': '*',
+                'Access-Control-Allow-Methods': 'GET, OPTIONS',
+                'Access-Control-Allow-Headers': 'Content-Type',
+                'Cross-Origin-Resource-Policy': 'cross-origin'
             }
         });
     }
