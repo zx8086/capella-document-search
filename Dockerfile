@@ -47,6 +47,10 @@ ENV COMMIT_HASH=${COMMIT_HASH}
 ENV BUILD_DATE=${BUILD_DATE}
 ENV NODE_ENV=${NODE_ENV}
 
+# Add these two lines to enable debugging in production
+ENV NODE_DEBUG=http
+ENV BUN_CONFIG_VERBOSE_FETCH=true
+
 WORKDIR /app
 
 # Copy everything from builder
