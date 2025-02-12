@@ -73,8 +73,6 @@ export const POST: RequestHandler = async ({ request }) => {
             // Message Details
             messageLength: message.length,
             
-            // Feature Flags
-            featureFlags: user?.featureFlags || {}
         };
 
         console.log('🔄 [Server] Executing RAG query');
