@@ -37,10 +37,7 @@ export interface RAGMetadata {
     
     // Message Details
     messageLength: number;
-    
-    // Feature Flags
-    featureFlags: Record<string, any>;
-    
+        
     // Allow additional properties
     [key: string]: any;
 }

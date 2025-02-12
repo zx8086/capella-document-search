@@ -10,7 +10,6 @@
   import { userAccount, isAuthenticated } from '$lib/stores/authStore';
   import { userPhotoUrl, fetchUserPhoto, ensureUserPhoto } from '$lib/stores/photoStore';
   import { getMsalInstance } from '$lib/config/authConfig';
-  import { getFlag } from '$lib/stores/featureFlagStore';
   
   const dispatch = createEventDispatcher();
   
@@ -104,7 +103,7 @@
   function toggleChat() {
     dispatch('toggle');
     
-    if (browser) {
+    if (browser && trackerReady) {
       trackEvent("User_Interaction", {
         type: "click",
         element: "ChatAssistant",
@@ -150,15 +149,10 @@
                     environment: $userAccount.environment,
                     isAuthenticated: $isAuthenticated,
                     // Add session/interaction context
-                    sessionStartTime: sessionStartTime, // You can track this in the component
+                    sessionStartTime: sessionStartTime,
                     messageCount: messages.length,
                     clientTimestamp: new Date().toISOString(),
-                    pathname: $page?.url?.pathname,
-                    // Add any feature flags or settings
-                    featureFlags: {
-                        isFeatureEnabled: getFlag('rag-chat-assistant'),
-                        // Add other relevant feature flags
-                    }
+                    pathname: $page?.url?.pathname
                 } : null
             })
         });
