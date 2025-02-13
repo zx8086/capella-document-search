@@ -70,14 +70,19 @@ export async function fetchUserPhoto(accessToken: string, userId: string) {
     const cached = localStorage.getItem(PHOTO_CACHE_KEY);
     if (cached) {
       const { url, timestamp, noPhoto }: PhotoCache = JSON.parse(cached);
-      // If user has no photo, don't try fetching again for 24 hours
-      if (noPhoto && Date.now() - timestamp < PHOTO_CACHE_EXPIRY) {
-        userPhotoUrl.set(DEFAULT_AVATAR);
-        return DEFAULT_AVATAR;
-      }
-      if (Date.now() - timestamp < PHOTO_CACHE_EXPIRY) {
-        userPhotoUrl.set(url);
-        return url;
+      // If cache exists but contains a blob URL, ignore it and refetch
+      if (url.startsWith('blob:')) {
+        localStorage.removeItem(PHOTO_CACHE_KEY);
+      } else {
+        // If user has no photo, don't try fetching again for 24 hours
+        if (noPhoto && Date.now() - timestamp < PHOTO_CACHE_EXPIRY) {
+          userPhotoUrl.set(DEFAULT_AVATAR);
+          return DEFAULT_AVATAR;
+        }
+        if (Date.now() - timestamp < PHOTO_CACHE_EXPIRY) {
+          userPhotoUrl.set(url);
+          return url;
+        }
       }
     }
 
@@ -86,32 +91,19 @@ export async function fetchUserPhoto(accessToken: string, userId: string) {
     });
 
     try {
-      const metadata = await graphClient
-        .api('/me/photos/96x96')
-        .get();
-
-      if (!metadata) {
-        // Cache the no-photo state
-        const cacheData: PhotoCache = {
-          url: DEFAULT_AVATAR,
-          timestamp: Date.now(),
-          noPhoto: true
-        };
-        localStorage.setItem(PHOTO_CACHE_KEY, JSON.stringify(cacheData));
-        userPhotoUrl.set(DEFAULT_AVATAR);
-        return DEFAULT_AVATAR;
-      }
-
       const photoResponse = await graphClient
         .api('/me/photos/96x96/$value')
         .responseType(ResponseType.ARRAYBUFFER)
         .get();
 
       if (photoResponse) {
-        const blob = new Blob([photoResponse], { 
-          type: metadata['@odata.mediaContentType'] || 'image/jpeg' 
-        });
-        const photoUrl = URL.createObjectURL(blob);
+        // Convert ArrayBuffer to base64 string
+        const base64String = btoa(
+          new Uint8Array(photoResponse)
+            .reduce((data, byte) => data + String.fromCharCode(byte), '')
+        );
+        
+        const photoUrl = `data:image/jpeg;base64,${base64String}`;
 
         // Cache the photo URL
         const cacheData: PhotoCache = {

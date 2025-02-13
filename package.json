@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "cp .env.development .env 2>/dev/null || true && bun run svelte-kit sync && bun --bun vite dev",
+    "dev": "NODE_DEBUG=http BUN_CONFIG_VERBOSE_FETCH=true cp .env.development .env 2>/dev/null || true && bun run svelte-kit sync && bun --bun vite dev",
     "build": "NODE_ENV=production LOG_LEVEL=info bun run svelte-kit sync && DISABLE_OPENTELEMETRY=true bun --bun vite build",
     "build:docker": "bun run svelte-kit sync && DISABLE_OPENTELEMETRY=true NODE_ENV=production bun --bun vite build",
     "preview": "bun --bun vite preview --host",
