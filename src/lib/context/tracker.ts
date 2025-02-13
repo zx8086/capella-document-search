@@ -108,7 +108,6 @@ export async function initTracker() {
                 obscureTextEmails: false,
                 obscureTextNumbers: false,
                 consoleThrottling: 60,
-                respectDoNotTrack: true,
                 connAttemptCount: 20,
                 onStart: () => {
                     console.log('OpenReplay session started:', trackerInstance?.__sessionID);                }
