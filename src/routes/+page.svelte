@@ -670,7 +670,9 @@
                                     </button>
                                 </span>
                                 <input
-                                    type="search"
+                                    type="text"
+                                    autocomplete="off"
+                                    spellcheck="false"
                                     id="documentKey"
                                     name="documentKey"
                                     data-transaction-name="Enter Document Key"
@@ -681,7 +683,7 @@
                                     }}
                                     onclick={handleInputClick}
                                     placeholder="Search for a single Document by typing in the Key here and click the Search button below..."
-                                    class="w-full py-2 pl-10 pr-4 text-sm rounded-md focus:outline-none bg-white border border-gray-300 text-black focus:ring-2 focus:ring-tommy-red focus:border-tommy-red transition duration-150 ease-in-out"
+                                    class="w-full py-2 pl-10 pr-4 text-sm rounded-md focus:outline-none bg-white border border-gray-300 text-gray-900 focus:ring-2 focus:ring-tommy-red focus:border-tommy-red transition duration-150 ease-in-out"
                                 />
                             </div>
                         {:else}

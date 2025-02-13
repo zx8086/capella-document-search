@@ -263,14 +263,15 @@ export abstract class MonitoredOTLPExporter<T> {
   protected async validateEndpoint(): Promise<void> {
     try {
       const response = await fetch(this.url, {
-        method: 'HEAD',
+        method: 'POST',
         timeout: 5000,
         headers: {
-          'Accept': 'application/json',
+          'Content-Type': 'application/x-protobuf',
+          'Accept': 'application/x-protobuf'
         }
       });
       
-      const acceptableStatuses = [200, 204, 400];
+      const acceptableStatuses = [200, 204, 400, 415];
       if (!acceptableStatuses.includes(response.status)) {
         warn(`OpenTelemetry endpoint ${this.url} returned unexpected status ${response.status}`);
       }
