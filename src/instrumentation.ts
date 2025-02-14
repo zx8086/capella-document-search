@@ -229,7 +229,7 @@ async function initializeOpenTelemetry() {
           }),
           new WinstonInstrumentation({
             enabled: true,
-            disableLogSending: true,
+            disableLogSending: false,
           }),
         ],
       });
