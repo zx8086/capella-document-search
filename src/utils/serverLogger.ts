@@ -2,6 +2,7 @@
 
 import winston from "winston";
 import { OpenTelemetryTransportV3 } from "@opentelemetry/winston-transport";
+import DailyRotateFile from "winston-daily-rotate-file";
 import { ecsFormat } from "@elastic/ecs-winston-format";
 import type { BackendConfig } from "../models/types";
 
@@ -16,6 +17,13 @@ function createLogger(config: BackendConfig) {
       new winston.transports.Console(),
       new OpenTelemetryTransportV3({
         level: config.application.LOG_LEVEL,
+      }),
+      new DailyRotateFile({
+        filename: "logs/application-%DATE%.log",
+        datePattern: "YYYY-MM-DD",
+        zippedArchive: true,
+        maxSize: config.application.LOG_MAX_SIZE,
+        maxFiles: config.application.LOG_MAX_FILES,
       }),
     ],
   });
