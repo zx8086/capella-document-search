@@ -29,8 +29,6 @@
 
     import FeatureFlagDebug from '$lib/components/FeatureFlagDebug.svelte';
 
-    // import { trackClick } from '$utils/tracker';
-
     interface SearchResult {
         collection: string;
         data: any;
