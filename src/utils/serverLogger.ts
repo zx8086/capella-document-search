@@ -2,37 +2,22 @@
 
 import winston from "winston";
 import { OpenTelemetryTransportV3 } from "@opentelemetry/winston-transport";
-import DailyRotateFile from "winston-daily-rotate-file";
 import { ecsFormat } from "@elastic/ecs-winston-format";
 import type { BackendConfig } from "../models/types";
 
 function createLogger(config: BackendConfig) {
-  const transports: winston.transport[] = [
-    new winston.transports.Console(),
-    new OpenTelemetryTransportV3({
-      level: config.application.LOG_LEVEL,
-    }),
-  ];
-
-  if (config.application.ENABLE_FILE_LOGGING) {
-    transports.push(
-      new DailyRotateFile({
-        filename: "logs/application-%DATE%.log",
-        datePattern: "YYYY-MM-DD",
-        zippedArchive: true,
-        maxSize: config.application.LOG_MAX_SIZE,
-        maxFiles: config.application.LOG_MAX_FILES,
-      }),
-    );
-  }
-
   return winston.createLogger({
     level: config.application.LOG_LEVEL,
     format: ecsFormat({
       convertReqRes: true,
       apmIntegration: true,
     }),
-    transports: transports,
+    transports: [
+      new winston.transports.Console(),
+      new OpenTelemetryTransportV3({
+        level: config.application.LOG_LEVEL,
+      }),
+    ],
   });
 }
 
