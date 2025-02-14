@@ -21,7 +21,7 @@
     import { collections } from "../stores/collectionsStore";
     import type { Collection } from "../models";
 
-    import { goto, pushState, replaceState } from '$app/navigation';
+    import { pushState, replaceState } from '$app/navigation';
 
     import { userAccount } from '$lib/stores/authStore';
 
