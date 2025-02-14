@@ -216,7 +216,7 @@ async function initializeOpenTelemetry() {
         resource: resource,
         traceExporter,
         spanProcessors: [batchSpanProcessor],
-        logRecordProcessor: new BatchLogRecordProcessor(logExporter),
+        logRecordProcessors: [new BatchLogRecordProcessor(logExporter)],
         instrumentations: [
           getNodeAutoInstrumentations({
             "@opentelemetry/instrumentation-aws-lambda": { enabled: false },
