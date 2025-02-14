@@ -221,7 +221,6 @@ async function initializeOpenTelemetry() {
           getNodeAutoInstrumentations({
             "@opentelemetry/instrumentation-aws-lambda": { enabled: false },
             "@opentelemetry/instrumentation-fs": { enabled: false },
-            "@opentelemetry/instrumentation-winston": { enabled: false },
           }),
           new GraphQLInstrumentation({
             allowValues: true,
