@@ -5,8 +5,9 @@ import { PineconeRAGProvider } from './providers/pinecone';
 import { VectorizeRAGProvider } from './providers/vectorize';
 import OpenAI from 'openai';
 import { wrapOpenAI } from "langsmith/wrappers";
+import { CapellaRAGProvider } from './providers/capella';
 
-export function createRAGProvider(): RAGProvider {
+export function createRAGProvider(fetch: typeof fetch): RAGProvider {
     // Add immediate environment check
     console.log('🔎 [RAG Factory] Environment check:', {
         RAG_PIPELINE: Bun.env.RAG_PIPELINE,
@@ -37,6 +38,10 @@ export function createRAGProvider(): RAGProvider {
         case 'VECTORIZE':
             console.log('🔍 [RAG Factory] Creating Vectorize provider instance');
             provider = new VectorizeRAGProvider(openai);
+            break;
+        case 'CAPELLA':
+            console.log('🔍 [RAG Factory] Creating Capella provider instance');
+            provider = new CapellaRAGProvider(openai, fetch);
             break;
         default:
             console.error('❌ [RAG Factory] Unsupported pipeline:', pipeline);

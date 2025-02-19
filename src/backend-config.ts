@@ -25,6 +25,13 @@ export function initializeBackendConfig(): BackendConfig {
       CLUSTER_ID: getEnvOrThrow("CLUSTER_ID"),
       BUCKET_ID: getEnvOrThrow("BUCKET_ID"),
       AUTH_TOKEN: getEnvOrThrow("AUTH_TOKEN"),
+      URL: getEnvOrThrow("COUCHBASE_URL"),
+      USERNAME: getEnvOrThrow("COUCHBASE_USERNAME"),
+      PASSWORD: getEnvOrThrow("COUCHBASE_PASSWORD"),
+      BUCKET: getEnvOrThrow("COUCHBASE_BUCKET"),
+      SCOPE: getEnvOrThrow("COUCHBASE_SCOPE"),
+      COLLECTION: getEnvOrThrow("COUCHBASE_COLLECTION"),
+      VECTOR_INDEX: getEnvOrThrow("COUCHBASE_VECTOR_INDEX"),
     },
     openTelemetry: {
       SERVICE_NAME: getEnvOrThrow("SERVICE_NAME"),

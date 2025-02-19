@@ -5,45 +5,40 @@ import type { RequestHandler } from './$types';
 import { createRAGProvider } from '$lib/rag/factory';
 import type { RAGMetadata } from '$lib/rag/types';
 import { verifyRAGSetup } from '$lib/rag/verify';
+import { log, err } from '$utils/unifiedLogger';
 
-// Run verification at startup
-await verifyRAGSetup();
+// Initialize provider lazily
+let ragProvider: any = null;
 
-// Then continue with normal initialization
-console.log('🌟 [Server] Starting RAG system initialization');
-const ragProvider = createRAGProvider();
-console.log('⚙️ [Server] Provider instance created:', {
-    type: ragProvider.constructor.name
-});
-
-await ragProvider.initialize();
-console.log('✅ [Server] RAG system initialized:', {
-    provider: Bun.env.RAG_PIPELINE,
-    timestamp: new Date().toISOString()
-});
-
-// Add immediate verification log
-console.log('🔍 [Server] Current RAG configuration:', {
-    provider: ragProvider.constructor.name,
-    pipeline: Bun.env.RAG_PIPELINE,
-    environment: Bun.env.NODE_ENV,
-    timestamp: new Date().toISOString()
-});
-
-export const POST: RequestHandler = async ({ request }) => {
+export const POST: RequestHandler = async ({ fetch, request }) => {
     const startTime = Date.now();
-    console.log('📥 [Server] Received request');
-    
-    const { message, user } = await request.json();
-    
-    console.log('📨 [Server] Processing chat request:', {
-        messageLength: message.length,
-        userId: user?.id,
-        provider: Bun.env.RAG_PIPELINE,
-        timestamp: new Date().toISOString()
-    });
+    log('📥 [Server] Received request');
     
     try {
+        // Initialize provider with fetch
+        if (!ragProvider) {
+            log('🌟 [Server] Starting RAG system initialization');
+            ragProvider = createRAGProvider(fetch);
+            log('⚙️ [Server] Provider instance created:', {
+                type: ragProvider.constructor.name
+            });
+
+            await ragProvider.initialize();
+            log('✅ [Server] RAG system initialized:', {
+                provider: Bun.env.RAG_PIPELINE,
+                timestamp: new Date().toISOString()
+            });
+        }
+
+        const { message, user } = await request.json();
+        
+        log('📨 [Server] Processing chat request:', {
+            messageLength: message.length,
+            userId: user?.id,
+            provider: Bun.env.RAG_PIPELINE,
+            timestamp: new Date().toISOString()
+        });
+        
         console.log('🔍 Server received user data:', user);
 
         // Prepare metadata for tracing
@@ -75,10 +70,10 @@ export const POST: RequestHandler = async ({ request }) => {
             
         };
 
-        console.log('🔄 [Server] Executing RAG query');
+        log('🔄 [Server] Executing RAG query');
         const { stream, context } = await ragProvider.query(message, metadata);
 
-        console.log('✅ [Server] Query completed:', {
+        log('✅ [Server] Query completed:', {
             contextSize: context?.length || 0,
             processingTime: Date.now() - startTime,
             provider: Bun.env.RAG_PIPELINE,
@@ -86,7 +81,7 @@ export const POST: RequestHandler = async ({ request }) => {
         });
 
         // Log context metrics
-        console.log('📊 Query Context:', {
+        log('📊 Query Context:', {
             contextSize: context?.length || 0,
             sourceFiles: context?.map(c => c.filename).join(', ')
         });
@@ -125,7 +120,7 @@ export const POST: RequestHandler = async ({ request }) => {
                         );
                         controller.close();
                     } catch (error) {
-                        console.error("❌ Stream processing error:", error);
+                        log('❌ Stream processing error:', error);
                         controller.error(error);
                     }
                 }
@@ -141,10 +136,9 @@ export const POST: RequestHandler = async ({ request }) => {
         );
 
     } catch (error) {
-        console.error('❌ [Server] Error in chat API:', {
+        err('❌ [Server] Error in chat API:', {
             error: error.message,
-            userId: user?.id,
-            provider: Bun.env.RAG_PIPELINE,
+            stack: error.stack,
             timestamp: new Date().toISOString()
         });
         throw error;

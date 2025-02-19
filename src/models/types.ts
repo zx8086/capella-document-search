@@ -16,6 +16,13 @@ export interface CapellaConfig {
   CLUSTER_ID: string;
   BUCKET_ID: string;
   AUTH_TOKEN: string;
+  URL: string;
+  USERNAME: string;
+  PASSWORD: string;
+  BUCKET: string;
+  SCOPE: string;
+  COLLECTION: string;
+  VECTOR_INDEX: string;
 }
 
 export interface OpenTelemetryConfig {
