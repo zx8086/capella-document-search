@@ -29,7 +29,7 @@ export class CapellaRAGProvider implements RAGProvider {
             try {
                 log('🔄 [Capella] Processing query:', { messageLength: message.length });
                 
-                const hf = new HfInference("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");
+                const hf = new HfInference(Bun.env.HUGGINGFACE_API_TOKEN);
                 
                 log('🔤 [Capella] Generating embedding');
                 const response = await hf.featureExtraction({
@@ -124,6 +124,6 @@ function padVector(vector: number[], targetLength: number): number[] {
         return vector.slice(0, targetLength);
     }
     
-    // Pad with zeros to reach target dimensions
+    // Pad with zeros to reach 4096 dimensions
     return [...vector, ...new Array(targetLength - vector.length).fill(0)];
 } 
