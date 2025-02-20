@@ -1,3 +1,5 @@
+/* src/lib/services/couchbase-service.ts */
+
 import { Worker } from "worker_threads";
 import { log, err } from "$utils/unifiedLogger";
 

@@ -1,3 +1,5 @@
+/* src/lib/tests/test-couchbase-connection.ts */
+
 import { backendConfig } from "../../backend-config";
 import { connect, Cluster, SearchQuery } from "couchbase";
 

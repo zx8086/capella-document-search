@@ -1,3 +1,5 @@
+/* src/lib/rag/providers/capella.ts */
+
 import type { RAGProvider, RAGResponse, RAGMetadata } from '../types';
 import OpenAI from 'openai';
 import { Worker } from 'worker_threads';

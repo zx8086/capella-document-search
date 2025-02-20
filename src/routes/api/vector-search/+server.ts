@@ -1,3 +1,5 @@
+/* src/routes/api/vector-search/+server.ts */
+
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { handleVectorSearch } from '$lib/services/couchbase-service';

@@ -1,3 +1,5 @@
+/* src/lib/services/couchbase-worker.ts */
+
 import { backendConfig } from "../../backend-config";
 import { connect, SearchRequest, VectorSearch, VectorQuery } from 'couchbase';
 import { parentPort } from "worker_threads";
