@@ -25,13 +25,6 @@ RUN --mount=type=cache,target=/root/.bun/install/cache \
 # Copy all files after dependency installation
 COPY . .
 
-# Ensure environment files are copied and set up correctly
-RUN if [ "${NODE_ENV}" = "production" ]; then \
-        cp .env.production .env; \
-    else \
-        cp .env.development .env; \
-    fi
-
 # Build the application
 COPY bunfig.build.toml bunfig.toml
 RUN NODE_ENV=${NODE_ENV} \
