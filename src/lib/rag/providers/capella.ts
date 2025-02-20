@@ -43,16 +43,22 @@ export class CapellaRAGProvider implements RAGProvider {
                 // Query vector store using worker
                 log('🔍 [Capella] Querying vector store');
                 const queryResponse = await new Promise((resolve, reject) => {
-                    this.worker!.once('message', (result) => {
+                    if (!this.worker) {
+                        reject(new Error('Worker not initialized'));
+                        return;
+                    }
+
+                    const messageHandler = (result: any) => {
+                        this.worker!.removeListener('message', messageHandler);
                         if (result.success) {
-                            // Always resolve with an array, even if empty
                             resolve(result.results || []);
                         } else {
                             reject(new Error(result.error));
                         }
-                    });
+                    };
 
-                    this.worker!.postMessage({ vector });
+                    this.worker.once('message', messageHandler);
+                    this.worker.postMessage({ vector });
                 });
 
                 log('📝 [Capella] Processing matches');

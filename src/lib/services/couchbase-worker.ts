@@ -38,17 +38,32 @@ if (parentPort) {
         try {
             const indexName = "default._default.ragpdfindex";
             
-            log("🔄 [Worker] Processing vector search request");
+            log("🔄 [Worker] Starting Couchbase connection with details:", {
+                url: backendConfig.capella.URL,
+                username: backendConfig.capella.USERNAME,
+                bucket: backendConfig.capella.BUCKET,
+                scope: backendConfig.capella.SCOPE,
+                collection: backendConfig.capella.COLLECTION,
+                indexName
+            });
 
-            // Get or create connection
-            const cluster = await getConnection();
-            
+            const cluster = await connect(backendConfig.capella.URL, {
+                username: backendConfig.capella.USERNAME,
+                password: backendConfig.capella.PASSWORD,
+            });
+
+            log("✅ [Worker] Connected to Couchbase");
+
             // Verify vector dimensions
-            // if (!Array.isArray(data.vector) || data.vector.length !== 4096) {
-            //     throw new Error(`Invalid vector dimensions. Expected 4096, got ${data.vector?.length}`);
+            log("🔍 [Worker] Verifying vector dimensions:", {
+                received: data.vector.length,
+                expected: 4096
+            });
+
+            // if (data.vector.length !== 4096) {
+            //     throw new Error(`Invalid vector dimensions. Expected 4096, got ${data.vector.length}`);
             // }
 
-            // Updated search query structure based on docs
             const searchQuery = {
                 fields: ["*"],
                 knn: [{
@@ -58,68 +73,54 @@ if (parentPort) {
                 }]
             };
 
-            log("🔍 [Worker] Executing vector search");
+            log("🔍 [Worker] Executing vector search with query:", {
+                indexName,
+                queryFields: searchQuery.fields,
+                vectorField: searchQuery.knn[0].field,
+                vectorLength: data.vector.length
+            });
 
-            try {
-                const result = await cluster.searchQuery(
-                    indexName,
-                    searchQuery,
-                    {
-                        timeout: 10000,
-                        metrics: true
-                    }
-                );
+            // List available indexes for debugging
+            const manager = cluster.searchIndexes();
+            const indexes = await manager.getAllIndexes();
+            log("📋 [Worker] Available indexes:", indexes.map(idx => ({
+                name: idx.name,
+                type: idx.type
+            })));
 
-                const rows = [];
-                for await (const row of result.rows) {
-                    rows.push({
-                        id: row.id,
-                        score: row.score,
-                        text: row.fields?.content || row.fields?.text,
-                        filename: row.fields?.filename || row.fields?.source,
-                        metadata: row.fields
-                    });
-                }
+            const result = await cluster.searchQuery(
+                indexName,
+                searchQuery,
+                { timeout: 10000 }
+            );
 
-                log(`✅ [Worker] Search complete, found ${rows.length} results`);
-                await cluster.close();
-                parentPort.postMessage({ success: true, results: rows });
-
-            } catch (searchError) {
-                // Specific error handling for search operations
-                if (searchError.message.includes('timeout')) {
-                    throw new Error('Search operation timed out');
-                }
-                if (searchError.message.includes('index not found')) {
-                    throw new Error(`Search index ${indexName} not found`);
-                }
-                throw searchError;
+            const rows = [];
+            for await (const row of result.rows) {
+                log("📄 [Worker] Processing row:", {
+                    id: row.id,
+                    score: row.score,
+                    fields: Object.keys(row.fields || {})
+                });
+                rows.push({
+                    id: row.id,
+                    score: row.score,
+                    text: row.fields?.content || row.fields?.text,
+                    filename: row.fields?.filename || row.fields?.source,
+                    metadata: row.fields
+                });
             }
 
+            log(`✅ [Worker] Search complete, found ${rows.length} results`);
+            parentPort.postMessage({ success: true, results: rows });
+            await cluster.close();
         } catch (error) {
-            // Enhanced error handling with specific error types
-            const errorResponse = {
-                success: false,
-                error: error.message,
-                errorType: error.constructor.name,
-                errorCode: error.code,
-                retryable: isRetryableError(error)
-            };
-
-            err("❌ [Worker] Error:", errorResponse);
-            parentPort.postMessage(errorResponse);
-
-            // Connection error handling
-            if (isConnectionError(error)) {
-                cluster = null; // Reset connection
-                setTimeout(async () => {
-                    try {
-                        await getConnection(); // Attempt reconnection
-                    } catch (reconnectError) {
-                        err("❌ [Worker] Reconnection failed:", reconnectError);
-                    }
-                }, RECONNECT_DELAY);
-            }
+            err("❌ [Worker] Error:", {
+                message: error.message,
+                code: error.code,
+                stack: error.stack,
+                type: error.constructor.name
+            });
+            parentPort.postMessage({ success: false, error: error.message });
         }
     });
 }
