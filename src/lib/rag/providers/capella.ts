@@ -33,7 +33,7 @@ export class CapellaRAGProvider implements RAGProvider {
                 
                 log('🔤 [Capella] Generating embedding');
                 const response = await hf.featureExtraction({
-                    model: "BAAI/bge-large-en-v1.5",
+                    model: "intfloat/e5-large-v2",
                     inputs: message
                 });
 
