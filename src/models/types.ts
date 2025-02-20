@@ -58,10 +58,20 @@ export interface AzureConfig {
   REDIRECT_URI: string;
 }
 
+export interface RAGConfig {
+  RAG_PIPELINE: string;
+  HUGGINGFACE_API_TOKEN: string;
+  OPENAI_API_KEY: string;
+  PINECONE_API_KEY: string;
+  PINECONE_INDEX_NAME: string;
+  PINECONE_NAMESPACE: string;
+}
+
 export interface BackendConfig {
   application: ApplicationConfig;
   capella: CapellaConfig;
   openTelemetry: OpenTelemetryConfig;
+  rag: RAGConfig;
 }
 
 export interface FrontendConfig {

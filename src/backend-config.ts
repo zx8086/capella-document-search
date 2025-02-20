@@ -43,6 +43,14 @@ export function initializeBackendConfig(): BackendConfig {
       METRIC_READER_INTERVAL: getEnvNumberOrThrow("METRIC_READER_INTERVAL"),
       SUMMARY_LOG_INTERVAL: getEnvNumberOrThrow("SUMMARY_LOG_INTERVAL"),
     },
+    rag: {
+      RAG_PIPELINE: getEnvOrThrow("RAG_PIPELINE"),
+      HUGGINGFACE_API_TOKEN: getEnvOrThrow("HUGGINGFACE_API_TOKEN"),
+      OPENAI_API_KEY: getEnvOrThrow("OPENAI_API_KEY"),
+      PINECONE_API_KEY: getEnvOrThrow("PINECONE_API_KEY"),
+      PINECONE_INDEX_NAME: getEnvOrThrow("PINECONE_INDEX_NAME"),
+      PINECONE_NAMESPACE: getEnvOrThrow("PINECONE_NAMESPACE"),
+    },
   };
 
   initializeLogger(config);

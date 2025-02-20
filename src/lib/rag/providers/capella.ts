@@ -5,6 +5,7 @@ import { log, err } from '$utils/unifiedLogger';
 import { traceable } from "langsmith/traceable";
 import { HfInference } from '@huggingface/inference';
 import { dev } from '$app/environment';
+import { backendConfig } from '../../../backend-config';
 
 export class CapellaRAGProvider implements RAGProvider {
     private openai: OpenAI;
@@ -29,16 +30,15 @@ export class CapellaRAGProvider implements RAGProvider {
             try {
                 log('🔄 [Capella] Processing query:', { messageLength: message.length });
                 
-                const hf = new HfInference(Bun.env.HUGGINGFACE_API_TOKEN);
+                const hf = new HfInference(backendConfig.rag.HUGGINGFACE_API_TOKEN);
                 
                 log('🔤 [Capella] Generating embedding');
                 const response = await hf.featureExtraction({
-                    model: "intfloat/e5-large-v2",
+                    model: "intfloat/e5-mistral-7b-instruct",
                     inputs: message
                 });
 
-                // Pad the vector to 4096 dimensions
-                const vector = padVector(response, 4096);
+                const vector = response;
 
                 // Query vector store using worker
                 log('🔍 [Capella] Querying vector store');
@@ -117,13 +117,4 @@ export class CapellaRAGProvider implements RAGProvider {
             throw error;
         }
     }
-}
-
-function padVector(vector: number[], targetLength: number): number[] {
-    if (vector.length >= targetLength) {
-        return vector.slice(0, targetLength);
-    }
-    
-    // Pad with zeros to reach 4096 dimensions
-    return [...vector, ...new Array(targetLength - vector.length).fill(0)];
 } 

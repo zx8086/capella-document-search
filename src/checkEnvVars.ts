@@ -3,10 +3,16 @@
 import { getPrivateEnv, getPublicEnv } from "./lib/env";
 
 function isString(value: unknown): value is string {
-  return typeof value === "string";
+  return typeof value === "string" && value.length > 0;
 }
 
 export function getEnvOrThrow(key: string): string {
+  // First try process.env directly for Docker environment
+  const dockerValue = process.env[key];
+  if (isString(dockerValue)) {
+    return dockerValue;
+  }
+
   const privateValue = getPrivateEnv(key);
   const publicValue = getPublicEnv(key);
 
