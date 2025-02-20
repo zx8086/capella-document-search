@@ -28,7 +28,6 @@ export const LOGS_ENDPOINT = process.env.LOGS_ENDPOINT;
 export const METRIC_READER_INTERVAL = process.env.METRIC_READER_INTERVAL;
 export const SUMMARY_LOG_INTERVAL = process.env.SUMMARY_LOG_INTERVAL;
 export const RAG_PIPELINE = process.env.RAG_PIPELINE;
-export const HUGGINGFACE_API_TOKEN = process.env.HUGGINGFACE_API_TOKEN;
 export const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 export const PINECONE_API_KEY = process.env.PINECONE_API_KEY;
 export const PINECONE_INDEX_NAME = process.env.PINECONE_INDEX_NAME;

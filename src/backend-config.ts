@@ -45,7 +45,6 @@ export function initializeBackendConfig(): BackendConfig {
     },
     rag: {
       RAG_PIPELINE: getEnvOrThrow("RAG_PIPELINE"),
-      HUGGINGFACE_API_TOKEN: getEnvOrThrow("HUGGINGFACE_API_TOKEN"),
       OPENAI_API_KEY: getEnvOrThrow("OPENAI_API_KEY"),
       PINECONE_API_KEY: getEnvOrThrow("PINECONE_API_KEY"),
       PINECONE_INDEX_NAME: getEnvOrThrow("PINECONE_INDEX_NAME"),

@@ -60,7 +60,6 @@ export interface AzureConfig {
 
 export interface RAGConfig {
   RAG_PIPELINE: string;
-  HUGGINGFACE_API_TOKEN: string;
   OPENAI_API_KEY: string;
   PINECONE_API_KEY: string;
   PINECONE_INDEX_NAME: string;

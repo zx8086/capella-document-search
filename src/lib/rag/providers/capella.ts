@@ -30,18 +30,31 @@ export class CapellaRAGProvider implements RAGProvider {
             try {
                 log('🔄 [Capella] Processing query:', { messageLength: message.length });
                 
-                const hf = new HfInference(backendConfig.rag.HUGGINGFACE_API_TOKEN);
+                // Enhanced embedding logging
+                log('🔤 [Capella] Generating embedding with OpenAI');
+                const embeddingResponse = await this.openai.embeddings.create({
+                    model: "text-embedding-3-large",
+                    input: message,
+                    encoding_format: "float",
+                    dimensions: 3072
+                });
                 
-                log('🔤 [Capella] Generating embedding');
-                const response = await hf.featureExtraction({
-                    model: "intfloat/e5-small-v2",
-                    inputs: message
+                const vector = embeddingResponse.data[0].embedding;
+                
+                // Log vector details
+                log('📊 [Capella] Embedding generated:', {
+                    vectorLength: vector.length,
+                    vectorSample: {
+                        first5: vector.slice(0, 5),
+                        last5: vector.slice(-5),
+                        min: Math.min(...vector),
+                        max: Math.max(...vector),
+                        avg: vector.reduce((a, b) => a + b, 0) / vector.length
+                    }
                 });
 
-                const vector = response;
-
                 // Query vector store using worker
-                log('🔍 [Capella] Querying vector store');
+                log('🔍 [Capella] Querying vector store with dimensions:', vector.length);
                 const queryResponse = await new Promise((resolve, reject) => {
                     if (!this.worker) {
                         reject(new Error('Worker not initialized'));
@@ -51,8 +64,13 @@ export class CapellaRAGProvider implements RAGProvider {
                     const messageHandler = (result: any) => {
                         this.worker!.removeListener('message', messageHandler);
                         if (result.success) {
+                            log('✅ [Capella] Vector search completed:', {
+                                resultCount: result.results?.length || 0,
+                                firstResult: result.results?.[0]?.score
+                            });
                             resolve(result.results || []);
                         } else {
+                            err('❌ [Capella] Vector search failed:', result.error);
                             reject(new Error(result.error));
                         }
                     };
@@ -88,7 +106,11 @@ export class CapellaRAGProvider implements RAGProvider {
 
                 return { stream, context };
             } catch (error) {
-                err('❌ [Capella] Error in pipeline:', error);
+                err('❌ [Capella] Error in pipeline:', {
+                    error: error.message,
+                    stack: error.stack,
+                    phase: 'embedding_generation'
+                });
                 throw error;
             }
         }, {

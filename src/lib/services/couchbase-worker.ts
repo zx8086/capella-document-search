@@ -1,9 +1,8 @@
 import { backendConfig } from "../../backend-config";
-import { connect } from "couchbase";
+import { connect, SearchRequest, VectorSearch, VectorQuery } from 'couchbase';
 import { parentPort } from "worker_threads";
 import { log, err } from "$utils/unifiedLogger";
 
-// Add connection management at the top
 let cluster: any = null;
 let isConnecting = false;
 const RECONNECT_DELAY = 5000;
@@ -34,24 +33,28 @@ async function getConnection() {
 }
 
 if (parentPort) {
-    parentPort.on("message", async (data) => {
+    parentPort.on("message", async (data: { vector: number[] }) => {
         try {
-            const indexName = "default._default.ragpdfindex";
-            
+            // Log the input vector (first few and last few dimensions)
+            log("📊 [Worker] Input vector sample:", {
+                length: data.vector.length,
+                first5: data.vector.slice(0, 5),
+                last5: data.vector.slice(-5),
+                min: Math.min(...data.vector),
+                max: Math.max(...data.vector),
+                avg: data.vector.reduce((a, b) => a + b, 0) / data.vector.length
+            });
+
             log("🔄 [Worker] Starting Couchbase connection with details:", {
                 url: backendConfig.capella.URL,
                 username: backendConfig.capella.USERNAME,
                 bucket: backendConfig.capella.BUCKET,
                 scope: backendConfig.capella.SCOPE,
                 collection: backendConfig.capella.COLLECTION,
-                indexName
+                indexName: backendConfig.capella.VECTOR_INDEX
             });
 
-            const cluster = await connect(backendConfig.capella.URL, {
-                username: backendConfig.capella.USERNAME,
-                password: backendConfig.capella.PASSWORD,
-            });
-
+            const cluster = await getConnection();
             log("✅ [Worker] Connected to Couchbase");
 
             // Verify vector dimensions
@@ -60,23 +63,18 @@ if (parentPort) {
                 expected: 4096
             });
 
-            // if (data.vector.length !== 4096) {
-            //     throw new Error(`Invalid vector dimensions. Expected 4096, got ${data.vector.length}`);
-            // }
-
-            const searchQuery = {
-                fields: ["*"],
-                knn: [{
-                    field: "vectors",
-                    k: 5,
-                    vector: data.vector
-                }]
-            };
+            // Create vector search request
+            const request = SearchRequest.create(
+                VectorSearch.fromVectorQuery(
+                    VectorQuery.create('vectors', data.vector)
+                        .numCandidates(5)
+                )
+            );
 
             log("🔍 [Worker] Executing vector search with query:", {
-                indexName,
-                queryFields: searchQuery.fields,
-                vectorField: searchQuery.knn[0].field,
+                indexName: backendConfig.capella.VECTOR_INDEX,
+                vectorField: 'vectors',
+                numCandidates: 5,
                 vectorLength: data.vector.length
             });
 
@@ -89,8 +87,8 @@ if (parentPort) {
             })));
 
             const result = await cluster.searchQuery(
-                indexName,
-                searchQuery,
+                backendConfig.capella.VECTOR_INDEX,
+                request,
                 { timeout: 10000 }
             );
 
@@ -111,16 +109,20 @@ if (parentPort) {
             }
 
             log(`✅ [Worker] Search complete, found ${rows.length} results`);
-            parentPort.postMessage({ success: true, results: rows });
-            await cluster.close();
-        } catch (error) {
+            if (parentPort) {
+                parentPort.postMessage({ success: true, results: rows });
+            }
+            
+        } catch (error: any) { // Type the error
             err("❌ [Worker] Error:", {
-                message: error.message,
-                code: error.code,
-                stack: error.stack,
-                type: error.constructor.name
+                message: error?.message,
+                code: error?.code,
+                stack: error?.stack,
+                type: error?.constructor?.name
             });
-            parentPort.postMessage({ success: false, error: error.message });
+            if (parentPort) {
+                parentPort.postMessage({ success: false, error: error?.message });
+            }
         }
     });
 }
