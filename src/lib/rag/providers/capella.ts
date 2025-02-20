@@ -34,7 +34,7 @@ export class CapellaRAGProvider implements RAGProvider {
                 
                 log('🔤 [Capella] Generating embedding');
                 const response = await hf.featureExtraction({
-                    model: "intfloat/e5-mistral-7b-instruct",
+                    model: "intfloat/e5-small-v2",
                     inputs: message
                 });
 
@@ -101,7 +101,7 @@ export class CapellaRAGProvider implements RAGProvider {
         });
         
         try {
-            return this.traceablePipeline(message, {
+            const result = await this.traceablePipeline(message, {
                 metadata,
                 tags: [
                     "rag-query",
@@ -112,8 +112,20 @@ export class CapellaRAGProvider implements RAGProvider {
                     dev ? 'development' : 'production'
                 ]
             });
+
+            // Add metrics to the trace
+            if (result.metrics) {
+                log('📊 [CapellaProvider] Search metrics:', result.metrics);
+            }
+
+            return result;
         } catch (error) {
             err('❌ [CapellaProvider] Query error:', error);
+            // Enhance error handling based on worker response
+            if (error.retryable) {
+                // Implement retry logic if needed
+                log('🔄 [CapellaProvider] Error is retryable');
+            }
             throw error;
         }
     }
