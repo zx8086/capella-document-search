@@ -25,9 +25,9 @@ if (parentPort) {
             log("✅ [Worker] Connected to Couchbase");
 
             // Verify vector dimensions
-            // if (data.vector.length !== 4096) {
-            //     throw new Error(`Invalid vector dimensions. Expected 4096, got ${data.vector.length}`);
-            // }
+            if (data.vector.length !== 4096) {
+                throw new Error(`Invalid vector dimensions. Expected 4096, got ${data.vector.length}`);
+            }
 
             const searchQuery = {
                 fields: ["*"],

@@ -6,6 +6,7 @@ import { createRAGProvider } from '$lib/rag/factory';
 import type { RAGMetadata } from '$lib/rag/types';
 import { verifyRAGSetup } from '$lib/rag/verify';
 import { log, err } from '$utils/unifiedLogger';
+import { dev } from '$app/environment';
 
 // Initialize provider lazily
 let ragProvider: any = null;
@@ -51,7 +52,7 @@ export const POST: RequestHandler = async ({ fetch, request }) => {
             isAuthenticated: user?.isAuthenticated || false,
 
             // Environment & Context
-            environment: import.meta.env.DEV ? 'development' : 'production',
+            environment: dev ? 'development' : 'production',
             pathname: user?.pathname || 'unknown',
             
             // Session Information

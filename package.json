@@ -63,6 +63,7 @@
     "@azure/msal-node": "^3.0.1",
     "@elastic/apm-rum": "^5.16.3",
     "@elastic/ecs-winston-format": "^1.5.3",
+    "@huggingface/hub": "^1.0.1",
     "@huggingface/inference": "^3.3.5",
     "@langchain/community": "^0.3.31",
     "@langchain/core": "^0.3.39",
