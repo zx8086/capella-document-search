@@ -1,26 +1,24 @@
 <!-- src/routes/api/health-check/+page.svelte -->
 
 <script lang="ts">
-    import { featureFlags, flagsStatus, useFeatureFlags } from '$lib/stores/featureFlagStore';
+    import { client } from '$lib/featureFlags';
     import { onMount } from "svelte";
     import type { PageData } from './$types';
     import { goto } from '$app/navigation';
     import { navigating } from '$app/stores';
     import { writable } from 'svelte/store';
     
-    const { flags, getFlag } = useFeatureFlags();
     const { data } = $props<{ data: PageData }>();
     
     let healthStatus = $state(data.healthStatus);
     let error = $state("");
     let checkType: "Simple" | "Detailed" = $state(data.checkType);
     let loading = $state(false);
-    let loadingType = $state(data.checkType);  // Initialize with data.checkType instead
-    
-    let showBuildInfo = $derived(getFlag('build-information'));
+    let loadingType = $state(data.checkType);
+    let showBuildInfo = $state(false);
 
-    onMount(() => {
-        featureFlags.initialize();
+    onMount(async () => {
+        showBuildInfo = await client.getBooleanValue('build-information', false);
     });
 
     async function toggleCheckType() {

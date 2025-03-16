@@ -53,7 +53,9 @@ export default defineConfig(({ mode }): UserConfig => {
           '$app': './.svelte-kit/runtime/app',
           '$app/environment': './.svelte-kit/runtime/app/environment',
           '$app/navigation': './.svelte-kit/runtime/app/navigation',
-          '$app/stores': './.svelte-kit/runtime/app/stores'
+          '$app/stores': './.svelte-kit/runtime/app/stores',
+          'node:events': 'events',
+          events: 'events-browserify'
         }
       },
       server: {
@@ -104,7 +106,11 @@ export default defineConfig(({ mode }): UserConfig => {
         }
       },
       ssr: {
-        noExternal: ["@apollo/client", "@openreplay/tracker"],
+        noExternal: [
+          '@openfeature/web-sdk',
+          '@growthbook/growthbook',
+          '@openfeature/growthbook-provider'
+        ],
         external: ['bun:sqlite']
       },
       build: {
@@ -123,10 +129,16 @@ export default defineConfig(({ mode }): UserConfig => {
         },
         target: "esnext",
         sourcemap: false,
+        commonjsOptions: {
+          include: [/@openfeature\/.*/, /@growthbook\/.*/],
+          transformMixedEsModules: true
+        }
       },
       optimizeDeps: {
-        exclude: enableOpenTelemetry ? ["src/utils/serverLogger"] : [],
         include: [
+          '@openfeature/web-sdk',
+          '@growthbook/growthbook',
+          '@openfeature/growthbook-provider',
           'svelte',
           'svelte/internal',
           'svelte/store',
@@ -134,6 +146,10 @@ export default defineConfig(({ mode }): UserConfig => {
           'bits-ui',
           'tailwind-merge'
         ],
+        exclude: [
+          'node:events',
+          ...(enableOpenTelemetry ? ["src/utils/serverLogger"] : [])
+        ]
       },
       define: {
         ...publicEnvVars,

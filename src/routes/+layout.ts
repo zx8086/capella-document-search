@@ -5,14 +5,23 @@ import type { LayoutLoad } from './$types';
 import { browser } from '$app/environment';
 import { redirect } from '@sveltejs/kit';
 import { initDebugTools } from '$lib/utils/debugUtils';
+import { featureFlags } from '$lib/stores/featureFlagStore';
 
 export const load: LayoutLoad = async ({ url }) => {
-    if (!browser) return {};
-
     const publicPaths = ['/login'];
     const isPublicPath = publicPaths.some(path => url.pathname.startsWith(path));
 
     try {
+        // Initialize feature flags only in browser
+        if (browser) {
+            try {
+                await featureFlags.initialize();
+            } catch (error) {
+                console.warn('Feature flags initialization failed:', error);
+                // Don't block the app if feature flags fail
+            }
+        }
+
         // Initialize auth state
         await auth.initialize();
         const isUserAuthenticated = auth.checkAuth();
@@ -27,9 +36,11 @@ export const load: LayoutLoad = async ({ url }) => {
             throw redirect(307, '/login');
         }
 
-        return {};
+        return {
+            featureFlags: browser ? true : false // Indicate if feature flags are available
+        };
     } catch (error) {
-        if (error.status === 307) {
+        if (error instanceof Error && error.message.includes('redirect')) {
             throw error;
         }
         console.error('Layout load error:', error);
@@ -37,7 +48,6 @@ export const load: LayoutLoad = async ({ url }) => {
         throw redirect(307, '/login');
     }
 };
-
 // Only initialize debug tools in browser and development
 if (browser && import.meta.env.DEV) {
     initDebugTools();

@@ -19,4 +19,9 @@ export const envSchema = {
     TENANT_ID: "PUBLIC_AZURE_TENANT_ID",
     REDIRECT_URI: "PUBLIC_AZURE_REDIRECT_URI",
   },
+  growthbook: {
+    apiHost: "PUBLIC_GROWTHBOOK_API_HOST",
+    clientKey: "PUBLIC_GROWTHBOOK_CLIENT_KEY",
+    encryptionKey: "PUBIC_GROWTHBOOK_ENCRYPTION_KEY"
+  },
 } as const;

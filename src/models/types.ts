@@ -66,6 +66,12 @@ export interface RAGConfig {
   PINECONE_NAMESPACE: string;
 }
 
+export interface GrowthBookConfig {
+  apiHost: string;
+  clientKey: string;
+  encryptionKey: string;
+}
+
 export interface BackendConfig {
   application: ApplicationConfig;
   capella: CapellaConfig;
@@ -78,4 +84,5 @@ export interface FrontendConfig {
   csv: CSVConfig;
   elasticApm: ElasticApmConfig;
   azure: AzureConfig;
+  growthbook: GrowthBookConfig;
 }

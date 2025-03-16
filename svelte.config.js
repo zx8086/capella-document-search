@@ -64,6 +64,9 @@ const config = {
           // Add these new entries for metadata/logging
           "https://*.openreplay.com",
           "https://openreplay.prd.shared-services.eu.pvh.cloud/*",
+          // GrowthBook required endpoints
+          "https://cdn.growthbook.io",
+          "https://*.growthbook.io",
           // Other necessary endpoints
           "https://capella-document-search.prd.shared-services.eu.pvh.cloud",
           "https://login.microsoftonline.com",

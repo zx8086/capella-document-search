@@ -23,6 +23,11 @@ export const frontendConfig: FrontendConfig = {
     CLIENT_ID: env[envSchema.azure.CLIENT_ID],
     TENANT_ID: env[envSchema.azure.TENANT_ID],
     REDIRECT_URI: env[envSchema.azure.REDIRECT_URI],
+  },
+  growthbook: {
+    apiHost: env[envSchema.growthbook.apiHost],
+    clientKey: env[envSchema.growthbook.clientKey],
+    encryptionKey: env[envSchema.growthbook.encryptionKey]
   }
 } as const;
 
