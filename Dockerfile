@@ -31,6 +31,14 @@ RUN NODE_ENV=${NODE_ENV} \
     bun run svelte-kit sync && \
     bun run build:no-telemetry
 
+# Add a patch step after dependencies are installed
+RUN --mount=type=cache,target=/root/.bun/install/cache \
+    bun install --frozen-lockfile && \
+    mkdir -p /app/patches && \
+    # Create patch file for webrtc-adapter
+    echo 'const sdp = require("sdp/sdp.js"); export default sdp;' > /app/patches/sdp-fix.js && \
+    sed -i 's/import SDPUtils from .sdp.;/import SDPUtils from "..\/..\/..\/patches\/sdp-fix.js";/' /app/node_modules/webrtc-adapter/src/js/common_shim.js
+
 # Production image
 FROM oven/bun:canary-alpine
 
