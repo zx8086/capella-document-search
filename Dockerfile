@@ -14,6 +14,7 @@ ENV BUILD_VERSION=${BUILD_VERSION}
 ENV COMMIT_HASH=${COMMIT_HASH}
 ENV BUILD_DATE=${BUILD_DATE}
 ENV NODE_ENV=${NODE_ENV}
+ENV VITE_DISABLE_OPENREPLAY=true
 
 WORKDIR /app
 
@@ -21,6 +22,15 @@ WORKDIR /app
 COPY package.json ./
 RUN --mount=type=cache,target=/root/.bun/install/cache \
     bun install --frozen-lockfile
+
+# Patch problematic packages
+RUN mkdir -p /app/patches && \
+    # Create patch files for problematic imports
+    echo 'const sdp = require("sdp/sdp.js"); module.exports = sdp;' > /app/patches/sdp-fix.js && \
+    echo 'const zenObservable = require("zen-observable"); module.exports = zenObservable;' > /app/patches/zen-observable-fix.js && \
+    # Apply patches
+    find /app/node_modules -name "common_shim.js" -exec sed -i 's/import SDPUtils from .sdp.;/import SDPUtils from "..\/..\/..\/patches\/sdp-fix.js";/' {} \; && \
+    find /app/node_modules -name "apolloMiddleware.js" -exec sed -i 's/import Observable from .zen-observable.;/import Observable from "..\/..\/..\/patches\/zen-observable-fix.js";/' {} \;
 
 # Copy all files after dependency installation
 COPY . .
@@ -30,14 +40,6 @@ COPY bunfig.build.toml bunfig.toml
 RUN NODE_ENV=${NODE_ENV} \
     bun run svelte-kit sync && \
     bun run build:no-telemetry
-
-# Add a patch step after dependencies are installed
-RUN --mount=type=cache,target=/root/.bun/install/cache \
-    bun install --frozen-lockfile && \
-    mkdir -p /app/patches && \
-    # Create patch file for webrtc-adapter
-    echo 'const sdp = require("sdp/sdp.js"); export default sdp;' > /app/patches/sdp-fix.js && \
-    sed -i 's/import SDPUtils from .sdp.;/import SDPUtils from "..\/..\/..\/patches\/sdp-fix.js";/' /app/node_modules/webrtc-adapter/src/js/common_shim.js
 
 # Production image
 FROM oven/bun:canary-alpine
