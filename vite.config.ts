@@ -56,8 +56,12 @@ export default defineConfig(({ mode }): UserConfig => {
           '$app/stores': './.svelte-kit/runtime/app/stores',
           'node:events': 'events',
           events: 'events-browserify',
-          'sdp': 'sdp/sdp.js'
-        }
+          'sdp': 'sdp/sdp.js',
+          // Add zen-observable alias to handle default export
+          'zen-observable': path.resolve('./node_modules/zen-observable/index.js')
+        },
+        // Add main fields to improve module resolution
+        mainFields: ['module', 'jsnext:main', 'jsnext', 'browser', 'main']
       },
       server: {
         fs: {
@@ -126,13 +130,30 @@ export default defineConfig(({ mode }): UserConfig => {
                   "@opentelemetry/winston-transport",
                 ]
               : [])
-          ]
+          ],
+          // Add output options to make module interop less strict
+          output: {
+            interop: 'auto',
+            esModule: true,
+            strict: false
+          }
         },
         target: "esnext",
         sourcemap: false,
         commonjsOptions: {
-          include: [/@openfeature\/.*/, /@growthbook\/.*/],
-          transformMixedEsModules: true
+          // Update to include problematic packages
+          include: [
+            /@openfeature\/.*/,
+            /@growthbook\/.*/,
+            /@openreplay\/.*/,
+            /zen-observable/,
+            /sdp/,
+            /webrtc-adapter/,
+            /node_modules/
+          ],
+          transformMixedEsModules: true,
+          // Add this key option to make default exports work
+          defaultIsModuleExports: true
         }
       },
       optimizeDeps: {
@@ -149,6 +170,10 @@ export default defineConfig(({ mode }): UserConfig => {
         ],
         exclude: [
           'node:events',
+          // Add problematic packages to exclude from pre-bundling
+          '@openreplay/tracker-assist',
+          '@openreplay/tracker-graphql',
+          'webrtc-adapter',
           ...(enableOpenTelemetry ? ["src/utils/serverLogger"] : [])
         ],
         esbuildOptions: {
@@ -158,6 +183,16 @@ export default defineConfig(({ mode }): UserConfig => {
               setup(build) {
                 build.onResolve({ filter: /^sdp$/ }, args => {
                   return { path: 'sdp/sdp.js', namespace: 'file' };
+                });
+              }
+            },
+            // Add zen-observable resolver
+            {
+              name: 'zen-observable-resolver',
+              setup(build) {
+                build.onResolve({ filter: /^zen-observable$/ }, args => {
+                  // Make this module work with default import
+                  return { path: path.resolve('./node_modules/zen-observable/index.js'), namespace: 'file' };
                 });
               }
             }
