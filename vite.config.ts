@@ -55,7 +55,8 @@ export default defineConfig(({ mode }): UserConfig => {
           '$app/navigation': './.svelte-kit/runtime/app/navigation',
           '$app/stores': './.svelte-kit/runtime/app/stores',
           'node:events': 'events',
-          events: 'events-browserify'
+          events: 'events-browserify',
+          'sdp': 'sdp/sdp.js'
         }
       },
       server: {
@@ -149,7 +150,19 @@ export default defineConfig(({ mode }): UserConfig => {
         exclude: [
           'node:events',
           ...(enableOpenTelemetry ? ["src/utils/serverLogger"] : [])
-        ]
+        ],
+        esbuildOptions: {
+          plugins: [
+            {
+              name: 'sdp-resolver',
+              setup(build) {
+                build.onResolve({ filter: /^sdp$/ }, args => {
+                  return { path: 'sdp/sdp.js', namespace: 'file' };
+                });
+              }
+            }
+          ]
+        }
       },
       define: {
         ...publicEnvVars,
