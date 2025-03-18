@@ -4,9 +4,12 @@ import { browser } from '$app/environment';
 import { GrowthBook } from '@growthbook/growthbook';
 import { writable } from 'svelte/store';
 import { frontendConfig } from "$frontendConfig";
+import { OpenFeature } from '@openfeature/web-sdk';
+import { GrowthBookProvider } from './openfeature/GrowthBookProvider';
 
 let client;
-let gb: GrowthBook;
+export let gb: GrowthBook;
+let openFeatureClient;
 
 const initializeFeatureFlags = async () => {
     if (!browser) return;
@@ -26,9 +29,15 @@ const initializeFeatureFlags = async () => {
         // Wait for features to load
         await gb.loadFeatures();
 
+        // Initialize OpenFeature with our GrowthBook instance
+        const provider = new GrowthBookProvider(gb);
+        await OpenFeature.setProviderAndWait(provider);
+        openFeatureClient = OpenFeature.getClient();
+
         // Create a client interface that matches our existing usage
         client = {
             getBooleanValue: async (key: string, defaultValue: boolean) => {
+                // Use GrowthBook directly to maintain existing behavior
                 return gb.isOn(key) ?? defaultValue;
             }
         };
@@ -59,13 +68,19 @@ export async function checkFeatureFlag(flagName: string, defaultValue: boolean =
     if (!browser || !client) return defaultValue;
     
     try {
+        // Continue using the existing client for now
         return await client.getBooleanValue(flagName, defaultValue);
+        
+        // TODO: Once OpenFeature is proven stable, switch to:
+        // return await openFeatureClient.getBooleanValue(flagName, defaultValue);
     } catch (error) {
         console.warn(`Failed to check feature flag ${flagName}:`, error);
         return defaultValue;
     }
 }
 
-export { client, gb }; // Export gb instance if needed elsewhere
+// Export OpenFeature client for future use
+export const getOpenFeatureClient = () => openFeatureClient;
 
-export const featureUpdates = writable(0); 
+export { client };
+export const featureUpdates = writable(0);
