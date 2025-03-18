@@ -1,0 +1,22 @@
+type Query {
+  searchDocuments(collections: [BucketScopeCollection!]!, keys: [String!]!): [SearchResult!]!
+}
+
+type SearchResult {
+  bucket: String!
+  scope: String!
+  collection: String!
+  data: JSON
+  timeTaken: Float!
+}
+
+input BucketScopeCollection {
+  bucket: String!
+  scope: String!
+  collection: String!
+}
+
+scalar JSON
+
+# This is a placeholder schema - you may need to expand it
+# based on the actual GraphQL API you're connecting to

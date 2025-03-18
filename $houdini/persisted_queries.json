@@ -1,0 +1,3 @@
+{
+    "c7b95fedd6f823a1aa7574be84db3b96a08116f59a19b5a882a8578365c7e5b3": "query SearchDocuments($collections: [BucketScopeCollection!]!, $keys: [String!]!) {\n  searchDocuments(collections: $collections, keys: $keys) {\n    bucket\n    scope\n    collection\n    data\n    timeTaken\n  }\n}\n"
+}
