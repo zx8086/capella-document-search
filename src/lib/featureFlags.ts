@@ -47,7 +47,7 @@ const initializeFeatureFlags = async () => {
             setInterval(() => {
                 gb.refreshFeatures();
                 console.log('Features refreshed from GrowthBook');
-            }, 10000);
+            }, 600000);
         }
 
     } catch (error) {

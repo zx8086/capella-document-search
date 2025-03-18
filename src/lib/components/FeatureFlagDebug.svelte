@@ -44,7 +44,7 @@
     onMount(async () => {
         await checkAllFlags();
         // Set up periodic refresh
-        const interval = setInterval(checkAllFlags, 10000);
+        const interval = setInterval(checkAllFlags, 6000000); // 10 minutes
         return () => clearInterval(interval);
     });
 </script>
