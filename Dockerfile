@@ -23,17 +23,51 @@ COPY package.json ./
 RUN --mount=type=cache,target=/root/.bun/install/cache \
     bun install --frozen-lockfile
 
-# Patch problematic packages
+# More explicit patching with debug output
 RUN mkdir -p /app/patches && \
     # Create patch files for problematic imports
     echo 'const sdp = require("sdp/sdp.js"); module.exports = sdp;' > /app/patches/sdp-fix.js && \
     echo 'const zenObservable = require("zen-observable"); module.exports = zenObservable;' > /app/patches/zen-observable-fix.js && \
-    # Apply patches
-    find /app/node_modules -name "common_shim.js" -exec sed -i 's/import SDPUtils from .sdp.;/import SDPUtils from "..\/..\/..\/patches\/sdp-fix.js";/' {} \; && \
-    find /app/node_modules -name "apolloMiddleware.js" -exec sed -i 's/import Observable from .zen-observable.;/import Observable from "..\/..\/..\/patches\/zen-observable-fix.js";/' {} \;
+    # Debug - locate the files
+    echo "Looking for files to patch..." && \
+    find /app/node_modules -path "*webrtc-adapter*/*common_shim.js" && \
+    find /app/node_modules -path "*openreplay/tracker-graphql*/*apolloMiddleware.js" && \
+    # Direct patching with explicit paths
+    if [ -f /app/node_modules/webrtc-adapter/src/js/common_shim.js ]; then \
+      echo "Patching webrtc-adapter..." && \
+      sed -i 's|import SDPUtils from .sdp.;|import SDPUtils from "../../../patches/sdp-fix.js";|' /app/node_modules/webrtc-adapter/src/js/common_shim.js && \
+      cat /app/node_modules/webrtc-adapter/src/js/common_shim.js | grep -A 2 "import SDPUtils"; \
+    fi && \
+    if [ -f /app/node_modules/@openreplay/tracker-graphql/lib/apolloMiddleware.js ]; then \
+      echo "Patching openreplay tracker-graphql..." && \
+      sed -i 's|import Observable from .zen-observable.;|import Observable from "../../../patches/zen-observable-fix.js";|' /app/node_modules/@openreplay/tracker-graphql/lib/apolloMiddleware.js && \
+      cat /app/node_modules/@openreplay/tracker-graphql/lib/apolloMiddleware.js | grep -A 2 "import Observable"; \
+    fi
 
 # Copy all files after dependency installation
 COPY . .
+
+# Create a temporary vite configuration to add resolver for zen-observable
+RUN echo "import { defineConfig } from 'vite'; \
+    import { sveltekit } from '@sveltejs/kit/vite'; \
+    export default defineConfig({ \
+      plugins: [ \
+        sveltekit(), \
+        { \
+          name: 'zen-observable-resolver', \
+          resolveId(id) { \
+            if (id === 'zen-observable') { \
+              return { id: '/app/patches/zen-observable-fix.js', external: false }; \
+            } \
+          } \
+        } \
+      ] \
+    });" > /app/vite.config.js
+
+# Create more direct patch for the zen-observable module
+RUN echo "// Create direct patch for zen-observable" && \
+    sed -i 's/module.exports = zenObservable;/module.exports = zenObservable; module.exports.default = zenObservable;/' /app/patches/zen-observable-fix.js && \
+    cat /app/patches/zen-observable-fix.js
 
 # Build the application
 COPY bunfig.build.toml bunfig.toml
