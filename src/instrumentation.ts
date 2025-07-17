@@ -3,7 +3,7 @@
 import { debug, log, warn, err } from "./utils/browserLogger";
 import { trace, context } from "@opentelemetry/api";
 
-log("Starting Application - Couchbase Capella GraphQL API Service");
+log("Starting Application - Couchbase Capella Document Search Application");
 
 import {
   diag,
@@ -45,7 +45,7 @@ import { backendConfig } from "./backend-config";
 log("Staring Instrumentation............");
 
 const INSTRUMENTATION_ENABLED =
-  (Bun.env["ENABLE_OPENTELEMETRY"] as string) === "true" && 
+  (Bun.env["ENABLE_OPENTELEMETRY"] as string) === "true" &&
   Bun.env["DISABLE_OPENTELEMETRY"] !== "true";
 
 log("OpenTelemetry Instrumentation Status", { INSTRUMENTATION_ENABLED });

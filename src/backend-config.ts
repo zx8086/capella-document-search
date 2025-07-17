@@ -49,6 +49,12 @@ export function initializeBackendConfig(): BackendConfig {
       PINECONE_API_KEY: getEnvOrThrow("PINECONE_API_KEY"),
       PINECONE_INDEX_NAME: getEnvOrThrow("PINECONE_INDEX_NAME"),
       PINECONE_NAMESPACE: getEnvOrThrow("PINECONE_NAMESPACE"),
+      AWS_REGION: getEnvOrThrow("AWS_REGION"),
+      AWS_ACCESS_KEY_ID: getEnvOrThrow("AWS_ACCESS_KEY_ID"),
+      AWS_SECRET_ACCESS_KEY: getEnvOrThrow("AWS_SECRET_ACCESS_KEY"),
+      AWS_BEARER_TOKEN_BEDROCK: getEnvOrThrow("AWS_BEARER_TOKEN_BEDROCK"),
+      BEDROCK_EMBEDDING_MODEL: getEnvOrThrow("BEDROCK_EMBEDDING_MODEL"),
+      BEDROCK_CHAT_MODEL: getEnvOrThrow("BEDROCK_CHAT_MODEL"),
     },
   };
 

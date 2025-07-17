@@ -1,18 +1,22 @@
 /* src/lib/rag/providers/pinecone.ts */
 
 import { Pinecone } from "@pinecone-database/pinecone";
-import OpenAI from 'openai';
 import type { RAGProvider, RAGResponse, RAGMetadata } from '../types';
 import { traceable } from "langsmith/traceable";
+import { BedrockEmbeddingService } from '../../services/bedrock-embedding';
+import { BedrockChatService } from '../../services/bedrock-chat';
+import { backendConfig } from '../../../backend-config';
 
 export class PineconeRAGProvider implements RAGProvider {
-    private openai: OpenAI;
+    private embeddingService: BedrockEmbeddingService;
+    private chatService: BedrockChatService;
     private pinecone: Pinecone;
     private traceablePipeline: any;
 
-    constructor(openai: OpenAI) {
+    constructor() {
         console.log('🎯 [PineconeProvider] Constructor called');
-        this.openai = openai;
+        this.embeddingService = new BedrockEmbeddingService(backendConfig.rag.AWS_REGION);
+        this.chatService = new BedrockChatService(backendConfig.rag.AWS_REGION);
     }
 
     async initialize() {
@@ -35,15 +39,12 @@ export class PineconeRAGProvider implements RAGProvider {
             const index = this.pinecone.index(Bun.env.PINECONE_INDEX_NAME as string)
                 .namespace(Bun.env.PINECONE_NAMESPACE as string);
 
-            console.log('🔤 [Pinecone] Generating embedding');
-            const embeddingResponse = await this.openai.embeddings.create({
-                model: "text-embedding-ada-002",
-                input: message
-            });
+            console.log('🔤 [Pinecone] Generating embedding with Bedrock');
+            const embedding = await this.embeddingService.createEmbedding(message);
 
             console.log('🔍 [Pinecone] Querying vector store');
             const queryResponse = await index.query({
-                vector: embeddingResponse.data[0].embedding,
+                vector: embedding,
                 topK: 3,
                 includeMetadata: true
             });
@@ -56,26 +57,26 @@ export class PineconeRAGProvider implements RAGProvider {
             const context = queryResponse.matches
                 ?.map(match => ({
                     text: match.metadata?.text,
-                    filename: match.metadata?.filename || 'Unknown source'
+                    filename: match.metadata?.filename || 'Unknown source',
+                    pageNumber: match.metadata?.page || match.metadata?.pageNumber || match.metadata?.page_number || match.metadata?.pageNum,
+                    chunkIndex: match.metadata?.chunkIndex || match.metadata?.chunk || match.metadata?.chunk_index || match.metadata?.index,
+                    metadata: match.metadata
                 }))
                 .filter(item => item.text);
 
-            // Generate completion
-            const stream = await this.openai.chat.completions.create({
-                model: "gpt-4-turbo-preview",
-                messages: [
-                    {
-                        role: "system",
-                        content: "You are a helpful assistant. Use the following context to answer the user's question. Always end your response with '\n\nReferences:' followed by the source filenames. If you cannot answer the question based on the context, say so."
-                    },
-                    {
-                        role: "user",
-                        content: `Context: ${context?.map(c => c.text).join('\n\n---\n\n')}\n\nSource files: ${context?.map(c => c.filename).join(', ')}\n\nQuestion: ${message}`
-                    }
-                ],
+            // Generate completion using Bedrock
+            const stream = await this.chatService.createChatCompletion([
+                {
+                    role: "system",
+                    content: "You are a helpful assistant. Use the following context to answer the user's question. Do not include references in your response as they will be added automatically. If you cannot answer the question based on the context, say so."
+                },
+                {
+                    role: "user",
+                    content: `Context: ${context?.map(c => c.text).join('\n\n---\n\n')}\n\nQuestion: ${message}`
+                }
+            ], {
                 temperature: 0.7,
-                max_tokens: 2000,
-                stream: true
+                max_tokens: 2000
             });
 
             return { stream, context };

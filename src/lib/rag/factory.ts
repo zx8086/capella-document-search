@@ -3,8 +3,6 @@
 import type { RAGProvider } from './types';
 import { PineconeRAGProvider } from './providers/pinecone';
 import { VectorizeRAGProvider } from './providers/vectorize';
-import OpenAI from 'openai';
-import { wrapOpenAI } from "langsmith/wrappers";
 import { CapellaRAGProvider } from './providers/capella';
 
 export function createRAGProvider(fetch: typeof fetch): RAGProvider {
@@ -23,25 +21,20 @@ export function createRAGProvider(fetch: typeof fetch): RAGProvider {
         timestamp: new Date().toISOString()
     });
     
-    // Initialize OpenAI with LangSmith tracing
-    const openai = wrapOpenAI(new OpenAI({
-        apiKey: Bun.env.OPENAI_API_KEY
-    }));
-    
     let provider: RAGProvider;
     
     switch (pipeline) {
         case 'PINECONE':
             console.log('📌 [RAG Factory] Creating Pinecone provider instance');
-            provider = new PineconeRAGProvider(openai);
+            provider = new PineconeRAGProvider();
             break;
         case 'VECTORIZE':
             console.log('🔍 [RAG Factory] Creating Vectorize provider instance');
-            provider = new VectorizeRAGProvider(openai);
+            provider = new VectorizeRAGProvider();
             break;
         case 'CAPELLA':
             console.log('🔍 [RAG Factory] Creating Capella provider instance');
-            provider = new CapellaRAGProvider(openai, fetch);
+            provider = new CapellaRAGProvider();
             break;
         default:
             console.error('❌ [RAG Factory] Unsupported pipeline:', pipeline);

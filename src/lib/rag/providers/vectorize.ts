@@ -1,15 +1,19 @@
 /* src/lib/rag/providers/vectorize.ts */
 
-import OpenAI from 'openai';
 import type { RAGProvider, RAGResponse, RAGMetadata } from '../types';
 import { traceable } from "langsmith/traceable";
+import { BedrockEmbeddingService } from '../../services/bedrock-embedding';
+import { BedrockChatService } from '../../services/bedrock-chat';
+import { backendConfig } from '../../../backend-config';
 
 export class VectorizeRAGProvider implements RAGProvider {
-    private openai: OpenAI;
+    private embeddingService: BedrockEmbeddingService;
+    private chatService: BedrockChatService;
     private traceablePipeline: any;
 
-    constructor(openai: OpenAI) {
-        this.openai = openai;
+    constructor() {
+        this.embeddingService = new BedrockEmbeddingService(backendConfig.rag.AWS_REGION);
+        this.chatService = new BedrockChatService(backendConfig.rag.AWS_REGION);
     }
 
     async initialize() {
@@ -18,12 +22,9 @@ export class VectorizeRAGProvider implements RAGProvider {
 
         // Create traced pipeline
         this.traceablePipeline = traceable(async (message: string) => {
-            // Generate embedding using OpenAI (same as Pinecone)
+            // Generate embedding using Bedrock
             console.log('🔄 Generating embedding...');
-            const embeddingResponse = await this.openai.embeddings.create({
-                model: "text-embedding-ada-002",
-                input: message
-            });
+            const embedding = await this.embeddingService.createEmbedding(message);
 
             // Mock Vectorize query
             // In reality, this would be your Vectorize-specific implementation
@@ -55,22 +56,19 @@ export class VectorizeRAGProvider implements RAGProvider {
                 }))
                 .filter(item => item.text);
 
-            // Generate completion (same as Pinecone)
-            const stream = await this.openai.chat.completions.create({
-                model: "gpt-4-turbo-preview",
-                messages: [
-                    {
-                        role: "system",
-                        content: "You are a helpful assistant. Use the following context to answer the user's question. Always end your response with '\n\nReferences:' followed by the source filenames. If you cannot answer the question based on the context, say so."
-                    },
-                    {
-                        role: "user",
-                        content: `Context: ${context?.map(c => c.text).join('\n\n---\n\n')}\n\nSource files: ${context?.map(c => c.filename).join(', ')}\n\nQuestion: ${message}`
-                    }
-                ],
+            // Generate completion using Bedrock
+            const stream = await this.chatService.createChatCompletion([
+                {
+                    role: "system",
+                    content: "You are a helpful assistant. Use the following context to answer the user's question. Always end your response with '\n\nReferences:' followed by the source filenames. If you cannot answer the question based on the context, say so."
+                },
+                {
+                    role: "user",
+                    content: `Context: ${context?.map(c => c.text).join('\n\n---\n\n')}\n\nSource files: ${context?.map(c => c.filename).join(', ')}\n\nQuestion: ${message}`
+                }
+            ], {
                 temperature: 0.7,
-                max_tokens: 2000,
-                stream: true
+                max_tokens: 2000
             });
 
             return { stream, context };
