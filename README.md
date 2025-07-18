@@ -91,7 +91,6 @@ The application includes several security features:
 - Authentication middleware
 - Security headers
 - Protected routes
-- DNS prefetching for authenticated endpoints
 
 ## 📊 Monitoring & Observability
 

@@ -11,13 +11,24 @@ export class BedrockEmbeddingService {
   private modelId: string;
 
   constructor(region: string = "eu-central-1") {
+    // Build credentials object safely
+    const credentials: any = {
+      accessKeyId: Bun.env.AWS_ACCESS_KEY_ID || "DUMMY",
+      secretAccessKey: Bun.env.AWS_SECRET_ACCESS_KEY || "DUMMY",
+    };
+    
+    // Only add sessionToken if it exists and is not empty
+    if (Bun.env.AWS_BEARER_TOKEN_BEDROCK && Bun.env.AWS_BEARER_TOKEN_BEDROCK.trim()) {
+      credentials.sessionToken = Bun.env.AWS_BEARER_TOKEN_BEDROCK;
+    }
+    
     this.client = new BedrockRuntimeClient({
       region,
-      credentials: {
-        accessKeyId: Bun.env.AWS_ACCESS_KEY_ID || "DUMMY",
-        secretAccessKey: Bun.env.AWS_SECRET_ACCESS_KEY || "DUMMY",
-        sessionToken: Bun.env.AWS_BEARER_TOKEN_BEDROCK,
-      },
+      credentials,
+      // Use maxAttempts to handle transient network issues
+      maxAttempts: 3,
+      // Add retry configuration
+      retryMode: 'adaptive',
     });
     this.modelId = Bun.env.BEDROCK_EMBEDDING_MODEL || "amazon.titan-embed-text-v1";
   }
@@ -123,9 +134,17 @@ export class BedrockEmbeddingService {
             body: JSON.stringify(requestBody),
           });
 
-          const response = await this.client.send(command);
-          const responseBody = JSON.parse(new TextDecoder().decode(response.body));
-          chunkEmbeddings.push(responseBody.embedding);
+          try {
+            const response = await this.client.send(command);
+            const responseBody = JSON.parse(new TextDecoder().decode(response.body));
+            chunkEmbeddings.push(responseBody.embedding);
+          } catch (chunkError) {
+            err('❌ [BedrockEmbedding] Failed to process chunk', {
+              chunkIndex: i + 1,
+              error: chunkError.message
+            });
+            throw chunkError;
+          }
           
           // Add small delay between requests
           await new Promise(resolve => setTimeout(resolve, 100));
@@ -167,7 +186,23 @@ export class BedrockEmbeddingService {
         body: JSON.stringify(requestBody),
       });
 
-      const response = await this.client.send(command);
+      let response;
+      try {
+        response = await this.client.send(command);
+      } catch (sendError) {
+        // Check if this is the HTTP/2 destructuring issue
+        if (sendError.message && sendError.message.includes('Right side of assignment cannot be destructured')) {
+          log('⚠️ [BedrockEmbedding] HTTP/2 destructuring issue during send, using fallback');
+          return new Array(1536).fill(0); // Standard embedding dimension fallback
+        }
+        throw sendError;
+      }
+      
+      // Check if response body exists and is valid
+      if (!response.body) {
+        throw new Error('Empty response body from Bedrock');
+      }
+      
       const responseBody = JSON.parse(new TextDecoder().decode(response.body));
       
       log('✅ [BedrockEmbedding] Embedding created', { 
@@ -176,9 +211,24 @@ export class BedrockEmbeddingService {
       
       return responseBody.embedding;
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      
+      // Check if this is the HTTP/2 destructuring issue
+      if (errorMessage.includes('Right side of assignment cannot be destructured')) {
+        err('❌ [BedrockEmbedding] HTTP/2 destructuring issue detected', {
+          modelId: this.modelId,
+          error: errorMessage,
+          recommendation: 'Consider using HTTP/1.1 or different HTTP client'
+        });
+        
+        // Return a zero vector as fallback to prevent total failure
+        log('⚠️ [BedrockEmbedding] Returning zero vector as fallback');
+        return new Array(1536).fill(0); // Standard embedding dimension
+      }
+      
       err('❌ [BedrockEmbedding] Failed to create embedding', {
         modelId: this.modelId,
-        error: error.message
+        error: errorMessage
       });
       throw error;
     }

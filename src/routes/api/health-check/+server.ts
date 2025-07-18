@@ -19,9 +19,6 @@ import {
 import type { RequestEvent } from '@sveltejs/kit';
 import { OpenAI } from "openai";
 import { Pinecone } from "@pinecone-database/pinecone";
-import { dns } from "bun";
-import { safeDnsPrefetch } from "$lib/utils/dnsUtils";
-import { prefetchDnsForCategories } from "$lib/config/dnsConfig";
 
 const INDIVIDUAL_CHECK_TIMEOUT = 15000; // 15 seconds timeout for most checks
 const CAPELLA_API_TIMEOUT = 30000; // 30 seconds timeout for Capella API
@@ -503,9 +500,6 @@ async function checkLangSmithEndpoint(fetch: typeof global.fetch): Promise<Check
     }
 }
 
-async function prefetchHealthCheckEndpoints() {
-    await prefetchDnsForCategories(['api', 'monitoring']);
-}
 
 export async function GET({ fetch, url }: RequestEvent) {
     try {
@@ -545,8 +539,6 @@ export async function GET({ fetch, url }: RequestEvent) {
                         { name: "OpenTelemetry Traces Endpoint", check: () => checkTracesEndpoint(fetch) },
                     ].sort((a, b) => a.name.localeCompare(b.name));
                     
-                    // Call before health checks
-                    await prefetchHealthCheckEndpoints();
 
                     // Modify the Promise.all to ensure individual check failures don't stop other checks
                     await Promise.allSettled((isSimpleCheck ? simpleChecks : detailedChecks)

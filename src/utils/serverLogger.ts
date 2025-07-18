@@ -3,169 +3,124 @@
 import { ecsFormat } from "@elastic/ecs-winston-format";
 import { context, type SpanContext, trace } from "@opentelemetry/api";
 import winston from "winston";
-import TransportStream from "winston-transport";
 import DailyRotateFile from "winston-daily-rotate-file";
+import TransportStream from "winston-transport";
 import type { BackendConfig } from "../models/types";
 
 let loggerInstance: winston.Logger | null = null;
 
-function getLogger(config: BackendConfig): winston.Logger {
-  if (loggerInstance) return loggerInstance;
+// Simple OpenTelemetry transport for Winston
+class OpenTelemetryTransport extends TransportStream {
+  private endpoint: string;
 
-  class OpenTelemetryHttpTransport extends TransportStream {
-    constructor(options: any) {
-      super(options);
-    }
+  constructor(options: { level?: string; endpoint: string }) {
+    super(options);
+    this.endpoint = options.endpoint;
+  }
 
-    override async log(info: any, callback: () => void) {
-      if (config?.openTelemetry && process.env.ENABLE_OPENTELEMETRY === 'true') {
-        try {
-          const logData = {
-            resourceLogs: [
-              {
-                resource: {
-                  attributes: [
-                    {
-                      key: "service.name",
-                      value: {
-                        stringValue: config.openTelemetry.SERVICE_NAME || "capella-document-search",
-                      },
-                    },
-                  ],
+  override async log(info: any, callback: () => void) {
+    try {
+      const logData = {
+        resourceLogs: [
+          {
+            resource: {
+              attributes: [
+                {
+                  key: "service.name",
+                  value: { stringValue: "capella-document-search" },
                 },
-                scopeLogs: [
+              ],
+            },
+            scopeLogs: [
+              {
+                scope: { name: "winston" },
+                logRecords: [
                   {
-                    scope: {
-                      name: "capella-document-search",
-                    },
-                    logRecords: [
-                      {
-                        timeUnixNano: Date.now() * 1000000,
-                        severityNumber: this.getSeverityNumber(info.level || info["log.level"] || "info"),
-                        severityText: (info.level || info["log.level"] || "info").toUpperCase(),
-                        body: {
-                          stringValue: info.message,
-                        },
-                        attributes: [
-                          {
-                            key: "log.level",
-                            value: { stringValue: info.level || info["log.level"] || "info" },
-                          },
-                          {
-                            key: "timestamp",
-                            value: { stringValue: info["@timestamp"] },
-                          },
-                        ],
+                    timeUnixNano: Date.now() * 1000000,
+                    severityNumber: this.getSeverityNumber(info.level),
+                    severityText: info.level.toUpperCase(),
+                    body: { stringValue: info.message },
+                    attributes: Object.entries(info).map(([key, value]) => ({
+                      key,
+                      value: {
+                        stringValue:
+                          typeof value === "string"
+                            ? value
+                            : JSON.stringify(value),
                       },
-                    ],
+                    })),
                   },
                 ],
               },
             ],
-          };
+          },
+        ],
+      };
 
-          const response = await fetch(
-            config.openTelemetry.LOGS_ENDPOINT || "http://localhost:4318/v1/logs",
-            {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-              },
-              body: JSON.stringify(logData),
-            },
-          );
-
-          if (!response.ok) {
-            console.debug(
-              `OpenTelemetry HTTP error: ${response.status} ${response.statusText}`,
-            );
-          }
-        } catch (error) {
-          console.debug(
-            `Failed to send log to OpenTelemetry (endpoint: ${config.openTelemetry?.LOGS_ENDPOINT || "http://localhost:4318/v1/logs"}):`,
-            error,
-          );
-        }
-      }
-      callback();
+      await fetch(this.endpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(logData),
+      });
+    } catch (error) {
+      // Silently fail to avoid log loops
     }
-
-    private getSeverityNumber(level: string): number {
-      switch (level.toLowerCase()) {
-        case "error":
-          return 17;
-        case "warn":
-          return 13;
-        case "info":
-          return 9;
-        case "debug":
-          return 5;
-        default:
-          return 9;
-      }
-    }
+    callback();
   }
 
-  const customFormat = winston.format.combine(
-    ecsFormat({ convertReqRes: true, apmIntegration: true }),
-    winston.format((info) => {
-      const traceObj = info["trace"] as
-        | { id?: string; span?: { id?: string } }
-        | undefined;
-      if (traceObj) {
-        info.trace = {
-          id: traceObj.id || "",
-          span: { id: traceObj.span?.id || "" },
-        };
-      }
-      return info;
-    })(),
-  );
+  private getSeverityNumber(level: string): number {
+    switch (level) {
+      case "error":
+        return 17;
+      case "warn":
+        return 13;
+      case "info":
+        return 9;
+      case "debug":
+        return 5;
+      default:
+        return 9;
+    }
+  }
+}
 
-  const dailyRotateFile = new DailyRotateFile({
-    filename: "logs/application-%DATE%.log",
-    datePattern: "YYYY-MM-DD",
-    zippedArchive: true,
-    maxSize: config.application.LOG_MAX_SIZE,
-    maxFiles: config.application.LOG_MAX_FILES,
-    handleExceptions: true,
-  });
-  
-  dailyRotateFile.setMaxListeners(20);
+function getLogger(config: BackendConfig): winston.Logger {
+  if (loggerInstance) return loggerInstance;
 
-  const transports: TransportStream[] = [];
+  const transports: winston.transport[] = [
+    new winston.transports.Console({
+      level: config.application.LOG_LEVEL || "info",
+      format: winston.format.combine(ecsFormat()),
+    }),
+  ];
 
-  if (config?.application?.LOG_LEVEL) {
+  if (config.application.ENABLE_FILE_LOGGING) {
     transports.push(
-      new winston.transports.Console({
-        level: config.application.LOG_LEVEL,
-        format: winston.format.combine(
-          winston.format.colorize(),
-          winston.format.simple(),
-        ),
-        handleExceptions: true,
-        handleRejections: true,
+      new DailyRotateFile({
+        filename: "logs/application-%DATE%.log",
+        datePattern: "YYYY-MM-DD",
+        zippedArchive: true,
+        maxSize: config.application.LOG_MAX_SIZE,
+        maxFiles: config.application.LOG_MAX_FILES,
+        format: ecsFormat(),
       }),
     );
   }
 
-  if (process.env.ENABLE_OPENTELEMETRY === 'true') {
-    try {
-      const otelLevel = config?.application?.LOG_LEVEL || "info";
-      const otelTransport = new OpenTelemetryHttpTransport({
-        level: otelLevel,
-      });
-      transports.push(otelTransport);
-    } catch (error) {
-      console.error("Failed to create OpenTelemetry transport:", error);
-    }
+  if (
+    config.openTelemetry?.LOGS_ENDPOINT &&
+    process.env.ENABLE_OPENTELEMETRY === "true"
+  ) {
+    transports.push(
+      new OpenTelemetryTransport({
+        level: config.application.LOG_LEVEL || "info",
+        endpoint: config.openTelemetry.LOGS_ENDPOINT,
+      }),
+    );
   }
 
-  transports.push(dailyRotateFile);
-
   loggerInstance = winston.createLogger({
-    level: config.application.LOG_LEVEL,
-    format: customFormat,
+    level: config.application.LOG_LEVEL || "info",
     transports,
     exitOnError: false,
   });
@@ -182,19 +137,17 @@ export function log(message: string, meta?: any): void {
   const span = trace.getSpan(ctx);
   const spanContext: SpanContext | undefined = span?.spanContext();
 
-  const logData = {
-    message,
-    ...(meta && { meta }),
-    ...(spanContext && {
-      trace: {
-        id: spanContext.traceId,
+  const traceData = spanContext
+    ? {
+        trace: { id: spanContext.traceId },
         span: { id: spanContext.spanId },
-      },
-    }),
-  };
+      }
+    : {};
+
+  const mergedMeta = { ...meta, ...traceData };
 
   if (loggerInstance) {
-    loggerInstance.info(logData);
+    loggerInstance.info(message, mergedMeta);
   } else {
     console.log(message, meta);
   }
@@ -205,19 +158,17 @@ export function err(message: string, meta?: any): void {
   const span = trace.getSpan(ctx);
   const spanContext: SpanContext | undefined = span?.spanContext();
 
-  const logData = {
-    message,
-    ...(meta && { meta }),
-    ...(spanContext && {
-      trace: {
-        id: spanContext.traceId,
+  const traceData = spanContext
+    ? {
+        trace: { id: spanContext.traceId },
         span: { id: spanContext.spanId },
-      },
-    }),
-  };
+      }
+    : {};
+
+  const mergedMeta = { ...meta, ...traceData };
 
   if (loggerInstance) {
-    loggerInstance.error(logData);
+    loggerInstance.error(message, mergedMeta);
   } else {
     console.error(message, meta);
   }
@@ -228,19 +179,17 @@ export function warn(message: string, meta?: any): void {
   const span = trace.getSpan(ctx);
   const spanContext: SpanContext | undefined = span?.spanContext();
 
-  const logData = {
-    message,
-    ...(meta && { meta }),
-    ...(spanContext && {
-      trace: {
-        id: spanContext.traceId,
+  const traceData = spanContext
+    ? {
+        trace: { id: spanContext.traceId },
         span: { id: spanContext.spanId },
-      },
-    }),
-  };
+      }
+    : {};
+
+  const mergedMeta = { ...meta, ...traceData };
 
   if (loggerInstance) {
-    loggerInstance.warn(logData);
+    loggerInstance.warn(message, mergedMeta);
   } else {
     console.warn(message, meta);
   }
@@ -251,19 +200,17 @@ export function debug(message: string, meta?: any): void {
   const span = trace.getSpan(ctx);
   const spanContext: SpanContext | undefined = span?.spanContext();
 
-  const logData = {
-    message,
-    ...(meta && { meta }),
-    ...(spanContext && {
-      trace: {
-        id: spanContext.traceId,
+  const traceData = spanContext
+    ? {
+        trace: { id: spanContext.traceId },
         span: { id: spanContext.spanId },
-      },
-    }),
-  };
+      }
+    : {};
+
+  const mergedMeta = { ...meta, ...traceData };
 
   if (loggerInstance) {
-    loggerInstance.debug(logData);
+    loggerInstance.debug(message, mergedMeta);
   } else {
     console.debug(message, meta);
   }

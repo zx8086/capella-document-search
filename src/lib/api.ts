@@ -10,13 +10,7 @@ const CLUSTER_ID = backendConfig.capella.CLUSTER_ID;
 const BUCKET_ID = backendConfig.capella.BUCKET_ID;
 const AUTH_TOKEN = backendConfig.capella.AUTH_TOKEN;
 
-log("Environment Variables");
-log("API_BASE_URL:", { meta: { API_BASE_URL } });
-log("ORG_ID:", { meta: { ORG_ID } });
-log("PROJECT_ID:", { meta: { PROJECT_ID } });
-log("CLUSTER_ID:", { meta: { CLUSTER_ID } });
-log("BUCKET_ID:", { meta: { BUCKET_ID } });
-log("AUTH_TOKEN:", { meta: AUTH_TOKEN ? "Set" : "Not set" });
+log("Environment Variables loaded for Capella API", { API_BASE_URL, ORG_ID, PROJECT_ID, CLUSTER_ID, BUCKET_ID, AUTH_TOKEN_STATUS: AUTH_TOKEN ? "Set" : "Not set" });
 
 const headers = new Headers({
   Authorization: `Bearer ${AUTH_TOKEN}`,
@@ -63,7 +57,7 @@ async function fetchWithAuth<T>(endpoint: string): Promise<T> {
     ]);
     if (!response.ok) {
       const errorBody = await response.text();
-      console.error(
+      err(
         `HTTP error! status: ${response.status}, body: ${errorBody}`,
       );
       throw new Error(`HTTP error! status: ${response.status}`);
@@ -92,17 +86,17 @@ export async function getAllScopes(): Promise<BucketScopeCollection[]> {
 
     if (!response.ok) {
       const errorBody = await response.text();
-      console.error(
+      err(
         `HTTP error! status: ${response.status}, body: ${errorBody}`,
       );
       throw new Error(`HTTP error! status: ${response.status}`);
     }
 
     const data: ApiResponse = await response.json();
-    log("Received data from Capella Management API Endpoint:", data);
+    log(`Received data from Capella Management API Endpoint: ${data.scopes.length} scopes found`, { scopesCount: data.scopes.length, data });
 
     if (!data || !data.scopes) {
-      console.error("Unexpected API response structure:", data);
+      err("Unexpected API response structure:", data);
       throw new Error("Unexpected API response structure");
     }
 
@@ -119,7 +113,7 @@ export async function getAllScopes(): Promise<BucketScopeCollection[]> {
 
     return allCollections;
   } catch (error) {
-    console.error("Error fetching scopes:", error);
+    err("Error fetching scopes:", error);
     if (error instanceof Error) {
       throw new Error(`Failed to fetch scopes: ${error.message}`);
     } else {

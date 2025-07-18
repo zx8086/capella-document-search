@@ -32,7 +32,7 @@ initializeDatabase();
 export const load: PageServerLoad = async () => {
   log("Calling function - getFormattedCollections()");
   const fetchedCollections = getFormattedCollections();
-  log("Retrieved collections:", { meta: { collections: fetchedCollections } });
+  log(`Retrieved collections: ${fetchedCollections.length} collections found`, { count: fetchedCollections.length, collections: fetchedCollections });
 
   const mappedCollections: Collection[] = fetchedCollections.map((c) => ({
     bucket: c.bucket,
@@ -58,7 +58,7 @@ export const actions: Actions = {
         const documentKey = data.get("documentKey") as string;
         const keys = [documentKey];
 
-        log("Keys:", { meta: { keys } });
+        log(`Search keys: ${keys.length} keys provided`, { keysCount: keys.length, keys });
 
         const formattedCollections = selectedCollections.map(
           ({ bucket, scope_name, collection_name }) => ({
@@ -191,7 +191,7 @@ export const actions: Actions = {
         throw error(400, "No file uploaded");
       }
 
-      log("File received:", file);
+      log(`File received: ${file.name} (${file.size} bytes)`, { fileName: file.name, fileSize: file.size, fileType: file.type });
 
       const content = await file.text();
       const documentKeys = content

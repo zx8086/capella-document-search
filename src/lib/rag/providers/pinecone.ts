@@ -6,6 +6,7 @@ import { traceable } from "langsmith/traceable";
 import { BedrockEmbeddingService } from '../../services/bedrock-embedding';
 import { BedrockChatService } from '../../services/bedrock-chat';
 import { backendConfig } from '../../../backend-config';
+import { log, err } from '../../../utils/unifiedLogger';
 
 export class PineconeRAGProvider implements RAGProvider {
     private embeddingService: BedrockEmbeddingService;
@@ -14,13 +15,13 @@ export class PineconeRAGProvider implements RAGProvider {
     private traceablePipeline: any;
 
     constructor() {
-        console.log('🎯 [PineconeProvider] Constructor called');
+        log('🎯 [PineconeProvider] Constructor called');
         this.embeddingService = new BedrockEmbeddingService(backendConfig.rag.AWS_REGION);
         this.chatService = new BedrockChatService(backendConfig.rag.AWS_REGION);
     }
 
     async initialize() {
-        console.log('🚀 [PineconeProvider] Starting initialization with config:', {
+        log('🚀 [PineconeProvider] Starting initialization with config', {
             indexName: Bun.env.PINECONE_INDEX_NAME,
             namespace: Bun.env.PINECONE_NAMESPACE,
             timestamp: new Date().toISOString()
@@ -30,26 +31,26 @@ export class PineconeRAGProvider implements RAGProvider {
             apiKey: Bun.env.PINECONE_API_KEY as string,
         });
 
-        console.log('📊 [Pinecone] Creating traceable pipeline');
+        log('📊 [Pinecone] Creating traceable pipeline');
         
         // Create traced pipeline
         this.traceablePipeline = traceable(async (message: string) => {
-            console.log('🔄 [Pinecone] Processing query:', { messageLength: message.length });
+            log('🔄 [Pinecone] Processing query', { messageLength: message.length });
             
             const index = this.pinecone.index(Bun.env.PINECONE_INDEX_NAME as string)
                 .namespace(Bun.env.PINECONE_NAMESPACE as string);
 
-            console.log('🔤 [Pinecone] Generating embedding with Bedrock');
+            log('🔤 [Pinecone] Generating embedding with Bedrock');
             const embedding = await this.embeddingService.createEmbedding(message);
 
-            console.log('🔍 [Pinecone] Querying vector store');
+            log('🔍 [Pinecone] Querying vector store');
             const queryResponse = await index.query({
                 vector: embedding,
                 topK: 3,
                 includeMetadata: true
             });
 
-            console.log('📝 [Pinecone] Processing matches:', {
+            log('📝 [Pinecone] Processing matches', {
                 matchCount: queryResponse.matches?.length || 0
             });
 
@@ -86,11 +87,11 @@ export class PineconeRAGProvider implements RAGProvider {
             tags: ["rag-query", "pinecone", "chat"]
         });
         
-        console.log('✅ [Pinecone] Initialization complete');
+        log('✅ [Pinecone] Initialization complete');
     }
 
     async query(message: string, metadata: RAGMetadata): Promise<RAGResponse> {
-        console.log('📝 [PineconeProvider] Query received:', {
+        log('📝 [PineconeProvider] Query received', {
             messageLength: message.length,
             userId: metadata.userId,
             timestamp: new Date().toISOString()
@@ -108,7 +109,7 @@ export class PineconeRAGProvider implements RAGProvider {
                 ]
             });
         } catch (error) {
-            console.error('❌ [PineconeProvider] Query error:', {
+            err('❌ [PineconeProvider] Query error', {
                 error: error.message,
                 stage: 'query',
                 timestamp: new Date().toISOString()

@@ -12,13 +12,24 @@ export class BedrockChatService {
   private modelId: string;
 
   constructor(region: string = "eu-central-1") {
+    // Build credentials object safely
+    const credentials: any = {
+      accessKeyId: Bun.env.AWS_ACCESS_KEY_ID || "DUMMY",
+      secretAccessKey: Bun.env.AWS_SECRET_ACCESS_KEY || "DUMMY",
+    };
+    
+    // Only add sessionToken if it exists and is not empty
+    if (Bun.env.AWS_BEARER_TOKEN_BEDROCK && Bun.env.AWS_BEARER_TOKEN_BEDROCK.trim()) {
+      credentials.sessionToken = Bun.env.AWS_BEARER_TOKEN_BEDROCK;
+    }
+    
     this.client = new BedrockRuntimeClient({
       region,
-      credentials: {
-        accessKeyId: Bun.env.AWS_ACCESS_KEY_ID || "DUMMY",
-        secretAccessKey: Bun.env.AWS_SECRET_ACCESS_KEY || "DUMMY",
-        sessionToken: Bun.env.AWS_BEARER_TOKEN_BEDROCK,
-      },
+      credentials,
+      // Use maxAttempts to handle transient network issues
+      maxAttempts: 3,
+      // Add retry configuration
+      retryMode: 'adaptive',
     });
     this.modelId = Bun.env.BEDROCK_CHAT_MODEL || "anthropic.claude-3-5-sonnet-20240620-v1:0";
   }
@@ -66,7 +77,21 @@ export class BedrockChatService {
         hasSystem: !!systemPrompt
       });
 
-      const response = await this.client.send(command);
+      let response;
+      try {
+        response = await this.client.send(command);
+      } catch (sendError) {
+        // Check if this is the HTTP/2 destructuring issue
+        if (sendError.message && sendError.message.includes('Right side of assignment cannot be destructured')) {
+          err('❌ [BedrockChat] HTTP/2 destructuring issue during send', {
+            modelId: this.modelId,
+            error: sendError.message
+          });
+          yield '❌ Error: HTTP/2 compatibility issue with AWS SDK. Please try again.';
+          return;
+        }
+        throw sendError;
+      }
 
       if (!response.stream) {
         throw new Error('No response stream received from Bedrock Converse API');

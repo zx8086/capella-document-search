@@ -10,14 +10,14 @@ export async function seedCollections() {
     // First check if we already have data
     const checkResponse = await fetch("/api/collections");
     const existingData = await checkResponse.json();
-    log("📊 Current database state:", { count: existingData.length });
+    log(`📊 Current database state: ${existingData.length} collections found`, { count: existingData.length, existingData });
 
     // Proceed with POST to populate
     log("📝 Sending POST request to populate database");
     const response = await fetch("/api/collections", { method: "POST" });
     const result = await response.json();
     
-    log("📬 POST response received:", result);
+    log(`📬 POST response received: ${result.success ? 'success' : 'failed'}`, { result });
 
     if (!response.ok) {
       err("❌ Failed to seed collections:", {
@@ -50,7 +50,7 @@ export async function getCollections(): Promise<Collection[]> {
       throw new Error(`Failed to fetch collections: ${response.status}`);
     }
     const collections = await response.json();
-    log("📦 Retrieved collections:", { count: collections.length });
+    log(`📦 Retrieved collections: ${collections.length} collections found`, { count: collections.length, collections });
     return collections;
   } catch (error) {
     err("💥 Error fetching collections:", error);
