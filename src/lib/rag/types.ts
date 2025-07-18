@@ -5,6 +5,9 @@ import type { RunTracer } from "langsmith/traceable";
 export interface RAGContext {
     text: string;
     filename: string;
+    pageNumber?: number;
+    chunkIndex?: number;
+    metadata?: Record<string, any>;
 }
 
 export interface RAGResponse {

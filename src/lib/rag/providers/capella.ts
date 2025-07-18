@@ -1,22 +1,25 @@
 /* src/lib/rag/providers/capella.ts */
 
 import type { RAGProvider, RAGResponse, RAGMetadata } from '../types';
-import OpenAI from 'openai';
 import { Worker } from 'worker_threads';
 import { log, err } from '$utils/unifiedLogger';
 import { traceable } from "langsmith/traceable";
 import { HfInference } from '@huggingface/inference';
 import { dev } from '$app/environment';
 import { backendConfig } from '../../../backend-config';
+import { BedrockEmbeddingService } from '../../services/bedrock-embedding';
+import { BedrockChatService } from '../../services/bedrock-chat';
 
 export class CapellaRAGProvider implements RAGProvider {
-    private openai: OpenAI;
+    private embeddingService: BedrockEmbeddingService;
+    private chatService: BedrockChatService;
     private worker: Worker | null = null;
     private traceablePipeline: any;
 
-    constructor(openai: OpenAI) {
+    constructor() {
         log('🎯 [CapellaProvider] Constructor called');
-        this.openai = openai;
+        this.embeddingService = new BedrockEmbeddingService(backendConfig.rag.AWS_REGION);
+        this.chatService = new BedrockChatService(backendConfig.rag.AWS_REGION);
     }
 
     async initialize() {
@@ -33,15 +36,8 @@ export class CapellaRAGProvider implements RAGProvider {
                 log('🔄 [Capella] Processing query:', { messageLength: message.length });
                 
                 // Enhanced embedding logging
-                log('🔤 [Capella] Generating embedding with OpenAI');
-                const embeddingResponse = await this.openai.embeddings.create({
-                    model: "text-embedding-3-large",
-                    input: message,
-                    encoding_format: "float",
-                    dimensions: 3072
-                });
-                
-                const vector = embeddingResponse.data[0].embedding;
+                log('🔤 [Capella] Generating embedding with Bedrock');
+                const vector = await this.embeddingService.createEmbedding(message);
                 
                 // Log vector details
                 log('📊 [Capella] Embedding generated:', {
@@ -85,25 +81,25 @@ export class CapellaRAGProvider implements RAGProvider {
                 // Ensure we always return an array
                 const context = Array.isArray(queryResponse) ? queryResponse.map(match => ({
                     text: match.text,
-                    filename: match.filename || 'Unknown source'
+                    filename: match.filename || 'Unknown source',
+                    pageNumber: match.metadata?.page || match.metadata?.pageNumber || match.metadata?.page_number || match.metadata?.pageNum,
+                    chunkIndex: match.metadata?.chunkIndex || match.metadata?.chunk || match.metadata?.chunk_index || match.metadata?.index,
+                    metadata: match.metadata
                 })).filter(item => item.text) : [];
 
-                // Generate completion using OpenAI
-                const stream = await this.openai.chat.completions.create({
-                    model: "gpt-4-turbo-preview",
-                    messages: [
-                        {
-                            role: "system",
-                            content: "You are a helpful assistant. Use the following context to answer the user's question. Always end your response with '\n\nReferences:' followed by the source filenames. If you cannot answer the question based on the context, say so."
-                        },
-                        {
-                            role: "user",
-                            content: `Context: ${context?.map(c => c.text).join('\n\n---\n\n')}\n\nSource files: ${context?.map(c => c.filename).join(', ')}\n\nQuestion: ${message}`
-                        }
-                    ],
+                // Generate completion using Bedrock
+                const stream = await this.chatService.createChatCompletion([
+                    {
+                        role: "system",
+                        content: "You are a helpful assistant. Use the following context to answer the user's question. Do not include references in your response as they will be added automatically. If you cannot answer the question based on the context, say so."
+                    },
+                    {
+                        role: "user",
+                        content: `Context: ${context?.map(c => c.text).join('\n\n---\n\n')}\n\nQuestion: ${message}`
+                    }
+                ], {
                     temperature: 0.7,
-                    max_tokens: 2000,
-                    stream: true
+                    max_tokens: 2000
                 });
 
                 return { stream, context };

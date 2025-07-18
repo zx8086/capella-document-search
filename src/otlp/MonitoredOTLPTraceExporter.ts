@@ -51,9 +51,10 @@ export class MonitoredOTLPTraceExporter extends MonitoredOTLPExporter<
         }, this.timeoutMillis);
 
         console.debug("Calling traceExporter.export");
-        this.traceExporter.export(spans, (result) => {
-          clearTimeout(timeoutId);
-          const duration = Date.now() - exportStartTime;
+        try {
+          this.traceExporter.export(spans, (result) => {
+            clearTimeout(timeoutId);
+            const duration = Date.now() - exportStartTime;
           console.debug(
             `traceExporter.export callback received after ${duration}ms`,
           );
@@ -76,7 +77,12 @@ export class MonitoredOTLPTraceExporter extends MonitoredOTLPExporter<
                 new Error(`Export failed with code: ${result.code}`),
             );
           }
-        });
+          });
+        } catch (exportError) {
+          clearTimeout(timeoutId);
+          console.warn('⚠️ Trace export failed (Bun compatibility issue):', exportError.message);
+          resolve(); // Resolve anyway to prevent blocking
+        }
       });
 
       console.debug("Waiting for exportPromise to resolve");

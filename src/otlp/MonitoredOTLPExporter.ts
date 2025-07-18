@@ -70,7 +70,7 @@ export abstract class MonitoredOTLPExporter<T> {
       warn(
         `Invalid logIntervalMs: ${this.logIntervalMs}. Using default of 300000ms.`,
       );
-      this.logIntervalMs = backendConfig.openTelemetry.SUMMARY_LOG_INTERVAL; // Using your original config
+      this.logIntervalMs = backendConfig.openTelemetry.SUMMARY_LOG_INTERVAL;
     } else {
       debug(`${this.constructor.name} log interval: ${this.logIntervalMs}ms`);
     }
@@ -112,11 +112,11 @@ export abstract class MonitoredOTLPExporter<T> {
       }
 
       // Add the current hostname to monitoring targets
-      const targets = [...getDnsPrefetchTargets(['monitoring']), this.hostName];
+      const targets = [...getDnsPrefetchTargets(["monitoring"]), this.hostName];
       await safeDnsPrefetch(targets);
-      
+
       this.dnsPrefetchInitiated = true;
-      debug(`DNS prefetch initiated for ${targets.join(', ')}`);
+      debug(`DNS prefetch initiated for ${targets.join(", ")}`);
 
       await this.verifyDNSPrefetch();
     } catch (error) {
@@ -263,17 +263,19 @@ export abstract class MonitoredOTLPExporter<T> {
   protected async validateEndpoint(): Promise<void> {
     try {
       const response = await fetch(this.url, {
-        method: 'POST',
+        method: "POST",
         timeout: 5000,
         headers: {
-          'Content-Type': 'application/x-protobuf',
-          'Accept': 'application/x-protobuf'
-        }
+          "Content-Type": "application/x-protobuf",
+          Accept: "application/x-protobuf",
+        },
       });
-      
+
       const acceptableStatuses = [200, 204, 400, 415];
       if (!acceptableStatuses.includes(response.status)) {
-        warn(`OpenTelemetry endpoint ${this.url} returned unexpected status ${response.status}`);
+        warn(
+          `OpenTelemetry endpoint ${this.url} returned unexpected status ${response.status}`,
+        );
       }
     } catch (error) {
       err(`Failed to validate OpenTelemetry endpoint ${this.url}:`, error);
