@@ -787,35 +787,30 @@
                         {/if}
                     </div>
 
-                    <!-- Mode toggle and future icons -->
-                    <div
-                        class="absolute top-0 right-0 flex items-center space-x-2"
-                    >
-                        <button
-                            type="button"
-                            onclick={toggleMode}
-                            data-transaction-name="Toggle Search Mode"
-                            class="p-2 bg-[#00174f] rounded-full hover:bg-[#00174f]/90 hover:ring-2 hover:ring-red-500 hover:ring-offset-2 focus:outline-none transition-all duration-300 animate-pulse"
-                            title={isSearchMode ? "Switch to Upload Mode" : "Switch to Search Mode"}
-                            aria-label={isSearchMode ? "Switch to Upload Mode" : "Switch to Search Mode"}
-                        >
-                            <svg
-                                xmlns="http://www.w3.org/2000/svg"
-                                fill="none"
-                                viewBox="0 0 24 24"
-                                stroke-width="1.5"
-                                stroke="currentColor"
-                                class="w-6 h-6 text-white"
-                                aria-hidden="true"
+                    <!-- Mode toggle - Pill-shaped Single/Multi switcher -->
+                    <div class="absolute top-0 right-0">
+                        <div class="inline-flex bg-gray-100 rounded-full p-1 shadow-sm border border-gray-200">
+                            <button
+                                type="button"
+                                onclick={() => { if (!isSearchMode) toggleMode(); }}
+                                data-transaction-name="Switch to Single Mode"
+                                class="px-5 py-2 rounded-full font-medium text-sm transition-all duration-200 {isSearchMode ? 'bg-gradient-to-r from-cyan-400 to-blue-500 text-white shadow-md' : 'text-gray-600 hover:text-gray-900'}"
+                                title="Search for a single document"
+                                aria-label="Switch to single document search"
                             >
-                                <path
-                                    stroke-linecap="round"
-                                    stroke-linejoin="round"
-                                    d="M19.5 12c0-1.232-.046-2.453-.138-3.662a4.006 4.006 0 0 0-3.7-3.7 48.678 48.678 0 0 0-7.324 0 4.006 4.006 0 0 0-3.7 3.7c-.017.22-.032.441-.046.662M19.5 12l3-3m-3 3-3-3m-12 3c0 1.232.046 2.453.138 3.662a4.006 4.006 0 0 0 3.7 3.7 48.656 48.656 0 0 0 7.324 0 4.006 4.006 0 0 0 3.7-3.7c.017-.22.032-.441.046-.662M4.5 12l3 3m-3-3-3 3"
-                                />
-                            </svg>
-                            <span class="sr-only">{isSearchMode ? "Switch to Upload Mode" : "Switch to Search Mode"}</span>
-                        </button>
+                                Single
+                            </button>
+                            <button
+                                type="button"
+                                onclick={() => { if (isSearchMode) toggleMode(); }}
+                                data-transaction-name="Switch to Multi Mode"
+                                class="px-5 py-2 rounded-full font-medium text-sm transition-all duration-200 {!isSearchMode ? 'bg-gradient-to-r from-cyan-400 to-blue-500 text-white shadow-md' : 'text-gray-600 hover:text-gray-900'}"
+                                title="Upload CSV for bulk search"
+                                aria-label="Switch to bulk document search"
+                            >
+                                Multi
+                            </button>
+                        </div>
                     </div>
                 </div>
 

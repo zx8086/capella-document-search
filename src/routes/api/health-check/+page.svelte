@@ -14,7 +14,6 @@
     let error = $state("");
     let checkType: "Simple" | "Detailed" = $state(data.checkType);
     let loading = $state(false);
-    let loadingType = $state(data.checkType);
     let showBuildInfo = $state(false);
 
     onMount(async () => {
@@ -46,7 +45,6 @@
         if (data.healthStatus) {
             healthStatus = data.healthStatus;
             checkType = data.checkType;
-            loadingType = data.checkType;  // Update loadingType when data changes
             if (data.healthStatus.failedChecks?.length > 0) {
                 error = `Some checks failed: ${data.healthStatus.failedChecks.join(", ")}`;
             }
@@ -104,13 +102,26 @@
                 ? "Simple check tests the SQL Database, Internal API & GraphQL endpoint."
                 : "Detailed check covering all dependencies."}
         </p>
-        <button
-            onclick={() => toggleCheckType()}
-            class="w-48 bg-[#00174f] hover:bg-[#00174f]/80 text-white font-bold py-2 px-4 rounded hover:ring-2 hover:ring-red-500 hover:ring-offset-2 transition-all duration-300"
-            data-transaction-name={`Switch to ${checkType === "Simple" ? "Detailed" : "Simple"} Check`}
-        >
-            Switch to {checkType === "Simple" ? "Detailed" : "Simple"}
-        </button>
+        <div class="inline-flex bg-gray-100 rounded-full p-1 shadow-sm border border-gray-200">
+            <button
+                onclick={() => { if (checkType !== "Simple") toggleCheckType(); }}
+                class="px-5 py-2 rounded-full font-medium text-sm transition-all duration-200 {checkType === 'Simple' ? 'bg-gradient-to-r from-cyan-400 to-blue-500 text-white shadow-md' : 'text-gray-600 hover:text-gray-900'}"
+                data-transaction-name="Switch to Simple Check"
+                title="Simple health check"
+                aria-label="Switch to simple health check"
+            >
+                Simple
+            </button>
+            <button
+                onclick={() => { if (checkType !== "Detailed") toggleCheckType(); }}
+                class="px-5 py-2 rounded-full font-medium text-sm transition-all duration-200 {checkType === 'Detailed' ? 'bg-gradient-to-r from-cyan-400 to-blue-500 text-white shadow-md' : 'text-gray-600 hover:text-gray-900'}"
+                data-transaction-name="Switch to Detailed Check"
+                title="Detailed health check"
+                aria-label="Switch to detailed health check"
+            >
+                Detailed
+            </button>
+        </div>
     </div>
 
     {#if loading}
