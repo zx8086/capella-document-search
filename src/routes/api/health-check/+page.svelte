@@ -12,51 +12,48 @@
     
     let healthStatus = $state(data.healthStatus);
     let error = $state("");
-    let checkType: "Simple" | "Detailed" = $state(data.checkType);
+    let isSimpleMode = $state(true); // Start with Simple mode by default
     let loading = $state(false);
     let showBuildInfo = $state(false);
 
     onMount(async () => {
+        // Initialize state based on current data without triggering effects
+        isSimpleMode = data.checkType === "Simple";
         showBuildInfo = await client.getBooleanValue('build-information', false);
     });
 
-    async function toggleCheckType() {
-        try {
-            const newType = checkType === "Simple" ? "Detailed" : "Simple";
-            loading = true;
-            error = "";
-            
-            // Update checkType immediately for UI feedback
-            checkType = newType;
-            
-            await goto(`/api/health-check?type=${newType}`, {
-                replaceState: true,
-                noScroll: true
-            });
-            
-        } catch (e) {
-            console.error("Health check error details:", e);
+    function toggleHealthMode(): void {
+        console.log('BEFORE toggle - isSimpleMode:', isSimpleMode);
+        loading = true;
+        error = "";
+        
+        const newType = isSimpleMode ? "Detailed" : "Simple";
+        console.log('Navigating to:', newType);
+        goto(`/api/health-check?type=${newType}`, {
+            replaceState: true,
+            noScroll: true
+        }).then(() => {
+            // Only toggle the state after successful navigation
+            isSimpleMode = !isSimpleMode;
+            console.log('AFTER navigation - isSimpleMode:', isSimpleMode);
+        }).catch((e) => {
             error = e instanceof Error ? e.message : String(e);
             loading = false;
-        }
+        });
     }
 
     $effect(() => {
         if (data.healthStatus) {
             healthStatus = data.healthStatus;
-            checkType = data.checkType;
             if (data.healthStatus.failedChecks?.length > 0) {
-                error = `Some checks failed: ${data.healthStatus.failedChecks.join(", ")}`;
+                error = `Some check failed: ${data.healthStatus.failedChecks.join(", ")}`;
             }
+            loading = false;
         }
     });
 
-    $effect(() => {
-        loading = Boolean($navigating);
-    });
-
     let transactionName = $derived(
-        `API Health Check Page - ${checkType} Check`
+        `API Health Check Page - ${isSimpleMode ? "Simple" : "Detailed"} Check`
     );
 
     // Add helper function to get status color
@@ -89,7 +86,7 @@
 </script>
 
 <svelte:head>
-    <title>Capella Document Search - {checkType.charAt(0).toUpperCase() + checkType.slice(1)} Status</title>
+    <title>Capella Document Search - {isSimpleMode ? "Simple" : "Detailed"} Status</title>
     <meta name="transaction-name" content={transactionName} />
 </svelte:head>
 
@@ -98,14 +95,25 @@
 
     <div class="mb-6">
         <p class="text-sm text-gray-600 mt-2 mb-4">
-            {checkType === "Simple"
+            {isSimpleMode
                 ? "Simple check tests the SQL Database, Internal API & GraphQL endpoint."
                 : "Detailed check covering all dependencies."}
+            {#if loading}
+                <span class="ml-2 text-blue-600">Loading...</span>
+            {/if}
         </p>
         <div class="inline-flex bg-gray-100 rounded-full p-1 shadow-sm border border-gray-200">
             <button
-                onclick={() => { if (checkType !== "Simple") toggleCheckType(); }}
-                class="px-5 py-2 rounded-full font-medium text-sm transition-all duration-200 {checkType === 'Simple' ? 'bg-gradient-to-r from-cyan-400 to-blue-500 text-white shadow-md' : 'text-gray-600 hover:text-gray-900'}"
+                onclick={() => { 
+                    console.log('Simple clicked - isSimpleMode:', isSimpleMode);
+                    if (!isSimpleMode) {
+                        console.log('Calling toggleHealthMode from Simple');
+                        toggleHealthMode(); 
+                    } else {
+                        console.log('Simple already active, not toggling');
+                    }
+                }}
+                class="px-5 py-2 rounded-full font-medium text-sm transition-all duration-200 {isSimpleMode ? 'bg-gradient-to-r from-cyan-400 to-blue-500 text-white shadow-md' : 'text-gray-600 hover:text-gray-900'}"
                 data-transaction-name="Switch to Simple Check"
                 title="Simple health check"
                 aria-label="Switch to simple health check"
@@ -113,8 +121,16 @@
                 Simple
             </button>
             <button
-                onclick={() => { if (checkType !== "Detailed") toggleCheckType(); }}
-                class="px-5 py-2 rounded-full font-medium text-sm transition-all duration-200 {checkType === 'Detailed' ? 'bg-gradient-to-r from-cyan-400 to-blue-500 text-white shadow-md' : 'text-gray-600 hover:text-gray-900'}"
+                onclick={() => { 
+                    console.log('Detailed clicked - isSimpleMode:', isSimpleMode);
+                    if (isSimpleMode) {
+                        console.log('Calling toggleHealthMode from Detailed');
+                        toggleHealthMode(); 
+                    } else {
+                        console.log('Detailed already active, not toggling');
+                    }
+                }}
+                class="px-5 py-2 rounded-full font-medium text-sm transition-all duration-200 {!isSimpleMode ? 'bg-gradient-to-r from-cyan-400 to-blue-500 text-white shadow-md' : 'text-gray-600 hover:text-gray-900'}"
                 data-transaction-name="Switch to Detailed Check"
                 title="Detailed health check"
                 aria-label="Switch to detailed health check"
@@ -127,7 +143,7 @@
     {#if loading}
         <div class="flex flex-col items-center justify-center gap-4">
             <p class="text-gray-600">
-                Loading {checkType === "Simple" ? "Detailed" : "Simple"} health check...
+                Loading {isSimpleMode ? "Simple" : "Detailed"} health check...
             </p>
             <div class="animate-spin rounded-full h-12 w-12 border-2 border-gray-200 border-b-gray-900">
                 <span class="sr-only">Loading health check status...</span>
