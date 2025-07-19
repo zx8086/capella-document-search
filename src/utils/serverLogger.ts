@@ -10,7 +10,8 @@ import type { BackendConfig } from "../models/types";
 
 let loggerInstance: winston.Logger | null = null;
 
-// Simple OpenTelemetry transport for Winston
+// Custom OpenTelemetry transport for Winston (unused - kept for reference)
+// The actual transport used is OpenTelemetryTransportV3 from @opentelemetry/winston-transport
 class OpenTelemetryTransport extends TransportStream {
   private endpoint: string;
 

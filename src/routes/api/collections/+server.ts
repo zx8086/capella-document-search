@@ -19,7 +19,7 @@ export async function POST() {
 
   try {
     const scopesAndCollections = await getAllScopes();
-    log(`Received scopes and collections: ${scopesAndCollections.length} items found`, { count: scopesAndCollections.length, scopes: scopesAndCollections });
+    log(`Received scopes and collections: ${scopesAndCollections.length} items found`, { count: scopesAndCollections.length });
     if (scopesAndCollections.length === 0) {
       warn("No scopes and collections returned from API");
       return json(
@@ -35,7 +35,7 @@ export async function POST() {
 
     db.transaction(() => {
       for (const item of scopesAndCollections) {
-        log(`Inserting item: ${item.bucket}.${item.scope}.${item.collection}`, item);
+        log(`Inserting item: ${item.bucket}.${item.scope}.${item.collection}`, { bucket: item.bucket, scope: item.scope, collection: item.collection });
         const scopeResult = insertScope(item.bucket, item.scope);
         const collectionResult = insertCollection(
           item.bucket,
@@ -48,16 +48,16 @@ export async function POST() {
           item.collection,
           `This is a mock tooltip for ${item.bucket}.${item.scope}.${item.collection}`,
         );
-        log(`Scope insertion completed: ${item.bucket}.${item.scope}, changes: ${scopeResult.changes}, rowid: ${scopeResult.lastInsertRowid}`, { ...scopeResult, bucket: item.bucket, scope: item.scope });
-        log(`Collection insertion completed: ${item.bucket}.${item.scope}.${item.collection}, changes: ${collectionResult.changes}, rowid: ${collectionResult.lastInsertRowid}`, { ...collectionResult, bucket: item.bucket, scope: item.scope, collection: item.collection });
-        log(`Tooltip insertion completed: ${item.bucket}.${item.scope}.${item.collection}, changes: ${tooltipResult.changes}, rowid: ${tooltipResult.lastInsertRowid}`, { ...tooltipResult, bucket: item.bucket, scope: item.scope, collection: item.collection });
+        log(`Scope insertion completed: ${item.bucket}.${item.scope}, changes: ${scopeResult.changes}, rowid: ${scopeResult.lastInsertRowid}`, { changes: scopeResult.changes, lastInsertRowid: scopeResult.lastInsertRowid, bucket: item.bucket, scope: item.scope });
+        log(`Collection insertion completed: ${item.bucket}.${item.scope}.${item.collection}, changes: ${collectionResult.changes}, rowid: ${collectionResult.lastInsertRowid}`, { changes: collectionResult.changes, lastInsertRowid: collectionResult.lastInsertRowid, bucket: item.bucket, scope: item.scope, collection: item.collection });
+        log(`Tooltip insertion completed: ${item.bucket}.${item.scope}.${item.collection}, changes: ${tooltipResult.changes}, rowid: ${tooltipResult.lastInsertRowid}`, { changes: tooltipResult.changes, lastInsertRowid: tooltipResult.lastInsertRowid, bucket: item.bucket, scope: item.scope, collection: item.collection });
         insertedCount++;
       }
     })();
 
     log(`Database seeding completed: ${insertedCount} items inserted`, { insertedCount });
     const allCollections = getAllCollectionsWithTooltips();
-    log(`All collections with tooltips after insertion: ${JSON.stringify(allCollections)}`, { collectionsCount: allCollections.length, collections: allCollections });
+    log(`All collections with tooltips after insertion: ${JSON.stringify(allCollections)}`, { collectionsCount: allCollections.length });
     return json({
       success: true,
       message: "Collections and tooltips seeded successfully",

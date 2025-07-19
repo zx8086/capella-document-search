@@ -1,7 +1,6 @@
 /* src/utils/unifiedLogger.ts */
 
-// Replace the direct import with a runtime check
-const isBrowser = typeof window !== 'undefined';
+const isBrowser = typeof window !== "undefined";
 import type { BackendConfig } from "../models/types";
 
 let serverLogger: any = null;

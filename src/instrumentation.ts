@@ -9,10 +9,12 @@ import { NodeSDK } from "@opentelemetry/sdk-node";
 import {
   ATTR_SERVICE_NAME,
   ATTR_SERVICE_VERSION,
-  SEMRESATTRS_DEPLOYMENT_ENVIRONMENT,
 } from "@opentelemetry/semantic-conventions";
-import { BatchSpanProcessor } from "@opentelemetry/sdk-trace-base";
+import { BatchSpanProcessor } from "@opentelemetry/sdk-trace-node";
+import { resourceFromAttributes } from "@opentelemetry/resources";
 import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-http";
+import { OTLPLogExporter } from "@opentelemetry/exporter-logs-otlp-http";
+import { BatchLogRecordProcessor } from "@opentelemetry/sdk-logs";
 import { getNodeAutoInstrumentations } from "@opentelemetry/auto-instrumentations-node";
 import { WinstonInstrumentation } from "@opentelemetry/instrumentation-winston";
 import { GraphQLInstrumentation } from "@opentelemetry/instrumentation-graphql";
@@ -28,18 +30,13 @@ log("OpenTelemetry enabled:", { INSTRUMENTATION_ENABLED });
 
 let sdk: NodeSDK | undefined;
 
-const createResource = async () => {
-  const { defaultResource, resourceFromAttributes } = await import(
-    "@opentelemetry/resources"
-  );
-  return (await defaultResource()).merge(
-    resourceFromAttributes({
-      [ATTR_SERVICE_NAME]: backendConfig.openTelemetry.SERVICE_NAME,
-      [ATTR_SERVICE_VERSION]: backendConfig.openTelemetry.SERVICE_VERSION,
-      [SEMRESATTRS_DEPLOYMENT_ENVIRONMENT]:
-        backendConfig.openTelemetry.DEPLOYMENT_ENVIRONMENT,
-    }),
-  );
+const createResource = () => {
+  return resourceFromAttributes({
+    [ATTR_SERVICE_NAME]: backendConfig.openTelemetry.SERVICE_NAME,
+    [ATTR_SERVICE_VERSION]: backendConfig.openTelemetry.SERVICE_VERSION,
+    ["deployment.environment"]:
+      backendConfig.openTelemetry.DEPLOYMENT_ENVIRONMENT,
+  });
 };
 
 const exporterTimeout = 300000; // 5 minutes
@@ -50,7 +47,7 @@ async function initializeOpenTelemetry() {
       log("Initializing OpenTelemetry SDK...");
       diag.setLogger(new DiagConsoleLogger(), DiagLogLevel.INFO);
 
-      const resource = await createResource();
+      const resource = createResource();
 
       const traceExporter = new OTLPTraceExporter({
         url: backendConfig.openTelemetry.TRACES_ENDPOINT,
@@ -63,8 +60,24 @@ async function initializeOpenTelemetry() {
         timeout: exporterTimeout,
       });
 
+      const logExporter = new OTLPLogExporter({
+        url: backendConfig.openTelemetry.LOGS_ENDPOINT,
+        headers: { "Content-Type": "application/json" },
+        timeoutMillis: exporterTimeout,
+      });
+
+      log("Logs exporter created with config:", {
+        url: backendConfig.openTelemetry.LOGS_ENDPOINT,
+        timeout: exporterTimeout,
+      });
 
       const batchSpanProcessor = new BatchSpanProcessor(traceExporter, {
+        maxExportBatchSize: 512,
+        scheduledDelayMillis: 5000,
+        exportTimeoutMillis: exporterTimeout,
+      });
+
+      const batchLogProcessor = new BatchLogRecordProcessor(logExporter, {
         maxExportBatchSize: 512,
         scheduledDelayMillis: 5000,
         exportTimeoutMillis: exporterTimeout,
@@ -73,6 +86,7 @@ async function initializeOpenTelemetry() {
       sdk = new NodeSDK({
         resource: resource,
         spanProcessors: [batchSpanProcessor],
+        logRecordProcessors: [batchLogProcessor],
         instrumentations: [
           getNodeAutoInstrumentations({
             "@opentelemetry/instrumentation-aws-lambda": { enabled: false },
