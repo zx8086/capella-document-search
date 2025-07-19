@@ -40,7 +40,7 @@
     }
 
     async function loadAndPlayVideo() {
-        if (!videoElement || !videos[currentVideoIndex]) return;
+        if (!videoElement || !videos[currentVideoIndex] || isExiting) return;
         
         try {
             console.debug(`Attempting to play video ${currentVideoIndex + 1}`);
@@ -50,15 +50,41 @@
             // Reset the video element
             videoElement.load();
             
-            // Wait for metadata to load
-            await new Promise((resolve) => {
-                videoElement.onloadedmetadata = resolve;
+            // Wait for metadata to load with timeout
+            await new Promise((resolve, reject) => {
+                const timeout = setTimeout(() => reject(new Error('Metadata load timeout')), 5000);
+                videoElement.onloadedmetadata = () => {
+                    clearTimeout(timeout);
+                    resolve(undefined);
+                };
             });
             
-            // Play the video
-            await videoElement.play();
-            console.debug("Video started playing");
-            isPlaying = true;
+            // Check if component is still mounted
+            if (!videoElement || isExiting) return;
+            
+            // Play the video with user interaction fallback
+            try {
+                await videoElement.play();
+                console.debug("Video started playing");
+                isPlaying = true;
+            } catch (playError) {
+                // Handle power-saving restrictions
+                if (playError.name === 'AbortError') {
+                    console.warn("Video playback was blocked by power-saving mode");
+                    // Add attributes to help bypass restrictions
+                    videoElement.setAttribute('autoplay', '');
+                    videoElement.setAttribute('loop', '');
+                    // Retry with reduced promise
+                    const playPromise = videoElement.play();
+                    if (playPromise !== undefined) {
+                        playPromise.catch(() => {
+                            console.warn("Autoplay prevented, waiting for user interaction");
+                        });
+                    }
+                } else {
+                    throw playError;
+                }
+            }
             
             // Preload next video
             const nextIndex = (currentVideoIndex + 1) % videos.length;
@@ -66,9 +92,11 @@
         } catch (error) {
             console.error("Error playing video:", error);
             isPlaying = false;
-            // Try next video if current one fails
-            currentVideoIndex = (currentVideoIndex + 1) % videos.length;
-            await loadAndPlayVideo();
+            // Only try next video if we haven't exceeded attempts
+            if (currentVideoIndex < videos.length - 1) {
+                currentVideoIndex = (currentVideoIndex + 1) % videos.length;
+                await loadAndPlayVideo();
+            }
         }
     }
 
@@ -95,8 +123,15 @@
 
     onDestroy(() => {
         if (browser) {
+            isExiting = true;
             window.removeEventListener("mousemove", handleUserActivity);
             window.removeEventListener("keydown", handleUserActivity);
+            // Stop any playing video
+            if (videoElement) {
+                videoElement.pause();
+                videoElement.src = '';
+                videoElement.load();
+            }
         }
     });
 </script>
@@ -119,6 +154,7 @@
                 preload="auto"
                 playsinline
                 muted
+                autoplay
                 onended={handleVideoEnded}
                 data-openreplay-hidden
             >

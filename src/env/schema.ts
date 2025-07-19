@@ -22,6 +22,6 @@ export const envSchema = {
   growthbook: {
     apiHost: "PUBLIC_GROWTHBOOK_API_HOST",
     clientKey: "PUBLIC_GROWTHBOOK_CLIENT_KEY",
-    encryptionKey: "PUBIC_GROWTHBOOK_ENCRYPTION_KEY"
+    encryptionKey: "PUBLIC_GROWTHBOOK_ENCRYPTION_KEY"
   },
 } as const;
