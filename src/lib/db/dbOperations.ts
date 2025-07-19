@@ -132,7 +132,7 @@ export function getFormattedCollections() {
   }>;
   log(
     `Retrieved formatted collections - function getFormattedCollections: ${results.length} items`,
-    { count: results.length, results },
+    { count: results.length },
   );
   return results;
 }

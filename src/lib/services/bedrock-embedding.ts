@@ -4,6 +4,7 @@ import {
   BedrockRuntimeClient,
   InvokeModelCommand,
 } from "@aws-sdk/client-bedrock-runtime";
+import { NodeHttpHandler } from "@smithy/node-http-handler";
 import { log, err } from '$utils/unifiedLogger';
 
 export class BedrockEmbeddingService {
@@ -29,6 +30,11 @@ export class BedrockEmbeddingService {
       maxAttempts: 3,
       // Add retry configuration
       retryMode: 'adaptive',
+      // Use HTTP/1.1 handler to avoid Bun HTTP/2 compatibility issues
+      requestHandler: new NodeHttpHandler({
+        httpAgent: { keepAlive: false },
+        httpsAgent: { keepAlive: false }
+      })
     });
     this.modelId = Bun.env.BEDROCK_EMBEDDING_MODEL || "amazon.titan-embed-text-v1";
   }

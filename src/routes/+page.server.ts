@@ -32,7 +32,7 @@ initializeDatabase();
 export const load: PageServerLoad = async () => {
   log("Calling function - getFormattedCollections()");
   const fetchedCollections = getFormattedCollections();
-  log(`Retrieved collections: ${fetchedCollections.length} collections found`, { count: fetchedCollections.length, collections: fetchedCollections });
+  log(`Retrieved collections: ${fetchedCollections.length} collections found`, { count: fetchedCollections.length });
 
   const mappedCollections: Collection[] = fetchedCollections.map((c) => ({
     bucket: c.bucket,

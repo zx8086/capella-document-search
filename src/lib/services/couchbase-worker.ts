@@ -40,8 +40,6 @@ if (parentPort) {
             // Log the input vector (first few and last few dimensions)
             log("📊 [Worker] Input vector sample:", {
                 length: data.vector.length,
-                first5: data.vector.slice(0, 5),
-                last5: data.vector.slice(-5),
                 min: Math.min(...data.vector),
                 max: Math.max(...data.vector),
                 avg: data.vector.reduce((a, b) => a + b, 0) / data.vector.length
@@ -83,10 +81,10 @@ if (parentPort) {
             // List available indexes for debugging
             const manager = cluster.searchIndexes();
             const indexes = await manager.getAllIndexes();
-            log("📋 [Worker] Available indexes:", indexes.map(idx => ({
-                name: idx.name,
-                type: idx.type
-            })));
+            log("📋 [Worker] Available indexes:", {
+                indexCount: indexes.length,
+                indexNames: indexes.map(idx => idx.name).join(", ")
+            });
 
             const result = await cluster.searchQuery(
                 backendConfig.capella.VECTOR_INDEX,

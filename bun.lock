@@ -53,6 +53,7 @@
         "@opentelemetry/winston-transport": "^0.14.0",
         "@pinecone-database/pinecone": "^6.1.1",
         "@slack/webhook": "^7.0.4",
+        "@smithy/node-http-handler": "^4.1.0",
         "@snyk/protect": "^1.1295.0",
         "@types/papaparse": "^5.3.15",
         "@types/video.js": "^7.3.58",

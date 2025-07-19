@@ -138,7 +138,7 @@ export function getFormattedCollections() {
     scope: string;
     collection: string;
   }>;
-  log(`Retrieved formatted collections - function getFormattedCollections: ${results.length} items`, { count: results.length, results });
+  log(`Retrieved formatted collections - function getFormattedCollections: ${results.length} items`, { count: results.length });
   return results;
 }
 

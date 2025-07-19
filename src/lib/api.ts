@@ -93,7 +93,7 @@ export async function getAllScopes(): Promise<BucketScopeCollection[]> {
     }
 
     const data: ApiResponse = await response.json();
-    log(`Received data from Capella Management API Endpoint: ${data.scopes.length} scopes found`, { scopesCount: data.scopes.length, data });
+    log(`Received data from Capella Management API Endpoint: ${data.scopes.length} scopes found`, { scopesCount: data.scopes.length });
 
     if (!data || !data.scopes) {
       err("Unexpected API response structure:", data);

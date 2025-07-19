@@ -5,6 +5,7 @@ import {
   ConverseStreamCommand,
 } from "@aws-sdk/client-bedrock-runtime";
 import type { Message, ContentBlock } from "@aws-sdk/client-bedrock-runtime";
+import { NodeHttpHandler } from "@smithy/node-http-handler";
 import { log, err } from '$utils/unifiedLogger';
 
 export class BedrockChatService {
@@ -30,6 +31,11 @@ export class BedrockChatService {
       maxAttempts: 3,
       // Add retry configuration
       retryMode: 'adaptive',
+      // Use HTTP/1.1 handler to avoid Bun HTTP/2 compatibility issues
+      requestHandler: new NodeHttpHandler({
+        httpAgent: { keepAlive: false },
+        httpsAgent: { keepAlive: false }
+      })
     });
     this.modelId = Bun.env.BEDROCK_CHAT_MODEL || "anthropic.claude-3-5-sonnet-20240620-v1:0";
   }

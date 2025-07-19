@@ -40,7 +40,11 @@ export const POST: RequestHandler = async ({ fetch, request }) => {
       timestamp: new Date().toISOString(),
     });
 
-    log("🔍 Server received user data:", user);
+    log("🔍 Server received user data:", {
+      userId: user?.id || "anonymous",
+      userName: user?.name || "anonymous", 
+      userEmail: user?.email || "anonymous"
+    });
 
     // Prepare metadata for tracing
     const metadata: RAGMetadata = {
@@ -157,7 +161,6 @@ export const POST: RequestHandler = async ({ fetch, request }) => {
             log("🔍 [Debug] Source references processing:", {
               contextLength: context?.length || 0,
               sourceReferencesLength: sourceReferences.length,
-              sourceReferences: sourceReferences,
               hasReferencesInResponse: fullResponse.includes("References:"),
             });
 
@@ -221,7 +224,10 @@ export const POST: RequestHandler = async ({ fetch, request }) => {
             controller.close();
             log("🔒 [Server] Stream closed");
           } catch (error) {
-            log("❌ Stream processing error:", error);
+            log("❌ Stream processing error:", { 
+              errorMessage: error instanceof Error ? error.message : String(error),
+              errorType: error instanceof Error ? error.constructor.name : typeof error
+            });
             controller.error(error);
           }
         },

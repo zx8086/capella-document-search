@@ -4,85 +4,46 @@ import { ecsFormat } from "@elastic/ecs-winston-format";
 import { context, type SpanContext, trace } from "@opentelemetry/api";
 import winston from "winston";
 import DailyRotateFile from "winston-daily-rotate-file";
-import TransportStream from "winston-transport";
 import { OpenTelemetryTransportV3 } from "@opentelemetry/winston-transport";
 import type { BackendConfig } from "../models/types";
 
 let loggerInstance: winston.Logger | null = null;
 
-// Custom OpenTelemetry transport for Winston (unused - kept for reference)
-// The actual transport used is OpenTelemetryTransportV3 from @opentelemetry/winston-transport
-class OpenTelemetryTransport extends TransportStream {
-  private endpoint: string;
+// Helper function to extract OpenTelemetry trace context
+function getTraceContext() {
+  try {
+    const ctx = context.active();
+    const span = trace.getSpan(ctx);
+    const spanContext: SpanContext | undefined = span?.spanContext();
 
-  constructor(options: { level?: string; endpoint: string }) {
-    super(options);
-    this.endpoint = options.endpoint;
+    return spanContext
+      ? {
+          trace: { id: spanContext.traceId },
+          span: { id: spanContext.spanId },
+        }
+      : {};
+  } catch (error) {
+    // Silently ignore if OpenTelemetry context is not ready
+    return {};
   }
+}
 
-  override async log(info: any, callback: () => void) {
-    try {
-      const logData = {
-        resourceLogs: [
-          {
-            resource: {
-              attributes: [
-                {
-                  key: "service.name",
-                  value: { stringValue: "capella-document-search" },
-                },
-              ],
-            },
-            scopeLogs: [
-              {
-                scope: { name: "winston" },
-                logRecords: [
-                  {
-                    timeUnixNano: Date.now() * 1000000,
-                    severityNumber: this.getSeverityNumber(info.level),
-                    severityText: info.level.toUpperCase(),
-                    body: { stringValue: info.message },
-                    attributes: Object.entries(info).map(([key, value]) => ({
-                      key,
-                      value: {
-                        stringValue:
-                          typeof value === "string"
-                            ? value
-                            : JSON.stringify(value),
-                      },
-                    })),
-                  },
-                ],
-              },
-            ],
-          },
-        ],
-      };
+// Generic logging function
+function logWithLevel(level: 'info' | 'error' | 'warn' | 'debug', message: string, meta?: any): void {
+  const traceData = getTraceContext();
+  const mergedMeta = { ...meta, ...traceData };
 
-      await fetch(this.endpoint, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(logData),
-      });
-    } catch (error) {
-      // Silently fail to avoid log loops
-    }
-    callback();
-  }
-
-  private getSeverityNumber(level: string): number {
-    switch (level) {
-      case "error":
-        return 17;
-      case "warn":
-        return 13;
-      case "info":
-        return 9;
-      case "debug":
-        return 5;
-      default:
-        return 9;
-    }
+  if (loggerInstance) {
+    loggerInstance[level](message, mergedMeta);
+  } else {
+    // Fallback to console with appropriate method
+    const consoleMethods = {
+      info: console.log,
+      error: console.error,
+      warn: console.warn,
+      debug: console.debug
+    };
+    consoleMethods[level](message, meta);
   }
 }
 
@@ -134,109 +95,17 @@ export function initializeLogger(config: BackendConfig) {
 }
 
 export function log(message: string, meta?: any): void {
-  let traceData = {};
-  
-  try {
-    const ctx = context.active();
-    const span = trace.getSpan(ctx);
-    const spanContext: SpanContext | undefined = span?.spanContext();
-
-    traceData = spanContext
-      ? {
-          trace: { id: spanContext.traceId },
-          span: { id: spanContext.spanId },
-        }
-      : {};
-  } catch (error) {
-    // Silently ignore if OpenTelemetry context is not ready
-  }
-
-  const mergedMeta = { ...meta, ...traceData };
-
-  if (loggerInstance) {
-    loggerInstance.info(message, mergedMeta);
-  } else {
-    console.log(message, meta);
-  }
+  logWithLevel('info', message, meta);
 }
 
 export function err(message: string, meta?: any): void {
-  let traceData = {};
-  
-  try {
-    const ctx = context.active();
-    const span = trace.getSpan(ctx);
-    const spanContext: SpanContext | undefined = span?.spanContext();
-
-    traceData = spanContext
-      ? {
-          trace: { id: spanContext.traceId },
-          span: { id: spanContext.spanId },
-        }
-      : {};
-  } catch (error) {
-    // Silently ignore if OpenTelemetry context is not ready
-  }
-
-  const mergedMeta = { ...meta, ...traceData };
-
-  if (loggerInstance) {
-    loggerInstance.error(message, mergedMeta);
-  } else {
-    console.error(message, meta);
-  }
+  logWithLevel('error', message, meta);
 }
 
 export function warn(message: string, meta?: any): void {
-  let traceData = {};
-  
-  try {
-    const ctx = context.active();
-    const span = trace.getSpan(ctx);
-    const spanContext: SpanContext | undefined = span?.spanContext();
-
-    traceData = spanContext
-      ? {
-          trace: { id: spanContext.traceId },
-          span: { id: spanContext.spanId },
-        }
-      : {};
-  } catch (error) {
-    // Silently ignore if OpenTelemetry context is not ready
-  }
-
-  const mergedMeta = { ...meta, ...traceData };
-
-  if (loggerInstance) {
-    loggerInstance.warn(message, mergedMeta);
-  } else {
-    console.warn(message, meta);
-  }
+  logWithLevel('warn', message, meta);
 }
 
 export function debug(message: string, meta?: any): void {
-  let traceData = {};
-  
-  try {
-    const ctx = context.active();
-    const span = trace.getSpan(ctx);
-    const spanContext: SpanContext | undefined = span?.spanContext();
-
-    traceData = spanContext
-      ? {
-          trace: { id: spanContext.traceId },
-          span: { id: spanContext.spanId },
-        }
-      : {};
-  } catch (error) {
-    // Silently ignore if OpenTelemetry context is not ready
-  }
-
-  const mergedMeta = { ...meta, ...traceData };
-
-  if (loggerInstance) {
-    loggerInstance.debug(message, mergedMeta);
-  } else {
-    console.debug(message, meta);
-  }
+  logWithLevel('debug', message, meta);
 }

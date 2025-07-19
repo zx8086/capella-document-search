@@ -789,7 +789,7 @@
 
                     <!-- Mode toggle - Pill-shaped Single/Multi switcher -->
                     <div class="absolute top-0 right-0">
-                        <div class="inline-flex bg-gray-100 rounded-full p-1 shadow-sm border border-gray-200">
+                        <div class="inline-flex bg-gray-100 rounded-full p-1 shadow-sm border border-gray-200 hover:ring-2 hover:ring-red-500 hover:ring-offset-2 transition-all duration-300">
                             <button
                                 type="button"
                                 onclick={() => { if (!isSearchMode) toggleMode(); }}

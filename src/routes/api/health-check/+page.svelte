@@ -29,13 +29,10 @@
         
         const newType = isSimpleMode ? "Detailed" : "Simple";
         console.log('Navigating to:', newType);
+        
         goto(`/api/health-check?type=${newType}`, {
             replaceState: true,
             noScroll: true
-        }).then(() => {
-            // Only toggle the state after successful navigation
-            isSimpleMode = !isSimpleMode;
-            console.log('AFTER navigation - isSimpleMode:', isSimpleMode);
         }).catch((e) => {
             error = e instanceof Error ? e.message : String(e);
             loading = false;
@@ -45,11 +42,16 @@
     $effect(() => {
         if (data.healthStatus) {
             healthStatus = data.healthStatus;
+            // Always sync with server data - this is the source of truth
+            isSimpleMode = data.checkType === "Simple";
             if (data.healthStatus.failedChecks?.length > 0) {
                 error = `Some check failed: ${data.healthStatus.failedChecks.join(", ")}`;
             }
-            loading = false;
         }
+    });
+
+    $effect(() => {
+        loading = Boolean($navigating);
     });
 
     let transactionName = $derived(
@@ -102,7 +104,7 @@
                 <span class="ml-2 text-blue-600">Loading...</span>
             {/if}
         </p>
-        <div class="inline-flex bg-gray-100 rounded-full p-1 shadow-sm border border-gray-200">
+        <div class="inline-flex bg-gray-100 rounded-full p-1 shadow-sm border border-gray-200 hover:ring-2 hover:ring-red-500 hover:ring-offset-2 transition-all duration-300">
             <button
                 onclick={() => { 
                     console.log('Simple clicked - isSimpleMode:', isSimpleMode);
@@ -143,7 +145,7 @@
     {#if loading}
         <div class="flex flex-col items-center justify-center gap-4">
             <p class="text-gray-600">
-                Loading {isSimpleMode ? "Simple" : "Detailed"} health check...
+                Loading {isSimpleMode ? "Detailed" : "Simple"} health check...
             </p>
             <div class="animate-spin rounded-full h-12 w-12 border-2 border-gray-200 border-b-gray-900">
                 <span class="sr-only">Loading health check status...</span>
