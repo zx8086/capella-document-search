@@ -28,11 +28,11 @@ log("OpenTelemetry enabled:", { INSTRUMENTATION_ENABLED });
 
 let sdk: NodeSDK | undefined;
 
-const createResource = () => {
-  const { defaultResource, resourceFromAttributes } = require(
+const createResource = async () => {
+  const { defaultResource, resourceFromAttributes } = await import(
     "@opentelemetry/resources"
   );
-  return defaultResource().merge(
+  return (await defaultResource()).merge(
     resourceFromAttributes({
       [ATTR_SERVICE_NAME]: backendConfig.openTelemetry.SERVICE_NAME,
       [ATTR_SERVICE_VERSION]: backendConfig.openTelemetry.SERVICE_VERSION,
@@ -50,7 +50,7 @@ async function initializeOpenTelemetry() {
       log("Initializing OpenTelemetry SDK...");
       diag.setLogger(new DiagConsoleLogger(), DiagLogLevel.INFO);
 
-      const resource = createResource();
+      const resource = await createResource();
 
       const traceExporter = new OTLPTraceExporter({
         url: backendConfig.openTelemetry.TRACES_ENDPOINT,

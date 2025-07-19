@@ -5,6 +5,7 @@ import { context, type SpanContext, trace } from "@opentelemetry/api";
 import winston from "winston";
 import DailyRotateFile from "winston-daily-rotate-file";
 import TransportStream from "winston-transport";
+import { OpenTelemetryTransportV3 } from "@opentelemetry/winston-transport";
 import type { BackendConfig } from "../models/types";
 
 let loggerInstance: winston.Logger | null = null;
@@ -107,17 +108,16 @@ function getLogger(config: BackendConfig): winston.Logger {
     );
   }
 
-  // if (
-  //   config.openTelemetry?.LOGS_ENDPOINT &&
-  //   process.env.ENABLE_OPENTELEMETRY === "true"
-  // ) {
-  //   transports.push(
-  //     new OpenTelemetryTransport({
-  //       level: config.application.LOG_LEVEL || "info",
-  //       endpoint: config.openTelemetry.LOGS_ENDPOINT,
-  //     }),
-  //   );
-  // }
+  if (
+    config.openTelemetry?.LOGS_ENDPOINT &&
+    process.env.ENABLE_OPENTELEMETRY === "true"
+  ) {
+    transports.push(
+      new OpenTelemetryTransportV3({
+        level: config.application.LOG_LEVEL || "info",
+      }),
+    );
+  }
 
   loggerInstance = winston.createLogger({
     level: config.application.LOG_LEVEL || "info",
