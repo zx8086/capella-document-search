@@ -19,7 +19,13 @@
     onMount(async () => {
         // Initialize state based on current data without triggering effects
         isSimpleMode = data.checkType === "Simple";
-        showBuildInfo = await client.getBooleanValue('build-information', false);
+        try {
+            showBuildInfo = await client.getBooleanValue('build-information', false);
+        } catch (e) {
+            // Handle extension conflicts or feature flag errors silently
+            console.warn('Feature flag check failed:', e);
+            showBuildInfo = false;
+        }
     });
 
     function toggleHealthMode(): void {
