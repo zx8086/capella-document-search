@@ -5,6 +5,7 @@ import { context, type SpanContext, trace } from "@opentelemetry/api";
 import winston from "winston";
 import DailyRotateFile from "winston-daily-rotate-file";
 import TransportStream from "winston-transport";
+import { OpenTelemetryTransportV3 } from "@opentelemetry/winston-transport";
 import type { BackendConfig } from "../models/types";
 
 let loggerInstance: winston.Logger | null = null;
@@ -112,9 +113,8 @@ function getLogger(config: BackendConfig): winston.Logger {
     process.env.ENABLE_OPENTELEMETRY === "true"
   ) {
     transports.push(
-      new OpenTelemetryTransport({
+      new OpenTelemetryTransportV3({
         level: config.application.LOG_LEVEL || "info",
-        endpoint: config.openTelemetry.LOGS_ENDPOINT,
       }),
     );
   }
@@ -133,16 +133,22 @@ export function initializeLogger(config: BackendConfig) {
 }
 
 export function log(message: string, meta?: any): void {
-  const ctx = context.active();
-  const span = trace.getSpan(ctx);
-  const spanContext: SpanContext | undefined = span?.spanContext();
+  let traceData = {};
+  
+  try {
+    const ctx = context.active();
+    const span = trace.getSpan(ctx);
+    const spanContext: SpanContext | undefined = span?.spanContext();
 
-  const traceData = spanContext
-    ? {
-        trace: { id: spanContext.traceId },
-        span: { id: spanContext.spanId },
-      }
-    : {};
+    traceData = spanContext
+      ? {
+          trace: { id: spanContext.traceId },
+          span: { id: spanContext.spanId },
+        }
+      : {};
+  } catch (error) {
+    // Silently ignore if OpenTelemetry context is not ready
+  }
 
   const mergedMeta = { ...meta, ...traceData };
 
@@ -154,16 +160,22 @@ export function log(message: string, meta?: any): void {
 }
 
 export function err(message: string, meta?: any): void {
-  const ctx = context.active();
-  const span = trace.getSpan(ctx);
-  const spanContext: SpanContext | undefined = span?.spanContext();
+  let traceData = {};
+  
+  try {
+    const ctx = context.active();
+    const span = trace.getSpan(ctx);
+    const spanContext: SpanContext | undefined = span?.spanContext();
 
-  const traceData = spanContext
-    ? {
-        trace: { id: spanContext.traceId },
-        span: { id: spanContext.spanId },
-      }
-    : {};
+    traceData = spanContext
+      ? {
+          trace: { id: spanContext.traceId },
+          span: { id: spanContext.spanId },
+        }
+      : {};
+  } catch (error) {
+    // Silently ignore if OpenTelemetry context is not ready
+  }
 
   const mergedMeta = { ...meta, ...traceData };
 
@@ -175,16 +187,22 @@ export function err(message: string, meta?: any): void {
 }
 
 export function warn(message: string, meta?: any): void {
-  const ctx = context.active();
-  const span = trace.getSpan(ctx);
-  const spanContext: SpanContext | undefined = span?.spanContext();
+  let traceData = {};
+  
+  try {
+    const ctx = context.active();
+    const span = trace.getSpan(ctx);
+    const spanContext: SpanContext | undefined = span?.spanContext();
 
-  const traceData = spanContext
-    ? {
-        trace: { id: spanContext.traceId },
-        span: { id: spanContext.spanId },
-      }
-    : {};
+    traceData = spanContext
+      ? {
+          trace: { id: spanContext.traceId },
+          span: { id: spanContext.spanId },
+        }
+      : {};
+  } catch (error) {
+    // Silently ignore if OpenTelemetry context is not ready
+  }
 
   const mergedMeta = { ...meta, ...traceData };
 
@@ -196,16 +214,22 @@ export function warn(message: string, meta?: any): void {
 }
 
 export function debug(message: string, meta?: any): void {
-  const ctx = context.active();
-  const span = trace.getSpan(ctx);
-  const spanContext: SpanContext | undefined = span?.spanContext();
+  let traceData = {};
+  
+  try {
+    const ctx = context.active();
+    const span = trace.getSpan(ctx);
+    const spanContext: SpanContext | undefined = span?.spanContext();
 
-  const traceData = spanContext
-    ? {
-        trace: { id: spanContext.traceId },
-        span: { id: spanContext.spanId },
-      }
-    : {};
+    traceData = spanContext
+      ? {
+          trace: { id: spanContext.traceId },
+          span: { id: spanContext.spanId },
+        }
+      : {};
+  } catch (error) {
+    // Silently ignore if OpenTelemetry context is not ready
+  }
 
   const mergedMeta = { ...meta, ...traceData };
 
