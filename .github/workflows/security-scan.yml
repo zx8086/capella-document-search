@@ -1,0 +1,156 @@
+name: Security Scanning
+
+on:
+  push:
+    branches: ["master"]
+  pull_request:
+    branches: ["master"]
+  schedule:
+    - cron: "0 6 * * 1" # Weekly on Monday at 6 AM UTC
+
+permissions:
+  contents: read
+  security-events: write
+
+env:
+  DOCKER_IMAGE: docker.io/zx8086/capella-document-search:latest
+
+jobs:
+  code-scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup environment
+        uses: ./.github/actions/setup-environment
+        with:
+          cache_dependencies: "true"
+
+      - name: Run Snyk code scan
+        continue-on-error: true
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        run: |
+          echo "Running Snyk code scan..."
+          npx snyk test \
+            --file=package.json \
+            --sarif-file-output=snyk-code.sarif \
+            --severity-threshold=high \
+            --json > snyk-code-report.json || echo "Code vulnerabilities found but continuing..."
+
+          # Monitor on master branch
+          if [[ "${{ github.ref }}" == "refs/heads/master" ]]; then
+            npx snyk monitor --file=package.json || echo "Code monitor command failed but continuing..."
+          fi
+
+      - name: Upload Snyk code scan results
+        if: hashFiles('snyk-code.sarif') != ''
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: snyk-code.sarif
+          category: snyk-code
+          wait-for-processing: true
+
+  container-scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    needs: []
+    if: github.event_name != 'pull_request'
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup environment
+        uses: ./.github/actions/setup-environment
+        with:
+          cache_dependencies: "false"
+
+      - name: Wait for image availability
+        run: |
+          echo "Waiting for image to be available..."
+          for i in {1..30}; do
+            if docker pull ${{ env.DOCKER_IMAGE }} >/dev/null 2>&1; then
+              echo "Image is available!"
+              break
+            fi
+            echo "Waiting for image... (attempt $i/30)"
+            sleep 10
+          done
+
+      - name: Run Snyk container scan
+        continue-on-error: true
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        run: |
+          echo "Running Snyk container scan..."
+          npx snyk container test ${{ env.DOCKER_IMAGE }} \
+            --file=Dockerfile \
+            --severity-threshold=high \
+            --sarif-file-output=snyk-container.sarif \
+            --json > snyk-container-report.json || echo "Container vulnerabilities found but continuing..."
+
+          # Monitor on master branch
+          if [[ "${{ github.ref }}" == "refs/heads/master" ]]; then
+            npx snyk container monitor ${{ env.DOCKER_IMAGE }} \
+              --file=Dockerfile || echo "Container monitor command failed but continuing..."
+          fi
+
+      - name: Upload Snyk container scan results
+        if: hashFiles('snyk-container.sarif') != ''
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: snyk-container.sarif
+          category: snyk-container
+          wait-for-processing: true
+
+      - name: Upload scan artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: security-scan-results-${{ github.run_id }}
+          path: |
+            snyk-*.sarif
+            snyk-*-report.json
+          retention-days: 90
+        continue-on-error: true
+
+  security-summary:
+    runs-on: ubuntu-latest
+    needs: [code-scan, container-scan]
+    if: always()
+    
+    steps:
+      - name: Security Summary
+        run: |
+          {
+            echo "### 🔒 Security Scanning Summary"
+            echo ""
+            echo "| Scan Type | Status |"
+            echo "|-----------|--------|"
+            
+            if [[ "${{ needs.code-scan.result }}" == "success" ]]; then
+              echo "| 📝 Code Scan | ✅ Completed |"
+            else
+              echo "| 📝 Code Scan | ❌ Failed |"
+            fi
+            
+            if [[ "${{ needs.container-scan.result }}" == "success" ]]; then
+              echo "| 📦 Container Scan | ✅ Completed |"
+            elif [[ "${{ github.event_name }}" == "pull_request" ]]; then
+              echo "| 📦 Container Scan | ⏭️ Skipped (PR) |"
+            else
+              echo "| 📦 Container Scan | ❌ Failed |"
+            fi
+            
+            echo ""
+            echo "#### 🔗 Useful Links"
+            echo "- [Security Tab](https://github.com/${{ github.repository }}/security)"
+            echo "- [Actions Run](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})"
+            
+          } >> $GITHUB_STEP_SUMMARY

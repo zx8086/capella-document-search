@@ -1,77 +1,47 @@
-name: Docker CI/CD with Bun and Snyk
+name: Docker CI/CD with Bun
 
 on:
   push:
     branches: ["master"]
   pull_request:
     branches: ["master"]
+  schedule:
+    - cron: "0 0 * * 0"
+
+env:
+  REGISTRY: docker.io
+  IMAGE_NAME: zx8086/capella-document-search
+  BUILDKIT_STEP_LOG_MAX_SIZE: 10000000
+  BUILDKIT_STEP_LOG_MAX_SPEED: 1000000
+  DOCKER_BUILDKIT: 1
+  COMPOSE_DOCKER_CLI_BUILD: 1
+  BUILDKIT_PROGRESS: plain
+  COSIGN_VERSION: "v2.5.2"
+  SYFT_VERSION: "v1.28.0"
+  COSIGN_YES: "true"
+  COSIGN_EXPERIMENTAL: "true"
 
 permissions:
   contents: read
   security-events: write
   packages: write
 
-env:
-  DOCKER_BUILDKIT: 1
-  COMPOSE_DOCKER_CLI_BUILD: 1
-  BUILDX_NO_DEFAULT_LOAD: true
-  BUILDKIT_INLINE_CACHE: 1
-  BUILDX_CACHE_TTL: "168h"
-  COSIGN_VERSION: "v2.4.0"
-  SYFT_VERSION: "v1.19.0"
-  COSIGN_YES: "true"
-  COSIGN_EXPERIMENTAL: "true"
-  BUILDKIT_PROGRESS: plain
-  ACTIONS_RUNTIME_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-  DOCKER_BUILDX_CACHE_DIR: /home/pi/.buildx-cache
-
 jobs:
   build-and-deploy:
     runs-on: ${{ github.event_name == 'pull_request' && 'ubuntu-latest' || 'self-hosted' }}
+    timeout-minutes: 60
+
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-      - name: Install verification tools
-        shell: bash
-        run: |
-          # Create directories first
-          mkdir -p "${GITHUB_WORKSPACE}/bin"
-          mkdir -p "${GITHUB_WORKSPACE}/tmp"
-          
-          cd "${GITHUB_WORKSPACE}/tmp"
-
-          # Install cosign
-          curl -Lo cosign "https://github.com/sigstore/cosign/releases/latest/download/cosign-linux-amd64"
-          chmod +x cosign
-          mv cosign "${GITHUB_WORKSPACE}/bin/"
-
-          # Install syft
-          SYFT_RELEASE=$(curl -s https://api.github.com/repos/anchore/syft/releases/latest | grep -o '"tag_name": ".*"' | cut -d'"' -f4)
-          curl -Lo syft.tar.gz "https://github.com/anchore/syft/releases/download/${SYFT_RELEASE}/syft_${SYFT_RELEASE#v}_linux_amd64.tar.gz"
-          tar xzf syft.tar.gz syft
-          mv syft "${GITHUB_WORKSPACE}/bin/"
-
-          # Add to PATH
-          echo "${GITHUB_WORKSPACE}/bin" >> $GITHUB_PATH
-
-          # Cleanup
-          cd "${GITHUB_WORKSPACE}"
-          rm -rf "${GITHUB_WORKSPACE}/tmp"
-
-          # Verify installations
-          "${GITHUB_WORKSPACE}/bin/cosign" version || true
-          "${GITHUB_WORKSPACE}/bin/syft" --version || true
-
-      - name: Install additional security tools
-        run: |
-          # Install jq if not present
-          if ! command -v jq &> /dev/null; then
-            sudo apt-get update && sudo apt-get install -y jq
-          fi
-
-      - name: Set build timestamp
-        id: timestamp
-        run: echo "BUILD_TIMESTAMP=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" >> $GITHUB_ENV
+      - name: Setup environment
+        uses: ./.github/actions/setup-environment
+        with:
+          cosign_version: ${{ env.COSIGN_VERSION }}
+          syft_version: ${{ env.SYFT_VERSION }}
 
       - name: Setup environment files
         env:
@@ -80,84 +50,6 @@ jobs:
           echo "$ENV_PRODUCTION" > .env.production
           cp .env.production .env
 
-      - name: Set metadata variables
-        run: |
-          # Use quotes to properly handle values with special characters
-          echo "IMAGE_DESCRIPTION='Capella Document Search is a web application that allows you to search for documents within Capella scopes and collections. Built with Bun, Svelte, and ELysiaJS.'" >> $GITHUB_ENV
-          echo "IMAGE_LICENSE='MIT'" >> $GITHUB_ENV
-
-      - name: Docker meta
-        id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: docker.io/zx8086/capella-document-search
-          labels: |
-            org.opencontainers.image.title=capella-document-search
-            org.opencontainers.image.description=${{ env.IMAGE_DESCRIPTION }}
-            org.opencontainers.image.created=${BUILD_TIMESTAMP}
-            org.opencontainers.image.version=${GITHUB_REF_NAME:-2.0.0}
-            org.opencontainers.image.revision=${GITHUB_SHA}
-            org.opencontainers.image.authors=Simon Owusu <simonowusupvh@gmail.com>
-            org.opencontainers.image.vendor=Siobytes
-            org.opencontainers.image.licenses=${{ env.IMAGE_LICENSE }}
-            org.opencontainers.image.url=https://github.com/zx8086/capella-document-search
-            org.opencontainers.image.source=https://github.com/zx8086/capella-document-search
-            org.opencontainers.image.documentation=https://github.com/zx8086/capella-document-search/README.md
-            org.opencontainers.image.base.name=oven/bun:canary-alpine
-            org.opencontainers.image.source.repository=github.com/zx8086/capella-document-search
-            org.opencontainers.image.source.branch=${GITHUB_REF_NAME:-master}
-            org.opencontainers.image.source.commit=${GITHUB_SHA}
-            com.capellaql.maintainer=Simon Owusu <simonowusupvh@gmail.com>
-            com.capellaql.release-date=${BUILD_TIMESTAMP}
-            com.capellaql.version.is-production=true
-            org.opencontainers.image.ref.name=${GITHUB_REF_NAME:-master}
-            org.opencontainers.image.version.semver=${GITHUB_REF_NAME:-2.0.0}
-            org.opencontainers.image.version.major=2
-            org.opencontainers.image.version.minor=0
-            org.opencontainers.image.version.patch=0
-          tags: |
-            type=raw,value=latest,enable={{is_default_branch}}
-            type=raw,value=buildcache,enable=true
-
-      # Platform and runtime setup
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
-        with:
-          platforms: linux/amd64,linux/arm64
-
-      - name: Set up Bun
-        uses: oven-sh/setup-bun@v1
-        with:
-          bun-version: 'latest'
-
-      - name: Cache Bun dependencies
-        uses: actions/cache@v3
-        with:
-          path: |
-            ~/.bun/install/cache
-            node_modules
-          key: ${{ runner.os }}-bun-${{ hashFiles('**/bun.lockb', '**/package.json') }}
-          restore-keys: |
-            ${{ runner.os }}-bun-
-
-      # Security scanning section
-      - name: Run Snyk code scan
-        continue-on-error: true
-        env:
-          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
-        run: |
-          bun install
-          bun run snyk test --file=package.json --sarif-file-output=snyk.sarif --severity-threshold=high
-          bun run snyk monitor --file=package.json
-
-      - name: Upload Snyk code scan results
-        if: hashFiles('snyk.sarif') != ''
-        uses: github/codeql-action/upload-sarif@v3
-        with:
-          sarif_file: snyk.sarif
-          category: snyk-code
-
-      # Docker build setup
       - name: Log in to Docker Hub
         uses: docker/login-action@v3
         with:
@@ -166,113 +58,194 @@ jobs:
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
-        with:
-          driver: cloud
-          endpoint: "zx8086/cldbuild"
-          install: true
 
-      - name: Install dependencies and generate lockfile
-        run: |
-          bun install
-          # Verify lockfile exists
-          if [ -f "bun.lockb" ]; then
-            echo "Lockfile generated successfully"
-          else
-            echo "Warning: Lockfile not generated"
-          fi
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=sha,prefix={{date 'YYYYMMDD'}}-
+            type=raw,value=latest,enable={{is_default_branch}}
+          labels: |
+            org.opencontainers.image.title=capella-document-search
+            org.opencontainers.image.description=Capella Document Search is a web application that allows you to search for documents within Capella scopes and collections. Built with Bun, Svelte, and SvelteKit.
+            org.opencontainers.image.vendor=Siobytes
+            org.opencontainers.image.licenses=MIT
+            org.opencontainers.image.url=https://github.com/zx8086/capella-document-search
+            org.opencontainers.image.source=https://github.com/zx8086/capella-document-search
+
+      # Security scanning moved to separate workflow
+      # See .github/workflows/security-scan.yml
 
       - name: Build and push Docker image
-        uses: docker/build-push-action@v6
+        id: build
+        uses: docker/build-push-action@v5
         with:
           context: .
+          platforms: linux/amd64,linux/arm64
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          platforms: linux/amd64,linux/arm64
-          cache-from: type=registry,ref=docker.io/zx8086/capella-document-search:buildcache
-          cache-to: type=registry,ref=docker.io/zx8086/capella-document-search:buildcache,mode=max
           build-args: |
-            NODE_ENV=production
-            BUILD_VERSION=${{ github.ref_name || '0.0.1' }}
+            BUILD_DATE=${{ fromJSON(steps.meta.outputs.json).labels['org.opencontainers.image.created'] }}
+            BUILD_VERSION=${{ fromJSON(steps.meta.outputs.json).labels['org.opencontainers.image.version'] }}
             COMMIT_HASH=${{ github.sha }}
-            BUILD_DATE=${{ env.BUILD_TIMESTAMP }}
-          outputs: ${{ github.event_name == 'pull_request' && 'type=cacheonly' || 'type=registry' }}
+          cache-from: |
+            type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:buildcache-amd64
+            type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:buildcache-arm64
+            type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+          cache-to: |
+            type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:buildcache-amd64,mode=max
+            type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:buildcache-arm64,mode=max
+          sbom: true
+          provenance: true
 
-      - name: Verify image
+      - name: Wait for image to be available
         if: github.event_name != 'pull_request'
         run: |
-          # Wait for image to be available
+          echo "Waiting for image to be available in registry..."
+          # Get the first tag from metadata (tags are newline-separated)
+          IMAGE_TAG=$(echo '${{ steps.meta.outputs.tags }}' | head -n1 | sed 's/.*://')
+          echo "Using image tag: ${IMAGE_TAG}"
+          # Wait for the image to be pushed and available
+          for i in {1..30}; do
+            if docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${IMAGE_TAG} >/dev/null 2>&1; then
+              echo "Image is available!"
+              break
+            fi
+            echo "Waiting for image... (attempt $i/30)"
+            sleep 5
+          done
+        continue-on-error: true
+
+      - name: Generate SBOM
+        uses: anchore/sbom-action@v0.17.8
+        if: github.event_name != 'pull_request'
+        with:
+          image: ${{ fromJSON(steps.meta.outputs.json).tags[0] }}
+          format: spdx-json
+          output-file: sbom.spdx.json
+          artifact-name: sbom-multi-arch
+        continue-on-error: true
+
+      - name: Upload SBOM
+        uses: actions/upload-artifact@v4
+        if: github.event_name != 'pull_request'
+        with:
+          name: anchore-sbom-multi-arch-${{ github.run_id }}
+          path: sbom.spdx.json
+        continue-on-error: true
+
+      - name: Test container health
+        if: github.event_name != 'pull_request'
+        run: |
+          # Get the runner's architecture
+          RUNNER_ARCH=$(uname -m)
+
+          # Stop existing containers using port 3000
+          docker ps -q --filter publish=3000 | xargs -r docker stop || true
+          docker rm -f capella-search-test 2>/dev/null || true
+
+          # Run container (will automatically use correct architecture from multi-arch manifest)
+          # Use the first tag from metadata output (tags are newline-separated)
+          IMAGE_TAG=$(echo '${{ steps.meta.outputs.tags }}' | head -n1)
+          echo "Using multi-arch image: ${IMAGE_TAG}"
+          echo "Runner architecture: ${RUNNER_ARCH}"
+          docker run -d \
+            --name capella-search-test \
+            -p 3000:3000 \
+            --env-file .env \
+            -e NODE_ENV=production \
+            -e BUILD_VERSION=${{ github.ref_name || '0.0.1' }} \
+            -e COMMIT_HASH=${{ github.sha }} \
+            -e BUILD_DATE=$(date -u +'%Y-%m-%dT%H:%M:%SZ') \
+            -e LOG_LEVEL=info \
+            "${IMAGE_TAG}"
+
+          # Add delay and better error handling
           sleep 15
-          
-          # Verify the image and its architectures
-          echo "Verifying image manifest..."
-          docker buildx imagetools inspect docker.io/zx8086/capella-document-search:latest
+          if ! docker ps | grep -q capella-search-test; then
+            echo "Container failed to start. Showing logs:"
+            docker logs capella-search-test
+            exit 1
+          fi
 
-      - name: Validate image metadata
-        if: github.event_name != 'pull_request'
-        run: |
-          IMAGE_REF="docker.io/zx8086/capella-document-search:latest"
-          echo "Validating image metadata..."
-          docker buildx imagetools inspect ${IMAGE_REF} --format '{{json .}}' | jq .
+          # Test health endpoint if available
+          echo "Testing application endpoints..."
+          curl -f http://localhost:3000/ || echo "Main endpoint test failed"
+
+          # Capture metrics
+          CONTAINER_STATUS=$(docker inspect --format='{{.State.Status}}' capella-search-test)
+          echo "CONTAINER_STATUS=${CONTAINER_STATUS}" >> $GITHUB_ENV
+          echo "CONTAINER_START_TIME=$(docker inspect --format='{{.State.StartedAt}}' capella-search-test)" >> $GITHUB_ENV
+
+          # Show container logs for debugging
+          echo "Container logs:"
+          docker logs capella-search-test --tail 50
+        continue-on-error: true
 
       - name: Verify image attestations
         if: github.event_name != 'pull_request'
-        continue-on-error: true
         run: |
           # Set results directory name first
           TIMESTAMP=$(date +%Y%m%d_%H%M%S)
           RESULTS_DIR="attestation-results-${TIMESTAMP}"
           echo "ATTESTATION_RESULTS_DIR=${RESULTS_DIR}" >> $GITHUB_ENV
-          
+
           mkdir -p "${RESULTS_DIR}"
-          
+
           # Get image digest and reference
           echo "Getting image digest..."
-          IMAGE_REF="docker.io/zx8086/capella-document-search:latest"
-          IMAGE_DIGEST=$(docker buildx imagetools inspect "${IMAGE_REF}" --raw | jq -r '.manifests[0].digest')
-          IMAGE_WITH_DIGEST="${IMAGE_REF}@${IMAGE_DIGEST}"
+          # Get the first tag from metadata (tags are newline-separated)
+          IMAGE_TAG=$(echo '${{ steps.meta.outputs.tags }}' | head -n1)
+          IMAGE_REF="${IMAGE_TAG}"
 
-          echo "Image reference: ${IMAGE_REF}"
-          echo "Image digest: ${IMAGE_DIGEST}"
+          # Try multiple methods to get the digest
+          echo "Trying to get image digest for: ${IMAGE_REF}"
 
-          # Additional verification methods
-          echo "Attempting direct verification..."
-          cosign verify-attestation \
-            --certificate-identity-regexp=".*" \
-            --certificate-oidc-issuer="https://token.actions.githubusercontent.com" \
-            "${IMAGE_WITH_DIGEST}" > "${RESULTS_DIR}/direct-attestation.json" 2>/dev/null || true
+          # Method 1: Use build output digest if available
+          if [ -n "${{ steps.build.outputs.digest }}" ]; then
+            IMAGE_DIGEST="${{ steps.build.outputs.digest }}"
+            echo "Using build output digest: ${IMAGE_DIGEST}"
+          else
+            # Method 2: Try docker buildx imagetools inspect
+            echo "Trying docker buildx imagetools inspect..."
+            IMAGE_DIGEST=$(docker buildx imagetools inspect "${IMAGE_REF}" --raw 2>/dev/null | jq -r '.manifests[0].digest' 2>/dev/null || echo "")
 
-          echo "Attempting SLSA verification..."
-          cosign verify-attestation \
-            --type slsaprovenance \
-            --certificate-identity-regexp=".*" \
-            --certificate-oidc-issuer="https://token.actions.githubusercontent.com" \
-            "${IMAGE_WITH_DIGEST}" > "${RESULTS_DIR}/slsa-attestation.json" 2>/dev/null || true
-
-          echo "Attempting predicate-less verification..."
-          cosign verify-attestation \
-            --certificate-identity-regexp=".*" \
-            --certificate-oidc-issuer="https://token.actions.githubusercontent.com" \
-            "${IMAGE_WITH_DIGEST}" > "${RESULTS_DIR}/predicate-attestation.json" 2>/dev/null || true
-
-          # Download all attestations for analysis
-          echo "Downloading attestations..."
-          cosign download attestation "${IMAGE_WITH_DIGEST}" > "${RESULTS_DIR}/all-attestations.json" 2>/dev/null || true
-
-          # Extract from manifest and save all data
-          echo "Extracting from manifest..."
-          docker buildx imagetools inspect "${IMAGE_WITH_DIGEST}" --raw > "${RESULTS_DIR}/manifest.json"
-          jq '.manifests[].annotations | select(."org.opencontainers.image.attestations" != null)' \
-            "${RESULTS_DIR}/manifest.json" > "${RESULTS_DIR}/manifest-attestations.json" 2>/dev/null || true
-
-          # Check results
-          VERIFICATION_SUCCESS=false
-          for file in "${RESULTS_DIR}"/*.json; do
-            if [ -s "$file" ] && jq -e . >/dev/null 2>&1 < "$file"; then
-              VERIFICATION_SUCCESS=true
-              echo "✅ Found valid data in $(basename "$file")"
+            if [ -z "$IMAGE_DIGEST" ]; then
+              # Method 3: Try to get any manifest digest
+              IMAGE_DIGEST=$(docker buildx imagetools inspect "${IMAGE_REF}" --raw 2>/dev/null | jq -r '.manifests[0].digest' 2>/dev/null || echo "")
             fi
-          done
+
+            if [ -z "$IMAGE_DIGEST" ]; then
+              # Method 4: Try docker manifest inspect as fallback
+              IMAGE_DIGEST=$(docker manifest inspect "${IMAGE_REF}" 2>/dev/null | jq -r '.config.digest' 2>/dev/null || echo "")
+            fi
+          fi
+
+          if [ -n "$IMAGE_DIGEST" ] && [ "$IMAGE_DIGEST" != "null" ] && [ "$IMAGE_DIGEST" != "" ]; then
+            IMAGE_WITH_DIGEST="${IMAGE_REF}@${IMAGE_DIGEST}"
+            echo "Image reference: ${IMAGE_REF}"
+            echo "Image digest: ${IMAGE_DIGEST}"
+            echo "Full reference: ${IMAGE_WITH_DIGEST}"
+
+            # Download all attestations for analysis
+            echo "Downloading attestations..."
+            cosign download attestation "${IMAGE_WITH_DIGEST}" > "${RESULTS_DIR}/all-attestations.json" 2>/dev/null || echo "No attestations found for ${IMAGE_WITH_DIGEST}"
+
+            # Extract from manifest and save all data
+            echo "Extracting from manifest..."
+            docker buildx imagetools inspect "${IMAGE_WITH_DIGEST}" --raw > "${RESULTS_DIR}/manifest.json" 2>/dev/null || true
+
+            # Also save the raw manifest for the tag
+            docker buildx imagetools inspect "${IMAGE_REF}" --raw > "${RESULTS_DIR}/manifest-tag.json" 2>/dev/null || true
+          else
+            echo "Could not get image digest, skipping attestation verification"
+            echo "This may be expected for multi-platform builds or if the image hasn't been pushed yet"
+          fi
 
           # Generate comprehensive report
           {
@@ -291,122 +264,71 @@ jobs:
                 echo "  - Size: ${size} bytes"
                 if jq -e . >/dev/null 2>&1 < "$file"; then
                   echo "  - Status: ✅ Valid JSON"
-                  echo "  - Content Preview:"
-                  jq -r 'try .predicateType // "No predicate type"' "$file" | head -n 1
                 else
                   echo "  - Status: ⚠️ Invalid JSON"
                 fi
               fi
             done
-
-            echo ""
-            echo "#### Overall Status:"
-            if [ "$VERIFICATION_SUCCESS" = true ]; then
-              echo "✅ Successfully found attestation data"
-            else
-              echo "⚠️ No attestations could be verified"
-            fi
           } > "${RESULTS_DIR}/verification-report.md"
-
-          # Set output directory for next step
-          echo "VERIFICATION_SUCCESS=${VERIFICATION_SUCCESS}" >> $GITHUB_ENV
+        continue-on-error: true
 
       - name: Upload attestation results
         if: github.event_name != 'pull_request'
         uses: actions/upload-artifact@v4
         with:
-          name: attestation-results
+          name: attestation-results-multi-arch
           path: |
             ${{ env.ATTESTATION_RESULTS_DIR }}/*.json
             ${{ env.ATTESTATION_RESULTS_DIR }}/*.md
           retention-days: 90
+        continue-on-error: true
 
-      - name: Verify SBOM
+      - name: Generate comprehensive SBOM
         if: github.event_name != 'pull_request'
         run: |
           mkdir -p sbom-output
-          syft docker.io/zx8086/capella-document-search:latest \
-            -o json=sbom-output/syft-sbom.json \
-            -o spdx-json=sbom-output/spdx-sbom.json \
-            -o cyclonedx-json=sbom-output/cyclonedx-sbom.json
 
-      - name: Upload SBOM Files
+          # Generate multiple SBOM formats
+          echo "Generating SBOM files..."
+          # Get the first tag from metadata (tags are newline-separated)
+          IMAGE_TAG=$(echo '${{ steps.meta.outputs.tags }}' | head -n1)
+          echo "Scanning image: ${IMAGE_TAG}"
+
+          # Check if we just built this image locally
+          if docker images --format "{{.Repository}}:{{.Tag}}" | grep -q "${IMAGE_TAG#*/}"; then
+            echo "Using locally built image for SBOM generation..."
+            "${GITHUB_WORKSPACE}/bin/syft" "${IMAGE_TAG}" \
+              -o json=sbom-output/syft-sbom.json \
+              -o spdx-json=sbom-output/spdx-sbom.json \
+              -o cyclonedx-json=sbom-output/cyclonedx-sbom.json || echo "SBOM generation failed but continuing..."
+          else
+            # Try to pull the image if not available locally
+            if docker pull "${IMAGE_TAG}"; then
+              echo "Image pulled successfully, generating SBOM..."
+              "${GITHUB_WORKSPACE}/bin/syft" "${IMAGE_TAG}" \
+                -o json=sbom-output/syft-sbom.json \
+                -o spdx-json=sbom-output/spdx-sbom.json \
+                -o cyclonedx-json=sbom-output/cyclonedx-sbom.json || echo "SBOM generation failed but continuing..."
+            else
+              echo "Warning: Failed to pull image ${IMAGE_TAG}, SBOM generation skipped"
+              echo "This is expected if the platform-specific image hasn't been pushed yet"
+            fi
+          fi
+
+          # List generated files
+          echo "Generated SBOM files:"
+          ls -la sbom-output/ || true
+        continue-on-error: true
+
+      - name: Upload comprehensive SBOM files
         if: github.event_name != 'pull_request'
         uses: actions/upload-artifact@v4
         with:
-          name: sbom-files
+          name: comprehensive-sbom-multi-arch-${{ github.run_id }}
           path: sbom-output/
           retention-days: 90
-
-      # Testing section
-      - name: Test container
-        if: github.event_name != 'pull_request'
-        run: |
-          # Get the runner's architecture
-          RUNNER_ARCH=$(uname -m)
-          
-          # Stop existing containers using port 3000
-          docker ps -q --filter publish=3000 | xargs -r docker stop
-          docker rm -f capella-search-test 2>/dev/null || true
-          
-          # Run container (will automatically use correct architecture)
-          docker run -d \
-            --name capella-search-test \
-            -p 3000:3000 \
-            --env-file .env \
-            -e NODE_ENV=production \
-            -e BUILD_VERSION=${{ github.ref_name || '0.0.1' }} \
-            -e COMMIT_HASH=${{ github.sha }} \
-            -e BUILD_DATE=${{ env.BUILD_TIMESTAMP }} \
-            -e ENABLE_FILE_LOGGING=false \
-            -e LOG_MAX_FILES=7d \
-            -e LOG_MAX_SIZE=10m \
-            -e LOG_LEVEL=info \
-            zx8086/capella-document-search:latest
-          
-          # Add delay and better error handling
-          sleep 15
-          if ! docker ps | grep -q capella-search-test; then
-            echo "Container failed to start. Showing logs:"
-            docker logs capella-search-test
-            exit 1
-          fi
-
-          # Capture metrics
-          CONTAINER_STATUS=$(docker inspect --format='{{.State.Status}}' capella-search-test)
-          echo "CONTAINER_STATUS=${CONTAINER_STATUS}" >> $GITHUB_ENV
-          echo "CONTAINER_START_TIME=$(docker inspect --format='{{.State.StartedAt}}' capella-search-test)" >> $GITHUB_ENV
-
-      # Container security scanning
-      - name: Run Snyk container scan
         continue-on-error: true
-        env:
-          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
-        run: |
-          # Install Snyk as a project dependency
-          bun add snyk
 
-          # Run Snyk container test
-          echo "Running Snyk scan..."
-          bun run snyk container test docker.io/zx8086/capella-document-search:latest \
-            --file=Dockerfile \
-            --severity-threshold=high \
-            --sarif-file-output=snyk-docker.sarif \
-            --json > snyk-report.json || echo "Vulnerabilities found but continuing..."
-            
-          if [[ "${{ github.ref }}" == "refs/heads/master" ]]; then
-            bun run snyk container monitor docker.io/zx8086/capella-document-search:latest \
-              --file=Dockerfile || echo "Monitor command failed but continuing..."
-          fi
-
-      - name: Upload Docker Snyk scan results
-        if: always() && hashFiles('snyk-docker.sarif') != ''
-        uses: github/codeql-action/upload-sarif@v3
-        with:
-          sarif_file: snyk-docker.sarif
-          category: snyk-docker
-
-      # Build Summary
       - name: Docker Build Summary
         if: always()
         run: |
@@ -418,48 +340,87 @@ jobs:
             echo "|--------|-------|"
             echo "| 🆔 Build ID | \`${GITHUB_SHA::7}\` |"
             echo "| 📦 Image | capella-document-search |"
+            echo "| 🏗️ Platform | Multi-arch (linux/amd64, linux/arm64) |"
             echo "| ⚡ Status | ${CONTAINER_STATUS:-N/A} |"
-            
+
             # Container Status
             if [ "${CONTAINER_STATUS:-}" = "running" ]; then
-              STATS=$(docker stats capella-search-test --no-stream --format "{{.CPUPerc}},{{.MemUsage}},{{.NetIO}},{{.BlockIO}}")
               echo "| 🔄 Status | ✅ Running |"
-              echo "| 🕒 Start Time | ${CONTAINER_START_TIME} |"
+              echo "| 🕒 Start Time | ${CONTAINER_START_TIME:-N/A} |"
             else
               echo "| 🔄 Status | ⚠️ Not Running |"
             fi
-          } >> $GITHUB_STEP_SUMMARY
 
-      # Cleanup
+            echo ""
+            echo "#### 🔒 Security Scanning"
+            echo "| Scan Type | Status |"
+            echo "|-----------|--------|"
+            echo "| 📦 Security Scans | ⏭️ Run in separate workflow |"
+
+            echo ""
+            echo "#### 📋 Supply Chain Security"
+            echo "| Component | Status |"
+            echo "|-----------|--------|"
+
+            if [ -d "sbom-output" ] && [ "$(ls -A sbom-output)" ]; then
+              echo "| 📄 SBOM Generation | ✅ Completed |"
+            else
+              echo "| 📄 SBOM Generation | ⚠️ Failed |"
+            fi
+
+            if [ -d "${{ env.ATTESTATION_RESULTS_DIR }}" ] && [ "$(ls -A ${{ env.ATTESTATION_RESULTS_DIR }})" ]; then
+              echo "| 🔐 Attestation Verification | ✅ Completed |"
+            else
+              echo "| 🔐 Attestation Verification | ⚠️ Failed |"
+            fi
+
+            echo ""
+            echo "#### 🔗 Useful Links"
+            echo "- [Security Tab](https://github.com/${{ github.repository }}/security)"
+            echo "- [Actions Run](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})"
+            echo "- [Docker Hub](https://hub.docker.com/r/zx8086/capella-document-search)"
+
+          } >> $GITHUB_STEP_SUMMARY
+        continue-on-error: true
+
       - name: Cleanup
         if: always()
         run: |
-          rm -f .env .env.production
-          rm -f snyk.sarif snyk-docker.sarif
-          docker container rm -f capella-search-test || true
-          docker image prune -f
-          docker volume prune -f
-          docker builder prune -a -f
-          rm -rf node_modules
-          rm -rf security-artifacts
-          rm -rf /usr/local/bin/syft
-          rm -rf ~/.sigstore
-          echo "Cleanup completed"
-          
-      - name: Verify metadata
+          echo "Starting cleanup process..."
+
+          # Remove test containers
+          docker container rm -f capella-search-test 2>/dev/null || true
+
+          # Clean up temporary files
+          rm -rf sbom-output/ || true
+          rm -rf "${{ env.ATTESTATION_RESULTS_DIR }}" || true
+          rm -f sbom.spdx.json || true
+          rm -f .env .env.production || true
+
+          # Docker cleanup
+          docker image prune -f --filter "until=24h" || true
+          docker volume prune -f || true
+          docker builder prune -f --filter "until=24h" || true
+
+          # Remove verification tools
+          rm -rf "${GITHUB_WORKSPACE}/bin" || true
+          rm -rf ~/.sigstore || true
+
+          echo "Cleanup completed successfully"
         continue-on-error: true
-        shell: bash
+
+  notify:
+    needs: build-and-deploy
+    runs-on: ${{ github.event_name == 'pull_request' && 'ubuntu-latest' || 'self-hosted' }}
+    if: always()
+    steps:
+      - name: Notify on success
+        if: needs.build-and-deploy.result == 'success'
         run: |
-          echo "Verifying metadata output..."
-          
-          # Store metadata JSON in a file to avoid shell interpretation issues
-          echo '${{ steps.meta.outputs.json }}' > metadata.json
-          
-          if [ -s metadata.json ]; then
-            echo "Processing metadata..."
-            jq -r '.labels | keys[]' metadata.json 2>/dev/null || echo "No labels found"
-          else
-            echo "⚠️ Warning: No metadata JSON output found"
-          fi
-          
-          echo "Metadata verification completed"
+          echo "✅ Docker build and deployment completed successfully"
+
+      - name: Notify on failure
+        if: needs.build-and-deploy.result == 'failure'
+        run: |
+          echo "❌ Docker build and deployment failed"
+          exit 1

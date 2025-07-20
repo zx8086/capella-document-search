@@ -1,0 +1,163 @@
+name: "Setup Environment"
+description: "Setup Bun, verification tools (Cosign, Syft), and environment for capella-document-search"
+inputs:
+  cosign_version:
+    description: "Cosign version to install"
+    required: false
+    default: "v2.4.0"
+  syft_version:
+    description: "Syft version to install"
+    required: false
+    default: "v1.19.0"
+  cache_dependencies:
+    description: "Whether to cache Bun dependencies"
+    required: false
+    default: "true"
+runs:
+  using: "composite"
+  steps:
+    - name: Setup Bun
+      uses: oven-sh/setup-bun@v2
+      with:
+        bun-version: latest
+
+    - name: Verify Bun installation
+      shell: bash
+      run: |
+        bun --version
+        echo "Bun installed successfully"
+
+    - name: Cache Bun dependencies
+      if: inputs.cache_dependencies == 'true'
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.bun/install/cache
+          node_modules
+        key: ${{ runner.os }}-bun-${{ hashFiles('**/bun.lockb', '**/package.json') }}
+        restore-keys: |
+          ${{ runner.os }}-bun-
+
+    - name: Install dependencies
+      shell: bash
+      run: |
+        bun install --frozen-lockfile
+
+    - name: Setup verification tools
+      shell: bash
+      run: |
+        # Create directories first
+        mkdir -p "${GITHUB_WORKSPACE}/bin"
+        mkdir -p "${GITHUB_WORKSPACE}/tmp"
+        
+        cd "${GITHUB_WORKSPACE}/tmp"
+
+        # Detect architecture
+        ARCH=$(uname -m)
+        case $ARCH in
+          x86_64)
+            ARCH_SUFFIX="amd64"
+            ;;
+          aarch64|arm64)
+            ARCH_SUFFIX="arm64"
+            ;;
+          *)
+            echo "Unsupported architecture: $ARCH"
+            exit 1
+            ;;
+        esac
+
+        echo "Installing verification tools for architecture: ${ARCH_SUFFIX}"
+
+        # Install cosign
+        echo "Installing Cosign ${{ inputs.cosign_version }}..."
+        curl -Lo cosign "https://github.com/sigstore/cosign/releases/download/${{ inputs.cosign_version }}/cosign-linux-${ARCH_SUFFIX}"
+        chmod +x cosign
+        mv cosign "${GITHUB_WORKSPACE}/bin/"
+
+        # Install syft
+        echo "Installing Syft ${{ inputs.syft_version }}..."
+        SYFT_VERSION_NO_V=$(echo "${{ inputs.syft_version }}" | sed 's/^v//')
+        curl -Lo syft.tar.gz "https://github.com/anchore/syft/releases/download/${{ inputs.syft_version }}/syft_${SYFT_VERSION_NO_V}_linux_${ARCH_SUFFIX}.tar.gz"
+        tar xzf syft.tar.gz syft
+        mv syft "${GITHUB_WORKSPACE}/bin/"
+
+        # Add to PATH
+        echo "${GITHUB_WORKSPACE}/bin" >> $GITHUB_PATH
+
+        # Cleanup
+        cd "${GITHUB_WORKSPACE}"
+        rm -rf "${GITHUB_WORKSPACE}/tmp"
+
+        echo "Verification tools installed successfully"
+      continue-on-error: true
+
+    - name: Verify tool installations
+      shell: bash
+      run: |
+        echo "Verifying tool installations..."
+        
+        # Verify cosign
+        if "${GITHUB_WORKSPACE}/bin/cosign" version; then
+          echo "✅ Cosign installed successfully"
+        else
+          echo "❌ Cosign installation failed"
+        fi
+        
+        # Verify syft
+        if "${GITHUB_WORKSPACE}/bin/syft" --version; then
+          echo "✅ Syft installed successfully"
+        else
+          echo "❌ Syft installation failed"
+        fi
+        
+        echo "Tool verification completed"
+      continue-on-error: true
+
+    - name: Install additional tools
+      shell: bash
+      run: |
+        # Install jq if not present
+        if ! command -v jq &> /dev/null; then
+          sudo apt-get update && sudo apt-get install -y jq
+        fi
+        echo "✅ Additional tools installed"
+
+    - name: Setup environment variables
+      shell: bash
+      run: |
+        echo "NODE_ENV=production" >> $GITHUB_ENV
+        echo "OPEN_TELEMETRY_ENABLED=true" >> $GITHUB_ENV
+        echo "OPEN_TELEMETRY_SERVICE_NAME=capella-document-search" >> $GITHUB_ENV
+        echo "OPEN_TELEMETRY_SERVICE_VERSION=2.0.0" >> $GITHUB_ENV
+        echo "OPEN_TELEMETRY_DEPLOYMENT_ENVIRONMENT=production" >> $GITHUB_ENV
+
+    - name: Configure Snyk for faster scans
+      shell: bash
+      continue-on-error: true
+      run: |
+        # Create .snyk configuration file to exclude unnecessary files
+        cat > .snyk << 'SNYK_CONFIG_EOF'
+        # Snyk configuration file
+        # Exclude files and directories from scanning
+        exclude:
+          global:
+            - "**/*.test.ts"
+            - "**/*.spec.ts"
+            - "**/test/**"
+            - "**/tests/**"
+            - "**/docs/**"
+            - "**/*.md"
+            - "**/examples/**"
+            - "**/coverage/**"
+            - "**/dist/**"
+            - "**/build/**"
+            - "**/.github/**"
+            - "**/node_modules/**"
+        
+        # Language settings
+        language-settings:
+          node:
+            enableLsp: true
+        SNYK_CONFIG_EOF
+        echo "✅ Snyk configuration created"
