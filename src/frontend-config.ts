@@ -8,7 +8,9 @@ const OpenReplayConfigSchema = z.object({
 });
 
 const CsvConfigSchema = z.object({
-  FILE_UPLOAD_LIMIT: z.number().positive("CSV file upload limit must be positive"),
+  FILE_UPLOAD_LIMIT: z
+    .number()
+    .positive("CSV file upload limit must be positive"),
 });
 
 const ElasticApmConfigSchema = z.object({
@@ -16,7 +18,9 @@ const ElasticApmConfigSchema = z.object({
   SERVER_URL: z.string().url("Elastic APM server URL must be a valid URL"),
   SERVICE_VERSION: z.string().min(1, "Elastic APM service version is required"),
   ENVIRONMENT: z.enum(["development", "staging", "production"], {
-    errorMap: () => ({ message: "Environment must be development, staging, or production" })
+    errorMap: () => ({
+      message: "Environment must be development, staging, or production",
+    }),
   }),
 });
 
@@ -28,8 +32,8 @@ const AzureConfigSchema = z.object({
 
 const GrowthBookConfigSchema = z.object({
   apiHost: z.string().url("GrowthBook API host must be a valid URL"),
-  clientKey: z.string().min(1, "GrowthBook client key is required"),
-  encryptionKey: z.string().min(1, "GrowthBook encryption key is required"),
+  clientKey: z.string()("GrowthBook client key is required"),
+  encryptionKey: z.string()("GrowthBook encryption key is required"),
 });
 
 const FrontendConfigSchema = z.object({
@@ -71,22 +75,34 @@ const defaultConfig: FrontendConfig = {
 function loadFrontendConfig(): FrontendConfig {
   try {
     const env = import.meta.env;
-    
+
     const envConfig: Partial<FrontendConfig> = {
       openreplay: {
         PROJECT_KEY: env.PUBLIC_OPENREPLAY_PROJECT_KEY || "",
-        INGEST_POINT: env.PUBLIC_OPENREPLAY_INGEST_POINT || defaultConfig.openreplay.INGEST_POINT,
+        INGEST_POINT:
+          env.PUBLIC_OPENREPLAY_INGEST_POINT ||
+          defaultConfig.openreplay.INGEST_POINT,
       },
       csv: {
-        FILE_UPLOAD_LIMIT: env.PUBLIC_CSV_FILE_UPLOAD_LIMIT 
-          ? Number(env.PUBLIC_CSV_FILE_UPLOAD_LIMIT) 
+        FILE_UPLOAD_LIMIT: env.PUBLIC_CSV_FILE_UPLOAD_LIMIT
+          ? Number(env.PUBLIC_CSV_FILE_UPLOAD_LIMIT)
           : defaultConfig.csv.FILE_UPLOAD_LIMIT,
       },
       elasticApm: {
-        SERVICE_NAME: env.PUBLIC_ELASTIC_APM_SERVICE_NAME || defaultConfig.elasticApm.SERVICE_NAME,
-        SERVER_URL: env.PUBLIC_ELASTIC_APM_SERVER_URL || defaultConfig.elasticApm.SERVER_URL,
-        SERVICE_VERSION: env.PUBLIC_ELASTIC_APM_SERVICE_VERSION || defaultConfig.elasticApm.SERVICE_VERSION,
-        ENVIRONMENT: (env.PUBLIC_ELASTIC_APM_ENVIRONMENT as "development" | "staging" | "production") || defaultConfig.elasticApm.ENVIRONMENT,
+        SERVICE_NAME:
+          env.PUBLIC_ELASTIC_APM_SERVICE_NAME ||
+          defaultConfig.elasticApm.SERVICE_NAME,
+        SERVER_URL:
+          env.PUBLIC_ELASTIC_APM_SERVER_URL ||
+          defaultConfig.elasticApm.SERVER_URL,
+        SERVICE_VERSION:
+          env.PUBLIC_ELASTIC_APM_SERVICE_VERSION ||
+          defaultConfig.elasticApm.SERVICE_VERSION,
+        ENVIRONMENT:
+          (env.PUBLIC_ELASTIC_APM_ENVIRONMENT as
+            | "development"
+            | "staging"
+            | "production") || defaultConfig.elasticApm.ENVIRONMENT,
       },
       azure: {
         CLIENT_ID: env.PUBLIC_AZURE_CLIENT_ID || "",
@@ -94,7 +110,8 @@ function loadFrontendConfig(): FrontendConfig {
         REDIRECT_URI: env.PUBLIC_AZURE_REDIRECT_URI || "",
       },
       growthbook: {
-        apiHost: env.PUBLIC_GROWTHBOOK_API_HOST || defaultConfig.growthbook.apiHost,
+        apiHost:
+          env.PUBLIC_GROWTHBOOK_API_HOST || defaultConfig.growthbook.apiHost,
         clientKey: env.PUBLIC_GROWTHBOOK_CLIENT_KEY || "",
         encryptionKey: env.PUBLIC_GROWTHBOOK_ENCRYPTION_KEY || "",
       },
@@ -102,22 +119,23 @@ function loadFrontendConfig(): FrontendConfig {
 
     const mergedConfig = { ...defaultConfig, ...envConfig };
     const validatedConfig = FrontendConfigSchema.parse(mergedConfig);
-    
+
     console.debug("Frontend configuration loaded successfully");
     return validatedConfig;
-    
   } catch (error) {
     if (error instanceof z.ZodError) {
       console.error("Frontend configuration validation failed:", {
-        errors: error.errors.map(err => ({
-          path: err.path.join('.'),
+        errors: error.errors.map((err) => ({
+          path: err.path.join("."),
           message: err.message,
-          code: err.code
-        }))
+          code: err.code,
+        })),
       });
-      throw new Error(`Frontend configuration validation failed: ${error.errors.map(e => `${e.path.join('.')}: ${e.message}`).join(', ')}`);
+      throw new Error(
+        `Frontend configuration validation failed: ${error.errors.map((e) => `${e.path.join(".")}: ${e.message}`).join(", ")}`,
+      );
     }
-    
+
     console.error("Failed to load frontend configuration:", error);
     throw new Error("Failed to load frontend configuration");
   }
@@ -125,4 +143,11 @@ function loadFrontendConfig(): FrontendConfig {
 
 export const frontendConfig = loadFrontendConfig();
 
-export { FrontendConfigSchema, OpenReplayConfigSchema, CsvConfigSchema, ElasticApmConfigSchema, AzureConfigSchema, GrowthBookConfigSchema };
+export {
+  FrontendConfigSchema,
+  OpenReplayConfigSchema,
+  CsvConfigSchema,
+  ElasticApmConfigSchema,
+  AzureConfigSchema,
+  GrowthBookConfigSchema,
+};

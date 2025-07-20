@@ -22,6 +22,9 @@
     let isExiting = $state(false);
     let isPlaying = $state(false);
     let currentVideoUrl = $state('');
+    let isLoading = $state(false);
+    let loadAttempts = $state(0);
+    let maxLoadAttempts = 3;
 
     const videoBasePath = dev ? '/idle-videos/' : 'https://d2bgp0ri487o97.cloudfront.net/';
 
@@ -40,7 +43,10 @@
     }
 
     async function loadAndPlayVideo() {
-        if (!videoElement || !videos[currentVideoIndex] || isExiting) return;
+        if (!videoElement || !videos[currentVideoIndex] || isExiting || isLoading) return;
+        
+        isLoading = true;
+        loadAttempts = 0;
         
         try {
             console.debug(`Attempting to play video ${currentVideoIndex + 1}`);
@@ -50,23 +56,41 @@
             // Reset the video element
             videoElement.load();
             
-            // Wait for metadata to load with timeout
+            // Wait for metadata to load with longer timeout and retry logic
             await new Promise((resolve, reject) => {
-                const timeout = setTimeout(() => reject(new Error('Metadata load timeout')), 5000);
+                const timeout = setTimeout(() => {
+                    videoElement.onloadedmetadata = null;
+                    videoElement.onerror = null;
+                    reject(new Error('Metadata load timeout'));
+                }, 10000); // Increased timeout to 10 seconds
+                
                 videoElement.onloadedmetadata = () => {
                     clearTimeout(timeout);
+                    videoElement.onloadedmetadata = null;
+                    videoElement.onerror = null;
                     resolve(undefined);
+                };
+                
+                videoElement.onerror = () => {
+                    clearTimeout(timeout);
+                    videoElement.onloadedmetadata = null;
+                    videoElement.onerror = null;
+                    reject(new Error('Video load error'));
                 };
             });
             
             // Check if component is still mounted
-            if (!videoElement || isExiting) return;
+            if (!videoElement || isExiting) {
+                isLoading = false;
+                return;
+            }
             
             // Play the video with user interaction fallback
             try {
                 await videoElement.play();
                 console.debug("Video started playing");
                 isPlaying = true;
+                loadAttempts = 0; // Reset attempts on success
             } catch (playError) {
                 // Handle power-saving restrictions
                 if (playError.name === 'AbortError') {
@@ -89,14 +113,34 @@
             // Preload next video
             const nextIndex = (currentVideoIndex + 1) % videos.length;
             console.debug(`Preloaded video: ${videos[nextIndex]}`);
+            
         } catch (error) {
             console.error("Error playing video:", error);
             isPlaying = false;
+            loadAttempts++;
+            
             // Only try next video if we haven't exceeded attempts
-            if (currentVideoIndex < videos.length - 1) {
+            if (loadAttempts < maxLoadAttempts && videos.length > 1) {
+                console.debug(`Trying next video (attempt ${loadAttempts}/${maxLoadAttempts})`);
                 currentVideoIndex = (currentVideoIndex + 1) % videos.length;
-                await loadAndPlayVideo();
+                // Add small delay before retry
+                await new Promise(resolve => setTimeout(resolve, 1000));
+                if (!isExiting) {
+                    await loadAndPlayVideo();
+                }
+            } else {
+                console.warn("Max load attempts reached or no more videos to try");
+                // Reset and try again after longer delay
+                setTimeout(() => {
+                    if (!isExiting && videos.length > 0) {
+                        loadAttempts = 0;
+                        currentVideoIndex = 0;
+                        loadAndPlayVideo();
+                    }
+                }, 30000); // Wait 30 seconds before trying again
             }
+        } finally {
+            isLoading = false;
         }
     }
 
