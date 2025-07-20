@@ -40,7 +40,7 @@ const OpenTelemetryConfigSchema = z.object({
 });
 
 const RagConfigSchema = z.object({
-  RAG_PIPELINE: z.enum(["PINECONE", "CAPELLA", "VECTORIZE"]),
+  RAG_PIPELINE: z.enum(["PINECONE", "CAPELLA", "VECTORIZE", "AWS_KNOWLEDGE_BASE"]),
   OPENAI_API_KEY: z.string(),
   PINECONE_API_KEY: z.string(),
   PINECONE_INDEX_NAME: z.string(),
@@ -51,6 +51,7 @@ const RagConfigSchema = z.object({
   AWS_BEARER_TOKEN_BEDROCK: z.string(),
   BEDROCK_EMBEDDING_MODEL: z.string(),
   BEDROCK_CHAT_MODEL: z.string(),
+  KNOWLEDGE_BASE_ID: z.string(),
 });
 
 const BackendConfigSchema = z.object({
@@ -99,16 +100,17 @@ const defaultConfig: BackendConfig = {
   },
   rag: {
     RAG_PIPELINE: "PINECONE",
-    OPENAI_API_KEY: "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",
-    PINECONE_API_KEY: "pcsk_3LKJP_FNw6XFkMD7xuYToKFYSLuj6yQuncBD58njiX2F9HAZJd35FHAMHMWhUWcGxCUme",
+    OPENAI_API_KEY: "",
+    PINECONE_API_KEY: "",
     PINECONE_INDEX_NAME: "platform-engineering-rag",
     PINECONE_NAMESPACE: "capella-document-search",
     AWS_REGION: "eu-central-1",
-    AWS_ACCESS_KEY_ID: "DUMMY",
-    AWS_SECRET_ACCESS_KEY: "DUMMY",
-    AWS_BEARER_TOKEN_BEDROCK: "ABSKQmVkcm9ja0FQSUtleS16ZWF1LWF0LTM1Mjg5Njg3NzI4MTpERHVXOFovZHVQTG5FWDlvM0VKUDcvQkEvZVhnOTMyZWpXRk1iQzlodlhBOFBkc0hrYlJBaTFXV3FpMD0=",
+    AWS_ACCESS_KEY_ID: "",
+    AWS_SECRET_ACCESS_KEY: "",
+    AWS_BEARER_TOKEN_BEDROCK: "",
     BEDROCK_EMBEDDING_MODEL: "amazon.titan-embed-text-v1",
-    BEDROCK_CHAT_MODEL: "anthropic.claude-3-5-sonnet-20240620-v1:0",
+    BEDROCK_CHAT_MODEL: "eu.amazon.nova-pro-v1:0",
+    KNOWLEDGE_BASE_ID: "OSYN5HVWI2",
   },
 };
 
@@ -159,6 +161,7 @@ const envVarMapping = {
     AWS_BEARER_TOKEN_BEDROCK: "AWS_BEARER_TOKEN_BEDROCK",
     BEDROCK_EMBEDDING_MODEL: "BEDROCK_EMBEDDING_MODEL",
     BEDROCK_CHAT_MODEL: "BEDROCK_CHAT_MODEL",
+    KNOWLEDGE_BASE_ID: "KNOWLEDGE_BASE_ID",
   },
 };
 
@@ -229,7 +232,7 @@ function loadConfigFromEnv(): Partial<BackendConfig> {
 
   // Load RAG config
   config.rag = {
-    RAG_PIPELINE: parseEnvVar(getEnvVar(envVarMapping.rag.RAG_PIPELINE), "string") as "PINECONE" | "CAPELLA" | "VECTORIZE" || defaultConfig.rag.RAG_PIPELINE,
+    RAG_PIPELINE: parseEnvVar(getEnvVar(envVarMapping.rag.RAG_PIPELINE), "string") as "PINECONE" | "CAPELLA" | "VECTORIZE" | "AWS_KNOWLEDGE_BASE" || defaultConfig.rag.RAG_PIPELINE,
     OPENAI_API_KEY: parseEnvVar(getEnvVar(envVarMapping.rag.OPENAI_API_KEY), "string") as string || defaultConfig.rag.OPENAI_API_KEY,
     PINECONE_API_KEY: parseEnvVar(getEnvVar(envVarMapping.rag.PINECONE_API_KEY), "string") as string || defaultConfig.rag.PINECONE_API_KEY,
     PINECONE_INDEX_NAME: parseEnvVar(getEnvVar(envVarMapping.rag.PINECONE_INDEX_NAME), "string") as string || defaultConfig.rag.PINECONE_INDEX_NAME,
@@ -240,6 +243,7 @@ function loadConfigFromEnv(): Partial<BackendConfig> {
     AWS_BEARER_TOKEN_BEDROCK: parseEnvVar(getEnvVar(envVarMapping.rag.AWS_BEARER_TOKEN_BEDROCK), "string") as string || defaultConfig.rag.AWS_BEARER_TOKEN_BEDROCK,
     BEDROCK_EMBEDDING_MODEL: parseEnvVar(getEnvVar(envVarMapping.rag.BEDROCK_EMBEDDING_MODEL), "string") as string || defaultConfig.rag.BEDROCK_EMBEDDING_MODEL,
     BEDROCK_CHAT_MODEL: parseEnvVar(getEnvVar(envVarMapping.rag.BEDROCK_CHAT_MODEL), "string") as string || defaultConfig.rag.BEDROCK_CHAT_MODEL,
+    KNOWLEDGE_BASE_ID: parseEnvVar(getEnvVar(envVarMapping.rag.KNOWLEDGE_BASE_ID), "string") as string || defaultConfig.rag.KNOWLEDGE_BASE_ID,
   };
 
   return config;

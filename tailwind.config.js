@@ -76,7 +76,7 @@ const config = {
       },
     },
   },
-  plugins: [],
+  plugins: [require("@tailwindcss/forms"), require("@tailwindcss/typography")],
   future: {
     hoverOnlyWhenSupported: true,
   },

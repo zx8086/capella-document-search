@@ -10,6 +10,136 @@
   import { userAccount, isAuthenticated } from '$lib/stores/authStore';
   import { userPhotoUrl, fetchUserPhoto, ensureUserPhoto } from '$lib/stores/photoStore';
   import { getMsalInstance } from '$lib/config/authConfig';
+  import { marked } from 'marked';
+  import hljs from 'highlight.js/lib/core';
+  import 'highlight.js/styles/github-dark.css';
+  
+  // Import specific language support for highlight.js
+  import sql from 'highlight.js/lib/languages/sql';
+  import javascript from 'highlight.js/lib/languages/javascript';
+  import json from 'highlight.js/lib/languages/json';
+  import bash from 'highlight.js/lib/languages/bash';
+  import python from 'highlight.js/lib/languages/python';
+  import java from 'highlight.js/lib/languages/java';
+  import yaml from 'highlight.js/lib/languages/yaml';
+  
+  // Register languages
+  hljs.registerLanguage('sql', sql);
+  hljs.registerLanguage('javascript', javascript);
+  hljs.registerLanguage('json', json);
+  hljs.registerLanguage('bash', bash);
+  hljs.registerLanguage('python', python);
+  hljs.registerLanguage('java', java);
+  hljs.registerLanguage('yaml', yaml);
+  
+  // Configure marked with highlight.js
+  marked.setOptions({
+    highlight: function(code, lang) {
+      if (lang && hljs.getLanguage(lang)) {
+        try {
+          return hljs.highlight(code, { language: lang }).value;
+        } catch (err) {
+          // Fall back to plain text
+        }
+      }
+      return hljs.highlightAuto(code).value;
+    },
+    breaks: true,
+    gfm: true
+  });
+  
+  // Function to copy text to clipboard
+  async function copyToClipboard(text: string) {
+    try {
+      await navigator.clipboard.writeText(text);
+      // Show brief success feedback (could be enhanced with a toast)
+      console.log('Code copied to clipboard');
+    } catch (err) {
+      console.error('Failed to copy to clipboard:', err);
+      // Fallback for older browsers
+      const textArea = document.createElement('textarea');
+      textArea.value = text;
+      document.body.appendChild(textArea);
+      textArea.select();
+      document.execCommand('copy');
+      document.body.removeChild(textArea);
+    }
+  }
+
+  // Function to render markdown to HTML with copy buttons
+  function renderMarkdown(text: string): string {
+    try {
+      let html = marked.parse(text);
+      
+      // Add copy buttons to code blocks
+      html = html.replace(
+        /<pre><code[^>]*>([\s\S]*?)<\/code><\/pre>/g,
+        (match, codeContent) => {
+          // Generate unique ID for this code block
+          const codeId = 'code-' + Math.random().toString(36).substr(2, 9);
+          
+          return `
+            <div class="code-block-wrapper relative">
+              <button 
+                class="copy-btn absolute top-2 right-2 bg-gray-700 hover:bg-gray-600 text-white text-xs px-2 py-1 rounded opacity-75 hover:opacity-100 transition-opacity duration-200 z-10"
+                data-code-id="${codeId}"
+                title="Copy code"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-3 h-3">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M15.666 3.888A2.25 2.25 0 0 0 13.5 2.25h-3c-1.03 0-1.75.694-1.75 1.542 0 .847.72 1.542 1.75 1.542h3A2.25 2.25 0 0 1 15.666 3.888zM8.25 4.5c0-.78.637-1.417 1.417-1.417h.666c.78 0 1.417.637 1.417 1.417v.583c0 .78-.637 1.417-1.417 1.417h-.666c-.78 0-1.417-.637-1.417-1.417V4.5z" />
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h3.75M9 15h3.75M9 18h3.75m-7.5-3v5.25A2.25 2.25 0 0 0 6.75 22.5h7.5a2.25 2.25 0 0 0 2.25-2.25V13.5a2.25 2.25 0 0 0-2.25-2.25H6.75a2.25 2.25 0 0 0-2.25 2.25z" />
+                </svg>
+              </button>
+              <pre id="${codeId}" class="code-content"><code>${codeContent}</code></pre>
+            </div>
+          `;
+        }
+      );
+      
+      return html;
+    } catch (error) {
+      console.warn('Failed to parse markdown:', error);
+      return text; // Fall back to plain text
+    }
+  }
+
+  // Function to handle copy button clicks using event delegation
+  function handleCopyClick(event: Event) {
+    const button = event.target as HTMLElement;
+    const copyBtn = button.closest('.copy-btn') as HTMLElement;
+    
+    if (copyBtn) {
+      const codeId = copyBtn.dataset.codeId;
+      if (codeId) {
+        const codeElement = document.getElementById(codeId);
+        if (codeElement) {
+          const codeText = codeElement.textContent || '';
+          copyToClipboard(codeText);
+          
+          // Visual feedback - briefly change button icon
+          const originalContent = copyBtn.innerHTML;
+          copyBtn.innerHTML = `
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-3 h-3">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+            </svg>
+          `;
+          setTimeout(() => {
+            copyBtn.innerHTML = originalContent;
+          }, 2000);
+        }
+      }
+    }
+  }
+
+  // Setup event delegation for copy buttons
+  function setupCopyFunction() {
+    if (browser && messagesContainer) {
+      // Remove any existing listener
+      messagesContainer.removeEventListener('click', handleCopyClick);
+      // Add event delegation for copy buttons
+      messagesContainer.addEventListener('click', handleCopyClick);
+    }
+  }
   
   const dispatch = createEventDispatcher();
   
@@ -49,7 +179,10 @@
   // Watch messages for changes and scroll
   $effect(() => {
     if (messages.length) {
-      setTimeout(scrollToBottom, 100); // Small delay to ensure content is rendered
+      setTimeout(() => {
+        scrollToBottom();
+        setupCopyFunction(); // Setup copy buttons after DOM updates
+      }, 100); // Small delay to ensure content is rendered
     }
   });
   
@@ -397,10 +530,10 @@
                       <div class="animate-spin rounded-full h-5 w-5 border-2 border-gray-500 border-t-transparent"></div>
                     </div>
                   {:else}
-                    <div class="whitespace-pre-wrap">
+                    <div class="prose prose-sm max-w-none dark:prose-invert prose-pre:bg-gray-900 prose-pre:text-gray-100">
                       {#if message.type === 'bot'}
                         {#if message.text.includes('References:')}
-                          {message.text.split('References:')[0]}
+                          {@html renderMarkdown(message.text.split('References:')[0])}
                           <div class="mt-2 text-sm text-gray-600 dark:text-gray-400 border-t border-gray-200 dark:border-gray-700 pt-2">
                             References:
                             {#each message.text.split('References:')[1].trim().split('\n').filter(ref => ref.trim()) as ref}
@@ -408,10 +541,10 @@
                             {/each}
                           </div>
                         {:else}
-                          {message.text}
+                          {@html renderMarkdown(message.text)}
                         {/if}
                       {:else}
-                        {message.text}
+                        <div class="whitespace-pre-wrap">{message.text}</div>
                       {/if}
                     </div>
                   {/if}
@@ -475,5 +608,85 @@
   /* Add this script to calculate scrollbar width on mount */
   :global(:root) {
     --scrollbar-width: 0px;
+  }
+
+  /* Custom markdown styling for chat messages */
+  :global(.prose) {
+    color: inherit !important;
+  }
+  
+  :global(.prose h1, .prose h2, .prose h3, .prose h4, .prose h5, .prose h6) {
+    color: inherit !important;
+    margin-top: 1rem !important;
+    margin-bottom: 0.5rem !important;
+  }
+  
+  :global(.prose p) {
+    margin-top: 0.5rem !important;
+    margin-bottom: 0.5rem !important;
+  }
+  
+  :global(.prose ul, .prose ol) {
+    margin-top: 0.5rem !important;
+    margin-bottom: 0.5rem !important;
+  }
+  
+  :global(.prose li) {
+    margin-top: 0.25rem !important;
+    margin-bottom: 0.25rem !important;
+  }
+  
+  :global(.code-block-wrapper) {
+    position: relative !important;
+    margin: 0.5rem 0 !important;
+  }
+  
+  :global(.prose pre) {
+    background-color: #1f2937 !important;
+    color: #f9fafb !important;
+    border-radius: 0.375rem !important;
+    padding: 1rem !important;
+    padding-top: 2.5rem !important; /* Make room for copy button */
+    margin: 0 !important;
+    overflow-x: auto !important;
+  }
+  
+  :global(.copy-btn) {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    border: none !important;
+    cursor: pointer !important;
+    transition: all 0.2s ease !important;
+  }
+  
+  :global(.copy-btn:hover) {
+    transform: scale(1.05) !important;
+  }
+  
+  :global(.prose code) {
+    background-color: #f3f4f6 !important;
+    color: #374151 !important;
+    padding: 0.125rem 0.25rem !important;
+    border-radius: 0.25rem !important;
+    font-size: 0.875em !important;
+  }
+  
+  :global(.prose pre code) {
+    background-color: transparent !important;
+    color: inherit !important;
+    padding: 0 !important;
+  }
+  
+  :global(.prose strong) {
+    font-weight: 600 !important;
+    color: inherit !important;
+  }
+  
+  :global(.prose blockquote) {
+    border-left: 4px solid #d1d5db !important;
+    padding-left: 1rem !important;
+    font-style: italic !important;
+    margin: 0.5rem 0 !important;
   }
 </style>

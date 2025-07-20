@@ -4,6 +4,7 @@ import type { RAGProvider } from './types';
 import { PineconeRAGProvider } from './providers/pinecone';
 import { VectorizeRAGProvider } from './providers/vectorize';
 import { CapellaRAGProvider } from './providers/capella';
+import { AWSKnowledgeBaseRAGProvider } from './providers/aws-knowledge-base';
 import { log, err } from '../../utils/unifiedLogger';
 
 export function createRAGProvider(fetch: typeof fetch): RAGProvider {
@@ -36,6 +37,10 @@ export function createRAGProvider(fetch: typeof fetch): RAGProvider {
         case 'CAPELLA':
             log('🔍 [RAG Factory] Creating Capella provider instance');
             provider = new CapellaRAGProvider();
+            break;
+        case 'AWS_KNOWLEDGE_BASE':
+            log('🔍 [RAG Factory] Creating AWS Knowledge Base provider instance');
+            provider = new AWSKnowledgeBaseRAGProvider();
             break;
         default:
             err('❌ [RAG Factory] Unsupported pipeline', { pipeline });
