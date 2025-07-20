@@ -31,13 +31,25 @@ jobs:
         with:
           cache_dependencies: "true"
 
+      - name: Install Snyk CLI
+        run: |
+          # Install Snyk CLI globally with Bun
+          bun add -g snyk
+          snyk --version
+
       - name: Run Snyk code scan
         continue-on-error: true
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
         run: |
           echo "Running Snyk code scan..."
-          npx snyk test \
+          
+          # Authenticate Snyk
+          snyk auth ${{ secrets.SNYK_TOKEN }}
+          
+          # Run code scan with proper package manager detection
+          snyk test \
+            --package-manager=yarn \
             --file=package.json \
             --sarif-file-output=snyk-code.sarif \
             --severity-threshold=high \
@@ -45,7 +57,9 @@ jobs:
 
           # Monitor on master branch
           if [[ "${{ github.ref }}" == "refs/heads/master" ]]; then
-            npx snyk monitor --file=package.json || echo "Code monitor command failed but continuing..."
+            snyk monitor \
+              --package-manager=yarn \
+              --file=package.json || echo "Code monitor command failed but continuing..."
           fi
 
       - name: Upload Snyk code scan results
@@ -83,13 +97,24 @@ jobs:
             sleep 10
           done
 
+      - name: Install Snyk CLI
+        run: |
+          # Install Snyk CLI globally with Bun
+          bun add -g snyk
+          snyk --version
+
       - name: Run Snyk container scan
         continue-on-error: true
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
         run: |
           echo "Running Snyk container scan..."
-          npx snyk container test ${{ env.DOCKER_IMAGE }} \
+          
+          # Authenticate Snyk
+          snyk auth ${{ secrets.SNYK_TOKEN }}
+          
+          # Run container scan
+          snyk container test ${{ env.DOCKER_IMAGE }} \
             --file=Dockerfile \
             --severity-threshold=high \
             --sarif-file-output=snyk-container.sarif \
@@ -97,7 +122,7 @@ jobs:
 
           # Monitor on master branch
           if [[ "${{ github.ref }}" == "refs/heads/master" ]]; then
-            npx snyk container monitor ${{ env.DOCKER_IMAGE }} \
+            snyk container monitor ${{ env.DOCKER_IMAGE }} \
               --file=Dockerfile || echo "Container monitor command failed but continuing..."
           fi
 
