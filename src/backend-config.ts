@@ -7,16 +7,16 @@ const ApplicationConfigSchema = z.object({
   LOG_LEVEL: z.enum(["debug", "info", "warn", "error"]),
   LOG_MAX_SIZE: z.string(),
   LOG_MAX_FILES: z.string(),
-  GRAPHQL_ENDPOINT: z.string().url(),
+  GRAPHQL_ENDPOINT: z.string().url().or(z.literal("")),
   DB_DATA_DIR: z.string(),
   ENABLE_FILE_LOGGING: z.boolean(),
 });
 
 const CapellaConfigSchema = z.object({
-  API_BASE_URL: z.string().url(),
-  ORG_ID: z.string().uuid(),
-  PROJECT_ID: z.string().uuid(),
-  CLUSTER_ID: z.string().uuid(),
+  API_BASE_URL: z.string().url().or(z.literal("")),
+  ORG_ID: z.string(),
+  PROJECT_ID: z.string(),
+  CLUSTER_ID: z.string(),
   BUCKET_ID: z.string(),
   AUTH_TOKEN: z.string(),
   URL: z.string(),
@@ -32,9 +32,9 @@ const OpenTelemetryConfigSchema = z.object({
   SERVICE_NAME: z.string(),
   SERVICE_VERSION: z.string(),
   DEPLOYMENT_ENVIRONMENT: z.enum(["development", "staging", "production"]),
-  TRACES_ENDPOINT: z.string().url(),
-  METRICS_ENDPOINT: z.string().url(),
-  LOGS_ENDPOINT: z.string().url(),
+  TRACES_ENDPOINT: z.string().url().or(z.literal("")),
+  METRICS_ENDPOINT: z.string().url().or(z.literal("")),
+  LOGS_ENDPOINT: z.string().url().or(z.literal("")),
   METRIC_READER_INTERVAL: z.number().min(1000).max(300000),
   SUMMARY_LOG_INTERVAL: z.number().min(1000).max(600000),
 });
@@ -191,6 +191,12 @@ function parseEnvVar(
   type: "string" | "number" | "boolean",
 ): unknown {
   if (value === undefined) return undefined;
+  
+  // Clean up quoted values
+  if (typeof value === "string") {
+    value = value.replace(/^['"]|['"]$/g, "").trim();
+  }
+  
   if (type === "number") return Number(value);
   if (type === "boolean") return value.toLowerCase() === "true";
   return value;
