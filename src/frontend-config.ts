@@ -3,7 +3,7 @@
 import { z } from "zod";
 
 const OpenReplayConfigSchema = z.object({
-  PROJECT_KEY: z.string().min(1, "OpenReplay project key is required"),
+  PROJECT_KEY: z.string(),
   INGEST_POINT: z.string().url("OpenReplay ingest point must be a valid URL"),
 });
 
@@ -25,15 +25,15 @@ const ElasticApmConfigSchema = z.object({
 });
 
 const AzureConfigSchema = z.object({
-  CLIENT_ID: z.string().uuid("Azure client ID must be a valid UUID"),
-  TENANT_ID: z.string().uuid("Azure tenant ID must be a valid UUID"),
-  REDIRECT_URI: z.string().url("Azure redirect URI must be a valid URL"),
+  CLIENT_ID: z.string(),
+  TENANT_ID: z.string(),
+  REDIRECT_URI: z.string().url("Azure redirect URI must be a valid URL").or(z.literal("")),
 });
 
 const GrowthBookConfigSchema = z.object({
   apiHost: z.string().url("GrowthBook API host must be a valid URL"),
-  clientKey: z.string()("GrowthBook client key is required"),
-  encryptionKey: z.string()("GrowthBook encryption key is required"),
+  clientKey: z.string(),
+  encryptionKey: z.string(),
 });
 
 const FrontendConfigSchema = z.object({
