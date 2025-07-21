@@ -72,7 +72,6 @@ export class AWSKnowledgeBaseRAGProvider implements RAGProvider {
         });
 
         return { response, retrievalTime };
-        
       } catch (error) {
         err("❌ [AWSKnowledgeBase] Knowledge base retrieval failed", {
           error: error.message,
@@ -81,24 +80,26 @@ export class AWSKnowledgeBaseRAGProvider implements RAGProvider {
           messageLength: message.length,
           awsRegion: backendConfig.rag.AWS_REGION,
         });
-        
+
         // Re-throw with additional context
-        const enhancedError = new Error(`Knowledge base retrieval failed: ${error.message}`);
-        enhancedError.name = 'KnowledgeBaseRetrievalError';
+        const enhancedError = new Error(
+          `Knowledge base retrieval failed: ${error.message}`,
+        );
+        enhancedError.name = "KnowledgeBaseRetrievalError";
         enhancedError.cause = error;
         throw enhancedError;
       }
     },
     {
-      run_type: "retriever", 
+      run_type: "retriever",
       name: "AWS Knowledge Base Retrieval",
       tags: [
         "retrieval",
-        "aws-knowledge-base", 
+        "aws-knowledge-base",
         "vector-search",
         "semantic-search",
         "document-retrieval",
-        "embeddings"
+        "embeddings",
       ],
     },
   );
@@ -111,13 +112,13 @@ export class AWSKnowledgeBaseRAGProvider implements RAGProvider {
 
       try {
         const startTime = Date.now();
-        
+
         // Check if response is valid
         if (!response || !response.retrievalResults) {
           log("⚠️ [AWSKnowledgeBase] No retrieval results in response");
           return { context: [], processingTime: 0, totalChars: 0, avgScore: 0 };
         }
-        
+
         // Extract context from AWS Knowledge Base response
         const context =
           response.retrievalResults
@@ -140,10 +141,17 @@ export class AWSKnowledgeBaseRAGProvider implements RAGProvider {
             .filter((item) => item.text.trim().length > 0) || [];
 
         const processingTime = Date.now() - startTime;
-        const totalChars = context.reduce((sum, item) => sum + item.text.length, 0);
-        const avgScore = context.length > 0 
-          ? context.reduce((sum, item) => sum + (item.metadata.score || 0), 0) / context.length 
-          : 0;
+        const totalChars = context.reduce(
+          (sum, item) => sum + item.text.length,
+          0,
+        );
+        const avgScore =
+          context.length > 0
+            ? context.reduce(
+                (sum, item) => sum + (item.metadata.score || 0),
+                0,
+              ) / context.length
+            : 0;
 
         log("✅ [AWSKnowledgeBase] Context processing complete", {
           contextItems: context.length,
@@ -153,7 +161,6 @@ export class AWSKnowledgeBaseRAGProvider implements RAGProvider {
         });
 
         return { context, processingTime, totalChars, avgScore };
-        
       } catch (error) {
         err("❌ [AWSKnowledgeBase] Context processing failed", {
           error: error.message,
@@ -162,24 +169,26 @@ export class AWSKnowledgeBaseRAGProvider implements RAGProvider {
           hasRetrievalResults: !!(response && response.retrievalResults),
           retrievalResultsCount: response?.retrievalResults?.length || 0,
         });
-        
+
         // Re-throw with additional context
-        const enhancedError = new Error(`Context processing failed: ${error.message}`);
-        enhancedError.name = 'ContextProcessingError';
+        const enhancedError = new Error(
+          `Context processing failed: ${error.message}`,
+        );
+        enhancedError.name = "ContextProcessingError";
         enhancedError.cause = error;
         throw enhancedError;
       }
     },
     {
       run_type: "parser",
-      name: "Context Processing", 
+      name: "Context Processing",
       tags: [
         "context-processing",
-        "document-parsing", 
+        "document-parsing",
         "text-extraction",
         "data-transformation",
         "content-filtering",
-        "metadata-enrichment"
+        "metadata-enrichment",
       ],
     },
   );
@@ -193,33 +202,32 @@ export class AWSKnowledgeBaseRAGProvider implements RAGProvider {
 
       try {
         const startTime = Date.now();
-        
+
         // Validate inputs
         if (!message || message.trim().length === 0) {
-          throw new Error('Empty message provided to LLM completion');
+          throw new Error("Empty message provided to LLM completion");
         }
-        
+
         if (!Array.isArray(context)) {
           log("⚠️ [AWSKnowledgeBase] Context is not an array, converting");
           context = context ? [context] : [];
         }
-        
+
         const contextText = context?.map((c) => c.text).join("\n\n---\n\n");
         const totalContextLength = contextText.length;
-        
+
         log("📝 [AWSKnowledgeBase] Prepared context for LLM", {
           contextItems: context.length,
           totalContextLength,
           messageLength: message.length,
         });
-        
+
         // Generate completion using Bedrock
         const stream = await this.chatService.createChatCompletion(
           [
             {
               role: "system",
-              content:
-                `You are a helpful assistant. Use the following context to answer the user's question. Do not include references in your response as they will be added automatically. If you cannot answer the question based on the context, say so.
+              content: `You are a helpful assistant. Use the following context to answer the user's question. Do not include references in your response as they will be added automatically. If you cannot answer the question based on the context, say so.
 
 When the user asks "How can I see [something]" or "How do I find [something]", they want to know the N1QL query syntax/code, not execute it. In those cases, show them the query code like in the context provided.`,
             },
@@ -235,26 +243,27 @@ When the user asks "How can I see [something]" or "How do I find [something]", t
         );
 
         const llmTime = Date.now() - startTime;
-        
+
         log("✅ [AWSKnowledgeBase] LLM completion initiated", {
           llmSetupTimeMs: llmTime,
           totalContextLength,
         });
 
         return { stream, llmTime };
-        
       } catch (error) {
         err("❌ [AWSKnowledgeBase] LLM completion failed", {
           error: error.message,
           errorType: error.constructor.name,
           messageLength: message.length,
-          contextItems: Array.isArray(context) ? context.length : 'not-array',
+          contextItems: Array.isArray(context) ? context.length : "not-array",
           contextType: typeof context,
         });
-        
+
         // Re-throw with additional context
-        const enhancedError = new Error(`LLM completion failed: ${error.message}`);
-        enhancedError.name = 'LLMCompletionError';
+        const enhancedError = new Error(
+          `LLM completion failed: ${error.message}`,
+        );
+        enhancedError.name = "LLMCompletionError";
         enhancedError.cause = error;
         throw enhancedError;
       }
@@ -265,11 +274,11 @@ When the user asks "How can I see [something]" or "How do I find [something]", t
       tags: [
         "llm",
         "bedrock",
-        "chat-completion", 
+        "chat-completion",
         "streaming",
         "generation",
         "aws-nova-pro",
-        "conversational-ai"
+        "conversational-ai",
       ],
     },
   );
@@ -281,7 +290,7 @@ When the user asks "How can I see [something]" or "How do I find [something]", t
         totalContextChars: metadata.totalContextChars,
       });
 
-      let responseContent = '';
+      let responseContent = "";
       let chunkCount = 0;
       const startTime = Date.now();
 
@@ -311,7 +320,6 @@ When the user asks "How can I see [something]" or "How do I find [something]", t
           contextItems: metadata.contextItems,
           avgRelevanceScore: metadata.avgRelevanceScore,
         };
-
       } catch (error) {
         err("❌ [AWSKnowledgeBase] Stream capture failed", {
           error: error.message,
@@ -328,7 +336,7 @@ When the user asks "How can I see [something]" or "How do I find [something]", t
         "response-capture",
         "streaming",
         "final-output",
-        "content-logging"
+        "content-logging",
       ],
     },
   );
@@ -340,7 +348,9 @@ When the user asks "How can I see [something]" or "How do I find [something]", t
       timestamp: new Date().toISOString(),
     });
 
-    log("📊 [AWSKnowledgeBase] Creating traceable pipeline with sub-components");
+    log(
+      "📊 [AWSKnowledgeBase] Creating traceable pipeline with sub-components",
+    );
 
     // Create traced pipeline that orchestrates sub-components
     this.traceablePipeline = traceable(
@@ -352,13 +362,18 @@ When the user asks "How can I see [something]" or "How do I find [something]", t
         const pipelineStartTime = Date.now();
 
         // Step 1: Knowledge Base Retrieval
-        const { response, retrievalTime } = await this.tracedKnowledgeBaseRetrieval(message);
+        const { response, retrievalTime } =
+          await this.tracedKnowledgeBaseRetrieval(message);
 
         // Step 2: Context Processing
-        const { context, processingTime, totalChars, avgScore } = await this.tracedContextProcessing(response);
+        const { context, processingTime, totalChars, avgScore } =
+          await this.tracedContextProcessing(response);
 
         // Step 3: LLM Completion
-        const { stream, llmTime } = await this.tracedLLMCompletion(message, context);
+        const { stream, llmTime } = await this.tracedLLMCompletion(
+          message,
+          context,
+        );
 
         // Create a traced stream wrapper to capture the final response
         const tracedStream = this.createTracedStreamWrapper(stream, {
@@ -401,10 +416,11 @@ When the user asks "How can I see [something]" or "How do I find [something]", t
 
     try {
       const queryStart = Date.now();
-      
-      // Generate thread/session ID for conversation tracking (following LangSmith threads docs)
-      const threadId = metadata.sessionId || `session-${metadata.userId}-${Date.now()}`;
-      
+
+      // Generate thread/session ID for conversation tracking
+      const threadId =
+        metadata.sessionId || `session-${metadata.userId}-${Date.now()}`;
+
       const result = await this.traceablePipeline(message, {
         metadata: {
           ...metadata,
@@ -422,31 +438,31 @@ When the user asks "How can I see [something]" or "How do I find [something]", t
           "rag-pipeline",
           "aws-knowledge-base",
           "chat-completion",
-          
-          // Context tags  
+
+          // Context tags
           "thread-enabled",
           metadata.environment,
-          
+
           // User classification
           `user:${metadata.userId}`,
-          `session:${threadId.split('-').pop()}`, // Just timestamp part
-          
+          `session:${threadId.split("-").pop()}`, // Just timestamp part
+
           // Message characteristics
-          `msg-length:${message.length > 100 ? 'long' : message.length > 50 ? 'medium' : 'short'}`,
+          `msg-length:${message.length > 100 ? "long" : message.length > 50 ? "medium" : "short"}`,
           `msg-count:${metadata.messageCount}`,
-          
+
           // Performance tags
           "streaming",
           "retrieval-augmented",
-          
+
           // Version tracking
-          "v2.0.2"
+          "v2.0.2",
         ],
       });
-      
+
       const queryEnd = Date.now();
       const totalQueryTime = queryEnd - queryStart;
-      
+
       log("✅ [AWSKnowledgeBaseProvider] Query completed successfully", {
         totalQueryTimeMs: totalQueryTime,
         userId: metadata.userId,
@@ -454,9 +470,8 @@ When the user asks "How can I see [something]" or "How do I find [something]", t
         hasContext: !!(result.context && result.context.length > 0),
         contextItems: result.context?.length || 0,
       });
-      
+
       return result;
-      
     } catch (error) {
       const errorContext = {
         error: error.message,
@@ -466,22 +481,25 @@ When the user asks "How can I see [something]" or "How do I find [something]", t
         userId: metadata.userId,
         environment: metadata.environment,
         timestamp: new Date().toISOString(),
-        stackTrace: error.stack?.split('\n').slice(0, 5).join('\n'), // First 5 lines of stack
+        stackTrace: error.stack?.split("\n").slice(0, 5).join("\n"), // First 5 lines of stack
       };
-      
-      err("❌ [AWSKnowledgeBaseProvider] Query error with context", errorContext);
-      
+
+      err(
+        "❌ [AWSKnowledgeBaseProvider] Query error with context",
+        errorContext,
+      );
+
       // Add error annotations for LangSmith
-      if (error.annotate && typeof error.annotate === 'function') {
+      if (error.annotate && typeof error.annotate === "function") {
         error.annotate({
           error_type: error.constructor.name,
-          error_stage: 'aws-knowledge-base-query',
+          error_stage: "aws-knowledge-base-query",
           user_id: metadata.userId,
           message_length: message.length,
           environment: metadata.environment,
         });
       }
-      
+
       throw error;
     }
   }

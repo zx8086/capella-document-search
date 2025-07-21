@@ -9,6 +9,7 @@
   import { trackEvent, waitForTracker, isTrackerReady } from "$lib/context/tracker";
   import { userAccount, isAuthenticated } from '$lib/stores/authStore';
   import { userPhotoUrl, fetchUserPhoto, ensureUserPhoto } from '$lib/stores/photoStore';
+  import { chatStore, formatMessagesForDisplay, type Conversation } from '$lib/stores/chatStore';
   import { getMsalInstance } from '$lib/config/authConfig';
   import { marked } from 'marked';
   import hljs from 'highlight.js/lib/core';
@@ -153,18 +154,16 @@
   let userPhoto = $state($userPhotoUrl);
   let trackerReady = $state(false);
   let isInitialized = $state(false);
+  let conversation = $state<Conversation | null>(null);
+  
+  // Use derived with safe access to avoid initialization issues
+  let messages = $derived(formatMessagesForDisplay(conversation));
+  let conversationSummary = $derived(conversation ? chatStore.getConversationSummary() : null);
   
   // Get first name from full name
   function getFirstName(fullName: string = ''): string {
     return fullName.split(' ')[0] || 'there';
   }
-  
-  let messages = $state([
-    { 
-      type: 'bot', 
-      text: `Hello ${getFirstName($userAccount?.name)}! How can I help you today?` 
-    }
-  ]);
   
   // Fix the state warning by properly declaring messagesContainer
   let messagesContainer = $state<HTMLDivElement | null>(null);
@@ -207,6 +206,15 @@
     });
   });
   
+  // Subscribe to chat store changes and update local conversation state
+  $effect(() => {
+    const unsubscribe = chatStore.subscribe(conv => {
+      conversation = conv;
+    });
+    
+    return () => unsubscribe();
+  });
+
   onMount(async () => {
     try {
       // Wait for tracker to be ready
@@ -222,6 +230,9 @@
         isAuthenticated: $isAuthenticated,
         timestamp: new Date().toISOString()
       });
+
+      // Initialize chat store
+      chatStore.initialize($userAccount?.name);
 
       // Fetch user photo if authenticated
       if ($isAuthenticated && $userAccount) {
@@ -276,8 +287,11 @@
     isLoading = true;
     
     try {
-        messages = [...messages, { type: 'user', text: userMessage }];
-        messages = [...messages, { type: 'bot', text: '', isLoading: true }];
+        // Add user message to conversation
+        chatStore.addMessage('user', userMessage);
+        
+        // Add loading assistant message
+        const loadingMessageId = chatStore.addMessage('assistant', '', true);
 
         const sessionStartTime = new Date().toISOString();
         const response = await fetch('/api/chat', {
@@ -286,7 +300,7 @@
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({ 
-                message: userMessage,
+                messages: chatStore.getMessagesForAPI(),
                 user: $userAccount ? {
                     id: $userAccount.localAccountId || $userAccount.homeAccountId,
                     name: $userAccount.name,
@@ -299,7 +313,8 @@
                     sessionStartTime: sessionStartTime,
                     messageCount: messages.length,
                     clientTimestamp: new Date().toISOString(),
-                    pathname: $page?.url?.pathname
+                    pathname: $page?.url?.pathname,
+                    conversationId: conversation?.id
                 } : null
             })
         });
@@ -360,11 +375,7 @@
                             if (data.content) {
                                 accumulatedResponse += data.content;
                                 console.log('💬 Updated response:', accumulatedResponse);
-                                messages = messages.map((msg, index) => 
-                                    index === messages.length - 1 
-                                        ? { type: 'bot', text: accumulatedResponse, isLoading: false }
-                                        : msg
-                                );
+                                chatStore.updateMessage(loadingMessageId, accumulatedResponse, false);
                                 // Force scroll on content updates to ensure visibility
                                 forceScrollToBottom();
                             }
@@ -390,11 +401,7 @@
                     const data = JSON.parse(buffer);
                     if (data.content) {
                         accumulatedResponse += data.content;
-                        messages = messages.map((msg, index) => 
-                            index === messages.length - 1 
-                                ? { type: 'bot', text: accumulatedResponse, isLoading: false }
-                                : msg
-                        );
+                        chatStore.updateMessage(loadingMessageId, accumulatedResponse, false);
                     }
                 } catch (e) {
                     console.warn('⚠️ Failed to parse final buffer:', buffer, e);
@@ -402,11 +409,7 @@
             }
             
             // Ensure final message state is set
-            messages = messages.map((msg, index) => 
-                index === messages.length - 1 
-                    ? { type: 'bot', text: accumulatedResponse, isLoading: false }
-                    : msg
-            );
+            chatStore.updateMessage(loadingMessageId, accumulatedResponse, false);
             
             // Final scroll to ensure all content is visible
             setTimeout(() => forceScrollToBottom(), 200);
@@ -421,18 +424,24 @@
 
     } catch (error) {
         console.error('❌ Chat error:', error);
-        messages = messages.map((msg, i) => 
-            i === messages.length - 1 
-                ? { 
-                    type: 'bot', 
-                    text: 'I apologize, but I encountered an error processing your request. Please try again.',
-                    isLoading: false 
-                  }
-                : msg
-        );
+        chatStore.updateMessage(loadingMessageId, 'I apologize, but I encountered an error processing your request. Please try again.', false);
     } finally {
         isLoading = false;
     }
+  }
+
+
+  function startNewConversation() {
+    if (browser && trackerReady) {
+      trackEvent("User_Interaction", {
+        type: "click",
+        element: "ChatAssistant",
+        action: "ClearConversation",
+        page: "Document Search"
+      });
+    }
+    
+    chatStore.startNewConversation($userAccount?.name);
   }
 
   $effect(() => {
@@ -512,19 +521,43 @@
         <div class="flex flex-col h-[80vh] max-h-[800px] min-h-[500px]">
           <!-- Header -->
           <div class="flex items-center justify-between border-b border-gray-200 bg-[#00174f] p-4 dark:border-gray-800">
-            <h2 class="font-bold text-white">Chat Assistant</h2>
-            <Button 
-              variant="ghost" 
-              size="icon" 
-              onclick={toggleChat} 
-              class="text-white hover:bg-transparent hover:text-red-500 transition-colors duration-200"
-              aria-label="Close chat"
-              data-transaction-name="Chat Assistant Close"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" />
-              </svg>
-            </Button>
+            <div class="flex items-center gap-2">
+              <h2 class="font-bold text-white">Chat Assistant</h2>
+              {#if conversationSummary?.hasContext}
+                <span class="text-xs text-gray-300 bg-gray-600 px-2 py-1 rounded">
+                  {conversationSummary.messageCount} messages
+                </span>
+              {/if}
+            </div>
+            <div class="flex items-center gap-2">
+              {#if conversationSummary?.hasContext}
+                <Button 
+                  variant="ghost" 
+                  size="icon" 
+                  onclick={startNewConversation}
+                  class="text-white hover:bg-gray-600 transition-colors duration-200"
+                  aria-label="Clear conversation and start new"
+                  title="Clear conversation and start new"
+                  data-transaction-name="Chat Assistant Clear"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
+                  </svg>
+                </Button>
+              {/if}
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                onclick={toggleChat} 
+                class="text-white hover:bg-transparent hover:text-red-500 transition-colors duration-200"
+                aria-label="Close chat"
+                data-transaction-name="Chat Assistant Close"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" />
+                </svg>
+              </Button>
+            </div>
           </div>
 
           <!-- Messages -->
@@ -591,7 +624,7 @@
               <input
                 type="text"
                 bind:value={newMessage}
-                placeholder={isLoading ? "Please wait..." : "Type your Couchbase Capella related question here..."}
+                placeholder={isLoading ? "Please wait..." : chatStore.isNearContextLimit() ? "Approaching context limit - consider clearing conversation..." : "Type your Couchbase Capella related question here..."}
                 disabled={isLoading}
                 class="flex-1 rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring focus:ring-tommy-red/50 dark:border-gray-700 bg-white text-black dark:bg-white dark:text-black disabled:opacity-50"
                 aria-label="Message input"
