@@ -50,10 +50,30 @@ function logWithLevel(level: 'info' | 'error' | 'warn' | 'debug', message: strin
 function getLogger(config: BackendConfig): winston.Logger {
   if (loggerInstance) return loggerInstance;
 
+  // Create a custom colorize format that only colors errors and warnings
+  const customColorize = winston.format.printf(({ level, message, ...meta }) => {
+    let coloredMessage = message;
+    
+    // Apply color based on log level
+    if (level === 'error') {
+      coloredMessage = `\x1b[31m${message}\x1b[0m`; // Red for errors
+    } else if (level === 'warn') {
+      coloredMessage = `\x1b[33m${message}\x1b[0m`; // Yellow for warnings
+    } else if (level === 'debug') {
+      coloredMessage = `\x1b[36m${message}\x1b[0m`; // Cyan for debug
+    }
+    // Info remains default (white/no color)
+    
+    return coloredMessage;
+  });
+
   const transports: winston.transport[] = [
     new winston.transports.Console({
       level: config.application.LOG_LEVEL || "info",
-      format: winston.format.combine(ecsFormat()),
+      format: winston.format.combine(
+        customColorize,
+        ecsFormat()
+      ),
     }),
   ];
 
