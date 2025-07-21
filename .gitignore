@@ -67,3 +67,6 @@ debug*.png
 redirect*.png
 test-failure*.png
 test-results/
+
+CLAUDE.md
+.claude

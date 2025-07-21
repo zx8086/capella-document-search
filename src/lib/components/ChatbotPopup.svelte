@@ -160,6 +160,14 @@
   let messages = $derived(formatMessagesForDisplay(conversation));
   let conversationSummary = $derived(conversation ? chatStore.getConversationSummary() : null);
   
+  // Derive placeholder reactively to fix clear conversation issue
+  const MAX_CONTEXT_THRESHOLD = 16; // 80% of 20 messages limit
+  let inputPlaceholder = $derived(
+    isLoading ? "Please wait..." :
+    (conversation && conversation.messages.filter(msg => !msg.isLoading).length > MAX_CONTEXT_THRESHOLD) ? "Approaching context limit - consider clearing conversation..." :
+    "Type your Couchbase Capella related question here..."
+  );
+  
   // Get first name from full name
   function getFirstName(fullName: string = ''): string {
     return fullName.split(' ')[0] || 'there';
@@ -624,7 +632,7 @@
               <input
                 type="text"
                 bind:value={newMessage}
-                placeholder={isLoading ? "Please wait..." : chatStore.isNearContextLimit() ? "Approaching context limit - consider clearing conversation..." : "Type your Couchbase Capella related question here..."}
+                placeholder={inputPlaceholder}
                 disabled={isLoading}
                 class="flex-1 rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring focus:ring-tommy-red/50 dark:border-gray-700 bg-white text-black dark:bg-white dark:text-black disabled:opacity-50"
                 aria-label="Message input"
