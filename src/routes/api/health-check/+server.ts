@@ -19,9 +19,13 @@ import {
 import type { RequestEvent } from '@sveltejs/kit';
 import { OpenAI } from "openai";
 import { Pinecone } from "@pinecone-database/pinecone";
+import { BedrockRuntimeClient, ConverseCommand, InvokeModelCommand } from "@aws-sdk/client-bedrock-runtime";
+import { BedrockAgentRuntimeClient, RetrieveCommand } from "@aws-sdk/client-bedrock-agent-runtime";
+import { NodeHttpHandler } from "@smithy/node-http-handler";
 
 const INDIVIDUAL_CHECK_TIMEOUT = 15000; // 15 seconds timeout for most checks
 const CAPELLA_API_TIMEOUT = 30000; // 30 seconds timeout for Capella API
+const AWS_API_TIMEOUT = 20000; // 20 seconds timeout for AWS services
 const GLOBAL_CHECK_TIMEOUT = 90000; // 90 seconds timeout for the entire health check
 
 const BUILD_VERSION = process.env.BUILD_VERSION || 'development';
@@ -500,6 +504,397 @@ async function checkLangSmithEndpoint(fetch: typeof global.fetch): Promise<Check
     }
 }
 
+async function checkAWSConfiguration(fetch: typeof global.fetch): Promise<CheckResult> {
+    const startTime = Date.now();
+    
+    try {
+        const region = Bun.env.AWS_REGION;
+        const accessKeyId = Bun.env.AWS_ACCESS_KEY_ID;
+        const secretAccessKey = Bun.env.AWS_SECRET_ACCESS_KEY;
+        const knowledgeBaseId = Bun.env.KNOWLEDGE_BASE_ID;
+        
+        const duration = Date.now() - startTime;
+        
+        // Check required AWS configuration
+        const missingConfigs = [];
+        if (!region) missingConfigs.push("AWS_REGION");
+        if (!accessKeyId) missingConfigs.push("AWS_ACCESS_KEY_ID");
+        if (!secretAccessKey) missingConfigs.push("AWS_SECRET_ACCESS_KEY");
+        if (!knowledgeBaseId) missingConfigs.push("KNOWLEDGE_BASE_ID");
+        
+        if (missingConfigs.length > 0) {
+            return {
+                status: "ERROR",
+                message: `Missing AWS configuration: ${missingConfigs.join(", ")}`,
+                responseTime: duration,
+            };
+        }
+        
+        return {
+            status: "OK",
+            message: `AWS configuration is complete (Region: ${region})`,
+            responseTime: duration,
+        };
+        
+    } catch (error) {
+        const duration = Date.now() - startTime;
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        
+        err("AWS configuration check failed:", error);
+        return {
+            status: "ERROR",
+            message: errorMessage,
+            responseTime: duration,
+        };
+    }
+}
+
+async function checkBedrockChatEndpoint(fetch: typeof global.fetch): Promise<CheckResult> {
+    const startTime = Date.now();
+    
+    try {
+        const region = Bun.env.AWS_REGION;
+        const chatModel = Bun.env.BEDROCK_CHAT_MODEL || "eu.amazon.nova-pro-v1:0";
+        
+        if (!region) {
+            return {
+                status: "ERROR",
+                message: "AWS_REGION is required for Bedrock chat",
+                responseTime: 0,
+            };
+        }
+        
+        // Build credentials object safely (matching bedrock-chat.ts pattern)
+        const credentials: any = {
+            accessKeyId: Bun.env.AWS_ACCESS_KEY_ID || "DUMMY",
+            secretAccessKey: Bun.env.AWS_SECRET_ACCESS_KEY || "DUMMY",
+        };
+        
+        // Only add sessionToken if it exists and is not empty
+        if (Bun.env.AWS_BEARER_TOKEN_BEDROCK && Bun.env.AWS_BEARER_TOKEN_BEDROCK.trim()) {
+            credentials.sessionToken = Bun.env.AWS_BEARER_TOKEN_BEDROCK;
+        }
+        
+        const client = new BedrockRuntimeClient({
+            region,
+            credentials,
+            // Use maxAttempts to handle transient network issues
+            maxAttempts: 3,
+            // Add retry configuration
+            retryMode: 'adaptive',
+            // Use HTTP/1.1 handler to avoid Bun HTTP/2 compatibility issues
+            requestHandler: new NodeHttpHandler({
+                httpAgent: { keepAlive: false },
+                httpsAgent: { keepAlive: false }
+            })
+        });
+        
+        // Test with a simple health check message
+        const command = new ConverseCommand({
+            modelId: chatModel,
+            messages: [
+                {
+                    role: "user",
+                    content: [{ text: "ping" }],
+                },
+            ],
+            inferenceConfig: {
+                maxTokens: 10,
+                temperature: 0,
+            },
+        });
+        
+        const response = await client.send(command);
+        const duration = Date.now() - startTime;
+        
+        if (response.output?.message?.content) {
+            return {
+                status: "OK",
+                message: `Bedrock chat model ${chatModel} is responsive`,
+                responseTime: duration,
+            };
+        }
+        
+        return {
+            status: "ERROR",
+            message: "Bedrock chat model returned unexpected response",
+            responseTime: duration,
+        };
+        
+    } catch (error) {
+        const duration = Date.now() - startTime;
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        
+        // Handle specific AWS errors
+        if (errorMessage.includes('ValidationException')) {
+            return {
+                status: "ERROR",
+                message: "Bedrock chat model validation failed - check model ID",
+                responseTime: duration,
+            };
+        }
+        
+        if (errorMessage.includes('UnauthorizedOperation') || errorMessage.includes('AccessDenied')) {
+            return {
+                status: "ERROR",
+                message: "AWS credentials lack Bedrock chat permissions",
+                responseTime: duration,
+            };
+        }
+        
+        if (errorMessage.includes('ThrottlingException')) {
+            return {
+                status: "WARNING",
+                message: "Bedrock chat model is throttled",
+                responseTime: duration,
+            };
+        }
+        
+        err("Bedrock chat endpoint health check failed:", error);
+        return {
+            status: "ERROR",
+            message: errorMessage,
+            responseTime: duration,
+        };
+    }
+}
+
+async function checkBedrockEmbeddingEndpoint(fetch: typeof global.fetch): Promise<CheckResult> {
+    const startTime = Date.now();
+    
+    try {
+        const region = Bun.env.AWS_REGION;
+        const embeddingModel = Bun.env.BEDROCK_EMBEDDING_MODEL || "amazon.titan-embed-text-v1";
+        
+        if (!region) {
+            return {
+                status: "ERROR",
+                message: "AWS_REGION is required for Bedrock embeddings",
+                responseTime: 0,
+            };
+        }
+        
+        // Build credentials object safely (matching bedrock-embedding.ts pattern)
+        const credentials: any = {
+            accessKeyId: Bun.env.AWS_ACCESS_KEY_ID || "DUMMY",
+            secretAccessKey: Bun.env.AWS_SECRET_ACCESS_KEY || "DUMMY",
+        };
+        
+        // Only add sessionToken if it exists and is not empty
+        if (Bun.env.AWS_BEARER_TOKEN_BEDROCK && Bun.env.AWS_BEARER_TOKEN_BEDROCK.trim()) {
+            credentials.sessionToken = Bun.env.AWS_BEARER_TOKEN_BEDROCK;
+        }
+        
+        const embeddingClient = new BedrockRuntimeClient({
+            region,
+            credentials,
+            // Use maxAttempts to handle transient network issues
+            maxAttempts: 3,
+            // Add retry configuration
+            retryMode: 'adaptive',
+            // Use HTTP/1.1 handler to avoid Bun HTTP/2 compatibility issues
+            requestHandler: new NodeHttpHandler({
+                httpAgent: { keepAlive: false },
+                httpsAgent: { keepAlive: false }
+            })
+        });
+        
+        // Test with a simple text embedding
+        const command = new InvokeModelCommand({
+            modelId: embeddingModel,
+            body: JSON.stringify({
+                inputText: "health check test"
+            }),
+        });
+        
+        const response = await embeddingClient.send(command);
+        const duration = Date.now() - startTime;
+        
+        if (response.body) {
+            const responseBody = JSON.parse(new TextDecoder().decode(response.body));
+            if (responseBody.embedding && Array.isArray(responseBody.embedding)) {
+                // Different Titan models have different dimensions:
+                // amazon.titan-embed-text-v1 = 1536 dimensions 
+                // amazon.titan-embed-text-v2:0 = 1024 dimensions
+                const expectedDimensions = embeddingModel.includes("titan-embed-text-v1") ? 1536 : 
+                                          embeddingModel.includes("titan-embed-text-v2") ? 1024 : 
+                                          1536; // default
+                const actualDimensions = responseBody.embedding.length;
+                
+                if (actualDimensions === expectedDimensions) {
+                    return {
+                        status: "OK",
+                        message: `Bedrock embedding model ${embeddingModel} is responsive (${actualDimensions} dimensions)`,
+                        responseTime: duration,
+                    };
+                } else {
+                    return {
+                        status: "WARNING",
+                        message: `Bedrock embedding model ${embeddingModel} returned unexpected dimensions (${actualDimensions}, expected ${expectedDimensions})`,
+                        responseTime: duration,
+                    };
+                }
+            }
+        }
+        
+        return {
+            status: "ERROR",
+            message: "Bedrock embedding model returned unexpected response",
+            responseTime: duration,
+        };
+        
+    } catch (error) {
+        const duration = Date.now() - startTime;
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        
+        // Handle specific AWS errors
+        if (errorMessage.includes('ValidationException')) {
+            return {
+                status: "ERROR",
+                message: "Bedrock embedding model validation failed - check model ID",
+                responseTime: duration,
+            };
+        }
+        
+        if (errorMessage.includes('UnauthorizedOperation') || errorMessage.includes('AccessDenied')) {
+            return {
+                status: "ERROR",
+                message: "AWS credentials lack Bedrock embedding permissions",
+                responseTime: duration,
+            };
+        }
+        
+        if (errorMessage.includes('ThrottlingException')) {
+            return {
+                status: "WARNING",
+                message: "Bedrock embedding model is throttled",
+                responseTime: duration,
+            };
+        }
+        
+        err("Bedrock embedding endpoint health check failed:", error);
+        return {
+            status: "ERROR",
+            message: errorMessage,
+            responseTime: duration,
+        };
+    }
+}
+
+async function checkKnowledgeBaseEndpoint(fetch: typeof global.fetch): Promise<CheckResult> {
+    const startTime = Date.now();
+    
+    try {
+        const region = Bun.env.AWS_REGION;
+        const knowledgeBaseId = Bun.env.KNOWLEDGE_BASE_ID;
+        
+        if (!region || !knowledgeBaseId) {
+            return {
+                status: "ERROR",
+                message: "AWS_REGION and KNOWLEDGE_BASE_ID are required",
+                responseTime: 0,
+            };
+        }
+        
+        // Use the same credentials pattern as the working AWS Knowledge Base provider
+        const credentials: any = {
+            accessKeyId: Bun.env.AWS_ACCESS_KEY_ID,
+            secretAccessKey: Bun.env.AWS_SECRET_ACCESS_KEY,
+        };
+        // Note: Knowledge Base uses different credentials than Bedrock chat/embedding
+        // Do not add sessionToken for Knowledge Base
+        
+        const knowledgeBaseClient = new BedrockAgentRuntimeClient({
+            region,
+            credentials,
+            // Use maxAttempts to handle transient network issues
+            maxAttempts: 3,
+            // Add retry configuration
+            retryMode: 'adaptive',
+            // Use HTTP/1.1 handler to avoid Bun HTTP/2 compatibility issues
+            requestHandler: new NodeHttpHandler({
+                httpAgent: { keepAlive: false },
+                httpsAgent: { keepAlive: false }
+            })
+        });
+        
+        // Test with a simple health check query
+        const command = new RetrieveCommand({
+            knowledgeBaseId,
+            retrievalQuery: {
+                text: "health"
+            },
+            retrievalConfiguration: {
+                vectorSearchConfiguration: {
+                    numberOfResults: 1,
+                },
+            },
+        });
+        
+        const response = await knowledgeBaseClient.send(command);
+        const duration = Date.now() - startTime;
+        
+        if (response.retrievalResults !== undefined) {
+            const resultCount = response.retrievalResults.length;
+            return {
+                status: "OK",
+                message: `AWS Knowledge Base ${knowledgeBaseId} is responsive (${resultCount} results returned)`,
+                responseTime: duration,
+            };
+        }
+        
+        return {
+            status: "ERROR",
+            message: "Knowledge Base returned unexpected response",
+            responseTime: duration,
+        };
+        
+    } catch (error) {
+        const duration = Date.now() - startTime;
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        
+        // Handle specific AWS errors
+        if (errorMessage.includes('ResourceNotFoundException')) {
+            return {
+                status: "ERROR",
+                message: "Knowledge Base not found - check KNOWLEDGE_BASE_ID",
+                responseTime: duration,
+            };
+        }
+        
+        if (errorMessage.includes('ValidationException')) {
+            return {
+                status: "ERROR",
+                message: "Knowledge Base request validation failed",
+                responseTime: duration,
+            };
+        }
+        
+        if (errorMessage.includes('UnauthorizedOperation') || errorMessage.includes('AccessDenied')) {
+            return {
+                status: "ERROR",
+                message: "AWS credentials lack Knowledge Base permissions",
+                responseTime: duration,
+            };
+        }
+        
+        if (errorMessage.includes('ThrottlingException')) {
+            return {
+                status: "WARNING",
+                message: "Knowledge Base is throttled",
+                responseTime: duration,
+            };
+        }
+        
+        err("Knowledge Base endpoint health check failed:", error);
+        return {
+            status: "ERROR",
+            message: errorMessage,
+            responseTime: duration,
+        };
+    }
+}
+
 
 export async function GET({ fetch, url }: RequestEvent) {
     try {
@@ -528,6 +923,10 @@ export async function GET({ fetch, url }: RequestEvent) {
 
                     const detailedChecks = [
                         ...simpleChecks,
+                        { name: "AWS Configuration", check: () => checkAWSConfiguration(fetch) },
+                        { name: "AWS Bedrock Chat Model", check: () => checkBedrockChatEndpoint(fetch) },
+                        { name: "AWS Bedrock Embedding Model", check: () => checkBedrockEmbeddingEndpoint(fetch) },
+                        { name: "AWS Knowledge Base", check: () => checkKnowledgeBaseEndpoint(fetch) },
                         { name: "Elastic APM Server", check: () => checkElasticAPMEndpoint(fetch) },
                         { name: "External Capella Cloud API", check: () => checkCapellaAPI(fetch) },
                         { name: "OpenReplay Endpoint", check: () => checkOpenReplayEndpoint(fetch) },
@@ -553,7 +952,9 @@ export async function GET({ fetch, url }: RequestEvent) {
                                             () => reject(new Error(`Timeout: ${name} check took too long`)),
                                             name === "External Capella Cloud API"
                                                 ? CAPELLA_API_TIMEOUT
-                                                : INDIVIDUAL_CHECK_TIMEOUT,
+                                                : name.startsWith("AWS")
+                                                    ? AWS_API_TIMEOUT
+                                                    : INDIVIDUAL_CHECK_TIMEOUT,
                                         ),
                                     ),
                                 ]);
