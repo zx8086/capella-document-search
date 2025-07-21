@@ -114,7 +114,8 @@ export default defineConfig(({ mode }): UserConfig => {
         noExternal: [
           '@openfeature/web-sdk',
           '@growthbook/growthbook',
-          '@openfeature/growthbook-provider'
+          '@openfeature/growthbook-provider',
+          'langsmith'
         ],
         external: ['bun:sqlite']
       },
@@ -166,7 +167,8 @@ export default defineConfig(({ mode }): UserConfig => {
           'svelte/store',
           'svelte/easing',
           'bits-ui',
-          'tailwind-merge'
+          'tailwind-merge',
+          'langsmith/traceable'
         ],
         exclude: [
           'node:events',

@@ -28,6 +28,7 @@ export interface RAGMetadata {
     pathname: string;
     
     // Session Information
+    sessionId?: string;
     sessionStartTime?: string;
     messageCount: number;
     

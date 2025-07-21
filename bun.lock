@@ -70,7 +70,7 @@
         "help": "^3.0.2",
         "highlight.js": "^11.11.1",
         "langchain": "^0.3.15",
-        "langsmith": "^0.3.7",
+        "langsmith": "^0.3.46",
         "marked": "^16.1.1",
         "mode-watcher": "^1.1.0",
         "net": "^1.0.2",
@@ -124,12 +124,8 @@
   ],
   "overrides": {
     "cookie": "^0.7.0",
-    "github.com/go-git/go-git/v5": "5.13.0",
-    "github.com/golang-jwt/jwt/v4": "4.5.1",
-    "golang.org/x/crypto": "0.31.0",
     "golang.org/x/net": "0.33.0",
     "golang.org/x/sys": "0.1.0",
-    "k8s.io/apimachinery": "0.29.0-alpha.3",
   },
   "packages": {
     "@alloc/quick-lru": ["@alloc/quick-lru@5.2.0", "", {}, "sha512-UrcABB+4bUrFABwbluTIBErXwvbsU/V7TZWfmbgJfbkwiBuziS9gxdODUyuiecfdGQ85jglMW6juS3+z5TsKLw=="],
