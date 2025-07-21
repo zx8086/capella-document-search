@@ -77,9 +77,6 @@ jobs:
             org.opencontainers.image.url=https://github.com/zx8086/capella-document-search
             org.opencontainers.image.source=https://github.com/zx8086/capella-document-search
 
-      # Security scanning moved to separate workflow
-      # See .github/workflows/security-scan.yml
-
       - name: Build and push Docker image
         id: build
         uses: docker/build-push-action@v5

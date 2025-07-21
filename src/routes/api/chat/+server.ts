@@ -5,15 +5,25 @@ import type { RequestHandler } from "./$types";
 import { createRAGProvider } from "$lib/rag/factory";
 import type { RAGMetadata } from "$lib/rag/types";
 import { verifyRAGSetup } from "$lib/rag/verify";
+import { BedrockChatService } from "$lib/services/bedrock-chat";
+import { clusterConn } from "$lib/couchbaseConnector";
+import { backendConfig } from "../../../backend-config";
 import { log, err } from "$utils/unifiedLogger";
 import { dev } from "$app/environment";
 
 // Initialize provider lazily
 let ragProvider: any = null;
+let chatService: BedrockChatService | null = null;
+
+// Force reset chat service for debugging
+chatService = null;
 
 export const POST: RequestHandler = async ({ fetch, request }) => {
   const startTime = Date.now();
   log("📥 [Server] Received request");
+
+  // Note: Only reset if needed to debug, but we want to maintain instance continuity
+  // chatService = null;
 
   try {
     // Initialize provider with fetch
@@ -32,6 +42,15 @@ export const POST: RequestHandler = async ({ fetch, request }) => {
     }
 
     const { message, user } = await request.json();
+
+    // Initialize chat service using global connection approach
+    if (!chatService) {
+      log("🌟 [Server] Creating chat service with global connection approach");
+      chatService = new BedrockChatService("eu-central-1");
+      log("✅ [Server] Chat service created (will use global connection for tools)");
+    } else {
+      log("♻️ [Server] Using existing chat service instance");
+    }
 
     log("📨 [Server] Processing chat request:", {
       messageLength: message.length,

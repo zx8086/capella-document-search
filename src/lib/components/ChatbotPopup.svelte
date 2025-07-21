@@ -79,18 +79,18 @@
           const codeId = 'code-' + Math.random().toString(36).substr(2, 9);
           
           return `
-            <div class="code-block-wrapper relative">
+            <div class="code-block-wrapper relative overflow-x-auto">
               <button 
                 class="copy-btn absolute top-2 right-2 bg-gray-700 hover:bg-gray-600 text-white text-xs px-2 py-1 rounded opacity-75 hover:opacity-100 transition-opacity duration-200 z-10"
                 data-code-id="${codeId}"
                 title="Copy code"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-3 h-3">
-                  <path stroke-linecap="round" stroke-linejoin="round" d="M15.666 3.888A2.25 2.25 0 0 0 13.5 2.25h-3c-1.03 0-1.75.694-1.75 1.542 0 .847.72 1.542 1.75 1.542h3A2.25 2.25 0 0 1 15.666 3.888zM8.25 4.5c0-.78.637-1.417 1.417-1.417h.666c.78 0 1.417.637 1.417 1.417v.583c0 .78-.637 1.417-1.417 1.417h-.666c-.78 0-1.417-.637-1.417-1.417V4.5z" />
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M15.666 3.888A2.25 2.25 0 0 0 13.5 2.25h-3c-1.03 0-1.75.694-1.75 1.542 0 .847.72 1.542 1.75 1.542h3A2.25 2.25 0 0 1 15.666 3.888zM8.25 4.5c0-.78.637-1.417 1.417-1.417h.666c.78 0 1.417.637 1.417 1.417v.583c0 .78-.637 1.417-1.417-1.417h-.666c-.78 0-1.417-.637-1.417-1.417V4.5z" />
                   <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h3.75M9 15h3.75M9 18h3.75m-7.5-3v5.25A2.25 2.25 0 0 0 6.75 22.5h7.5a2.25 2.25 0 0 0 2.25-2.25V13.5a2.25 2.25 0 0 0-2.25-2.25H6.75a2.25 2.25 0 0 0-2.25 2.25z" />
                 </svg>
               </button>
-              <pre id="${codeId}" class="code-content"><code>${codeContent}</code></pre>
+              <pre id="${codeId}" class="code-content overflow-x-auto whitespace-pre min-w-full"><code>${codeContent}</code></pre>
             </div>
           `;
         }
@@ -185,6 +185,20 @@
       }, 100); // Small delay to ensure content is rendered
     }
   });
+
+  // Enhanced scroll function that ensures we see the latest content
+  function forceScrollToBottom() {
+    if (messagesContainer) {
+      // Force scroll with multiple attempts to handle dynamic content height
+      requestAnimationFrame(() => {
+        messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        // Additional scroll attempt after content renders
+        setTimeout(() => {
+          messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        }, 50);
+      });
+    }
+  }
   
   $effect(() => {
     console.debug('🤖 Chat Assistant Visibility Check:', {
@@ -351,6 +365,8 @@
                                         ? { type: 'bot', text: accumulatedResponse, isLoading: false }
                                         : msg
                                 );
+                                // Force scroll on content updates to ensure visibility
+                                forceScrollToBottom();
                             }
                         } catch (e) {
                             console.warn('⚠️ Failed to parse line:', line, e);
@@ -391,6 +407,9 @@
                     ? { type: 'bot', text: accumulatedResponse, isLoading: false }
                     : msg
             );
+            
+            // Final scroll to ensure all content is visible
+            setTimeout(() => forceScrollToBottom(), 200);
             
         } catch (error) {
             console.error('❌ Stream processing error:', error);
@@ -490,7 +509,7 @@
         aria-modal="true"
         aria-label="Chat window"
       >
-        <div class="flex flex-col h-[700px] max-h-[calc(100vh-6rem)]">
+        <div class="flex flex-col h-[80vh] max-h-[800px] min-h-[500px]">
           <!-- Header -->
           <div class="flex items-center justify-between border-b border-gray-200 bg-[#00174f] p-4 dark:border-gray-800">
             <h2 class="font-bold text-white">Chat Assistant</h2>
@@ -511,7 +530,7 @@
           <!-- Messages -->
           <div 
             bind:this={messagesContainer}
-            class="flex-1 overflow-y-auto p-4 space-y-4"
+            class="flex-1 overflow-y-auto p-4 space-y-4 scroll-smooth"
             role="log"
             aria-label="Chat messages"
           >
@@ -530,21 +549,21 @@
                       <div class="animate-spin rounded-full h-5 w-5 border-2 border-gray-500 border-t-transparent"></div>
                     </div>
                   {:else}
-                    <div class="prose prose-sm max-w-none dark:prose-invert prose-pre:bg-gray-900 prose-pre:text-gray-100">
+                    <div class="prose prose-sm max-w-none dark:prose-invert prose-pre:bg-gray-900 prose-pre:text-gray-100 overflow-x-auto">
                       {#if message.type === 'bot'}
                         {#if message.text.includes('References:')}
                           {@html renderMarkdown(message.text.split('References:')[0])}
                           <div class="mt-2 text-sm text-gray-600 dark:text-gray-400 border-t border-gray-200 dark:border-gray-700 pt-2">
                             References:
                             {#each message.text.split('References:')[1].trim().split('\n').filter(ref => ref.trim()) as ref}
-                              <div>- {ref.trim()}</div>
+                              <div class="break-all">- {ref.trim()}</div>
                             {/each}
                           </div>
                         {:else}
                           {@html renderMarkdown(message.text)}
                         {/if}
                       {:else}
-                        <div class="whitespace-pre-wrap">{message.text}</div>
+                        <div class="whitespace-pre-wrap break-words">{message.text}</div>
                       {/if}
                     </div>
                   {/if}
@@ -639,6 +658,8 @@
   :global(.code-block-wrapper) {
     position: relative !important;
     margin: 0.5rem 0 !important;
+    overflow-x: auto !important;
+    max-width: 100% !important;
   }
   
   :global(.prose pre) {
@@ -649,6 +670,43 @@
     padding-top: 2.5rem !important; /* Make room for copy button */
     margin: 0 !important;
     overflow-x: auto !important;
+    white-space: pre !important;
+    word-wrap: normal !important;
+    min-width: max-content !important;
+  }
+  
+  /* Improve styling for long lines in tool responses */
+  :global(.prose code:not(pre code)) {
+    white-space: nowrap !important;
+    word-break: break-all !important;
+  }
+  
+  /* Handle long lines in regular text */
+  :global(.prose p) {
+    overflow-wrap: break-word !important;
+    word-break: break-word !important;
+  }
+  
+  /* Better handling for numbered lists with long text */
+  :global(.prose ol li) {
+    overflow-wrap: break-word !important;
+    word-break: break-word !important;
+  }
+  
+  /* Ensure container allows horizontal scrolling */
+  :global(.prose) {
+    overflow-x: auto !important;
+    max-width: 100% !important;
+  }
+  
+  /* Ensure very long content is properly contained */
+  :global(.prose h1, .prose h2, .prose h3, .prose h4, .prose h5, .prose h6) {
+    word-break: break-word !important;
+  }
+  
+  /* Custom styling for better long content display */
+  .scroll-smooth {
+    scroll-behavior: smooth;
   }
   
   :global(.copy-btn) {
