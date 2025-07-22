@@ -97,29 +97,8 @@ export class AWSKnowledgeBaseRAGProvider implements RAGProvider {
       });
 
       try {
-        // Enhance query with context for better semantic retrieval
-        let enhancedQuery = message;
-        
-        // Query expansion for better semantic matching
-        if (message.toLowerCase().includes('amadeus')) {
-          enhancedQuery = `${message} travel airline reservation system Couchbase Capella`;
-        } else if (message.toLowerCase().includes('tommy hilfiger')) {
-          enhancedQuery = `${message} retail fashion e-commerce Couchbase Capella`;
-        } else if (message.toLowerCase().includes('companies') || message.toLowerCase().includes('who uses')) {
-          enhancedQuery = `${message} customer case study success story Couchbase Capella`;
-        } else if (message.toLowerCase().includes('retail')) {
-          enhancedQuery = `${message} e-commerce shopping cart inventory Couchbase Capella`;
-        } else if (message.toLowerCase().includes('travel')) {
-          enhancedQuery = `${message} airline hotel booking reservation Couchbase Capella`;
-        } else if (!message.toLowerCase().includes('couchbase') && !message.toLowerCase().includes('capella')) {
-          enhancedQuery = `${message} Couchbase Capella database`;
-        }
-        
-        log("🔍 [AWSKnowledgeBase] Query enhancement", {
-          originalQuery: message,
-          enhancedQuery: enhancedQuery,
-          queryLength: enhancedQuery.length
-        });
+        // Use the original query without hardcoded enhancements
+        const enhancedQuery = message;
         
         const command = new RetrieveCommand({
           knowledgeBaseId: this.knowledgeBaseId,
@@ -194,20 +173,40 @@ export class AWSKnowledgeBaseRAGProvider implements RAGProvider {
         // Extract context from AWS Knowledge Base response with correct page numbers
         const rawContext =
           response.retrievalResults
-            ?.map((result) => ({
-              text: result.content?.text || "",
-              filename: this.extractFilename(
-                result.location?.s3Location?.uri || "Unknown source",
-              ),
-              pageNumber: this.extractPageNumberFromMetadata(result.metadata) || this.extractPageNumber(result.location?.s3Location?.uri),
-              chunkIndex: undefined, // AWS Knowledge Base doesn't provide chunk index
-              metadata: {
-                score: result.score,
-                uri: result.location?.s3Location?.uri,
-                type: result.location?.type,
-                ...result.metadata,
-              },
-            }))
+            ?.map((result, index) => {
+              const contextItem = {
+                text: result.content?.text || "",
+                filename: this.extractFilename(
+                  result.location?.s3Location?.uri || "Unknown source",
+                ),
+                pageNumber: this.extractPageNumberFromMetadata(result.metadata) || this.extractPageNumber(result.location?.s3Location?.uri),
+                chunkIndex: undefined, // AWS Knowledge Base doesn't provide chunk index
+                metadata: {
+                  score: result.score,
+                  uri: result.location?.s3Location?.uri,
+                  type: result.location?.type,
+                  ...result.metadata,
+                },
+              };
+              
+              // DEBUG: Log document text content to check for URLs
+              if (index < 3) { // Only log first 3 items to avoid spam
+                log(`🔍 [Debug] AWS KB Document ${index + 1} content analysis:`, {
+                  filename: contextItem.filename,
+                  pageNumber: contextItem.pageNumber,
+                  textLength: contextItem.text.length,
+                  textPreview: contextItem.text.substring(0, 200) + (contextItem.text.length > 200 ? "..." : ""),
+                  hasURLs: /https?:\/\/[^\s]+/.test(contextItem.text),
+                  urlsInText: contextItem.text.match(/https?:\/\/[^\s]+/g) || [],
+                  metadataKeys: Object.keys(contextItem.metadata),
+                  metadataWithURLs: Object.entries(contextItem.metadata)
+                    .filter(([key, value]) => typeof value === 'string' && /https?:\/\//.test(value))
+                    .reduce((acc, [key, value]) => ({ ...acc, [key]: value }), {})
+                });
+              }
+              
+              return contextItem;
+            })
             .filter((item) => item.text.trim().length > 0) || [];
 
         // Apply deduplication to prevent repetitive responses
@@ -319,19 +318,34 @@ export class AWSKnowledgeBaseRAGProvider implements RAGProvider {
           [
             {
               role: "system",
-              content: `You are a helpful assistant for Couchbase. Use the following context to answer the user's question. Do not include references in your response as they will be added automatically. If you cannot answer the question based on the context, say so.
+              content: `You are a helpful assistant for Couchbase. Use the following context to answer the user's question. If you cannot answer the question based on the context, say so.
+
+CRITICAL INSTRUCTION - READ CAREFULLY:
+You must NEVER include any URLs, links, references, or source citations in your response. This is absolutely forbidden. References will be automatically added after your response.
+
+FORBIDDEN CONTENT - DO NOT INCLUDE ANY OF THESE:
+- URLs (like https://www.couchbase.com/customers/anything)
+- Website links of any kind
+- References sections
+- Source document names
+- Page numbers
+- Phrases like "References:", "Sources:", "For more information"
+- Any text that looks like: "References:\nfilename.pdf (Page X)"
 
 IMPORTANT TERMINOLOGY:
 - Couchbase and Capella are interchangeable terms - Capella is Couchbase's cloud database platform
 - When users ask about "Couchbase", this includes information about "Capella" and vice versa
 - Couchbase Server is the core database technology, Capella is the cloud-based platform built on Couchbase
 
-IMPORTANT INSTRUCTIONS:
+RESPONSE INSTRUCTIONS:
 - DO NOT show your thinking process or reasoning steps
 - DO NOT include phrases like "The context mentions..." or "I will..." or "Based on the context..."
 - Start your response directly with the answer
 - When showing query results or data, display ALL items - do not summarize or show only one example
 - Treat questions about Couchbase and Capella as referring to the same technology platform
+- End your response with a period, nothing else
+
+REMINDER: NO URLS, NO LINKS, NO REFERENCES IN YOUR RESPONSE. PERIOD.
 
 When the user asks "How can I see [something]" or "How do I find [something]", they want to know the N1QL query syntax/code, not execute it. In those cases, show them the query code like in the context provided.`,
             },

@@ -301,6 +301,15 @@ IMPORTANT INSTRUCTIONS:
 
             // Add references only if no tools were executed and we have context
             if (!toolsWereExecuted && context && context.length > 0) {
+              // DEBUG: Log the full LLM response before any processing
+              log("🔍 [Debug] Full LLM response before reference processing:", {
+                fullResponseLength: fullResponse.length,
+                fullResponsePreview: fullResponse.substring(0, 500) + (fullResponse.length > 500 ? "..." : ""),
+                hasReferencesSection: fullResponse.toLowerCase().includes('references:'),
+                hasURLs: /https?:\/\/[^\s]+/.test(fullResponse),
+                urlMatches: fullResponse.match(/https?:\/\/[^\s]+/g) || []
+              });
+              
               // Remove any existing references section from the response (multiple patterns)
               let processedResponse = fullResponse;
               
@@ -312,9 +321,26 @@ IMPORTANT INSTRUCTIONS:
                 /\n\n?For more information[\s\S]*$/i
               ];
               
+              // DEBUG: Log each pattern replacement
               for (const pattern of referencePatterns) {
+                const beforeReplacement = processedResponse;
                 processedResponse = processedResponse.replace(pattern, '');
+                if (beforeReplacement !== processedResponse) {
+                  log(`🔍 [Debug] Pattern ${pattern.toString()} matched and removed:`, {
+                    beforeLength: beforeReplacement.length,
+                    afterLength: processedResponse.length,
+                    removedContent: beforeReplacement.substring(processedResponse.length).substring(0, 200)
+                  });
+                }
               }
+              
+              // DEBUG: Log the processed response after reference removal
+              log("🔍 [Debug] Processed response after reference cleaning:", {
+                processedResponseLength: processedResponse.length,
+                processedResponsePreview: processedResponse.substring(Math.max(0, processedResponse.length - 300)),
+                stillHasURLs: /https?:\/\/[^\s]+/.test(processedResponse),
+                remainingURLs: processedResponse.match(/https?:\/\/[^\s]+/g) || []
+              });
               
               processedResponse = processedResponse.trim();
 
