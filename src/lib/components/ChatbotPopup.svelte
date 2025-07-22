@@ -328,6 +328,18 @@
         });
 
         if (!response.ok) {
+            // Try to parse error response if it's JSON
+            const contentType = response.headers.get('content-type');
+            if (contentType && contentType.includes('application/json')) {
+                try {
+                    const errorData = await response.json();
+                    if (errorData.message) {
+                        throw new Error(errorData.message);
+                    }
+                } catch (parseError) {
+                    // Fall through to generic error
+                }
+            }
             throw new Error(`HTTP error! status: ${response.status}`);
         }
 
@@ -376,6 +388,14 @@
                             
                             if (data.done) {
                                 console.log('🏁 Received done signal');
+                                streamComplete = true;
+                                break;
+                            }
+                            
+                            if (data.error) {
+                                console.error('❌ Received error from server:', data.content);
+                                accumulatedResponse = data.content || 'An error occurred while processing your request.';
+                                chatStore.updateMessage(loadingMessageId, accumulatedResponse, false);
                                 streamComplete = true;
                                 break;
                             }
@@ -432,7 +452,16 @@
 
     } catch (error) {
         console.error('❌ Chat error:', error);
-        chatStore.updateMessage(loadingMessageId, 'I apologize, but I encountered an error processing your request. Please try again.', false);
+        let errorMessage = 'I apologize, but I encountered an error processing your request. Please try again.';
+        
+        // Handle specific error types
+        if (error instanceof TypeError && error.message.includes('fetch')) {
+            errorMessage = 'Unable to connect to the chat service. Please check your internet connection and try again.';
+        } else if (error.message?.includes('Failed to fetch')) {
+            errorMessage = 'Network error occurred. Please check your connection and try again.';
+        }
+        
+        chatStore.updateMessage(loadingMessageId, errorMessage, false);
     } finally {
         isLoading = false;
     }
@@ -531,11 +560,6 @@
           <div class="flex items-center justify-between border-b border-gray-200 bg-[#00174f] p-4 dark:border-gray-800">
             <div class="flex items-center gap-2">
               <h2 class="font-bold text-white">Chat Assistant</h2>
-              {#if conversationSummary?.hasContext}
-                <span class="text-xs text-gray-300 bg-gray-600 px-2 py-1 rounded">
-                  {conversationSummary.messageCount} messages
-                </span>
-              {/if}
             </div>
             <div class="flex items-center gap-2">
               {#if conversationSummary?.hasContext}

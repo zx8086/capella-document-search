@@ -148,10 +148,23 @@ function createChatStore() {
       const conversation = get({ subscribe });
       if (!conversation) return [];
 
-      // Get recent messages within context limit, excluding system messages and loading messages
-      const validMessages = conversation.messages
-        .filter(msg => !msg.isLoading && msg.role !== 'system')
-        .slice(-MAX_CONTEXT_MESSAGES);
+      // Filter out loading and system messages
+      let validMessages = conversation.messages
+        .filter(msg => !msg.isLoading && msg.role !== 'system');
+      
+      // AWS Bedrock requirement: conversation must start with a user message
+      // Find the first user message and start from there
+      const firstUserIndex = validMessages.findIndex(msg => msg.role === 'user');
+      if (firstUserIndex === -1) {
+        // No user messages yet
+        return [];
+      }
+      
+      // Start from the first user message to ensure proper conversation structure
+      validMessages = validMessages.slice(firstUserIndex);
+      
+      // Apply context limit
+      validMessages = validMessages.slice(-MAX_CONTEXT_MESSAGES);
 
       return validMessages.map(msg => ({
         role: msg.role,
@@ -166,11 +179,16 @@ function createChatStore() {
 
       // Count only user messages as they represent actual conversation turns
       const userMessages = conversation.messages.filter(msg => !msg.isLoading && msg.role === 'user');
+      const messageCount = userMessages.length;
 
       return {
-        messageCount: userMessages.length,
+        messageCount,
         lastUpdated: conversation.updatedAt,
-        hasContext: userMessages.length > 0
+        hasContext: messageCount > 0,
+        contextLimit: MAX_CONTEXT_MESSAGES,
+        contextPercentage: Math.round((messageCount / MAX_CONTEXT_MESSAGES) * 100),
+        isNearLimit: messageCount >= MAX_CONTEXT_MESSAGES * 0.8,
+        isAtLimit: messageCount >= MAX_CONTEXT_MESSAGES * 0.9
       };
     },
 

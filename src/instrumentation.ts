@@ -45,7 +45,8 @@ async function initializeOpenTelemetry() {
   if (INSTRUMENTATION_ENABLED) {
     try {
       log("Initializing OpenTelemetry SDK...");
-      diag.setLogger(new DiagConsoleLogger(), DiagLogLevel.INFO);
+      // Reduce OpenTelemetry diagnostic verbosity to prevent duplicate console logs
+      diag.setLogger(new DiagConsoleLogger(), DiagLogLevel.WARN);
 
       const resource = createResource();
 

@@ -18,6 +18,39 @@ let chatService: BedrockChatService | null = null;
 // Force reset chat service for debugging
 chatService = null;
 
+// Helper function to prepare conversation messages for streaming
+function prepareConversationMessages(messages: any[], currentMessage: string): any[] {
+  const conversationMessages = messages || (currentMessage ? [{ role: 'user', content: currentMessage }] : []);
+  
+  // Basic validation - ensure we have at least one user message
+  if (conversationMessages.length === 0) {
+    return [{ role: 'user', content: currentMessage }];
+  }
+  
+  return conversationMessages;
+}
+
+// Helper function to convert technical errors to user-friendly messages
+function getUserFriendlyErrorMessage(errorMessage: string): string {
+  const errorPatterns = [
+    { pattern: /conversation must start with a user message/i, message: "Please refresh the page and start a new conversation." },
+    { pattern: /ValidationException/i, message: "Please try rephrasing your question or starting a new conversation." },
+    { pattern: /(throttled|rate limit)/i, message: "Service is experiencing high demand. Please wait a moment and try again." },
+    { pattern: /(timeout|TimeoutError)/i, message: "Request timed out. Please try again with a shorter message." },
+    { pattern: /(network|connection)/i, message: "Network connectivity issue. Please check your connection and try again." },
+    { pattern: /(unauthorized|authentication)/i, message: "Authentication failed. Please refresh the page and sign in again." },
+    { pattern: /(forbidden|access denied)/i, message: "You don't have permission to perform this action. Please contact support if this persists." }
+  ];
+
+  for (const { pattern, message } of errorPatterns) {
+    if (pattern.test(errorMessage)) {
+      return message;
+    }
+  }
+
+  return "I apologize, but I encountered an unexpected error. Please try again, and if the problem persists, consider starting a new conversation.";
+}
+
 export const POST: RequestHandler = async ({ fetch, request }) => {
   const startTime = Date.now();
   log("📥 [Server] Received request");
@@ -45,7 +78,7 @@ export const POST: RequestHandler = async ({ fetch, request }) => {
     const { message, messages, user } = requestBody;
     
     // Handle both old single message format and new messages array format
-    const conversationMessages = messages || (message ? [{ role: 'user', content: message }] : []);
+    const conversationMessages = prepareConversationMessages(messages, message);
     const currentMessage = conversationMessages[conversationMessages.length - 1]?.content || message || '';
 
     // Initialize chat service using global connection approach
@@ -148,64 +181,45 @@ export const POST: RequestHandler = async ({ fetch, request }) => {
 
             log("🌊 [Server] Starting to read stream with conversation context");
             let chunkCount = 0;
+            let toolsWereExecuted = false; // Track if any tools were executed
             
-            // If using AWS Knowledge Base (which uses Bedrock) and we have conversation history, use conversation mode
-            if (Bun.env.RAG_PIPELINE === 'AWS_KNOWLEDGE_BASE' && conversationMessages.length > 1) {
-              log("🤖 [Server] Using Bedrock with conversation context", {
+            // Create system message with context
+            const contextContent = (context || []).map(c => c.text).join('\n\n') || 'No additional context available.';
+            
+            log("🔍 [Server] Context content prepared:", {
+              contextItems: context?.length || 0,
+              contextPreview: contextContent.substring(0, 500) + (contextContent.length > 500 ? '...' : ''),
+              totalContextLength: contextContent.length
+            });
+            
+            const systemMessage = `You are a helpful assistant for Couchbase Capella, a cloud database service. Use the following context to answer questions accurately and comprehensively.
+
+Context: ${contextContent}
+
+IMPORTANT INSTRUCTIONS:
+- Provide a clear response based ONLY on the context provided
+- DO NOT show your thinking process or reasoning steps
+- DO NOT include phrases like "The context mentions..." or "I will..."
+- DO NOT repeat the same information in different ways
+- DO NOT repeat or re-display tool results that were already shown to the user
+- When tools have been executed, provide analysis and insights about the results, not a duplicate display
+- Start your response directly with the answer, not with explanatory text
+- Structure your response clearly without repetitive statements`;
+
+            // Use either Bedrock conversation mode or regular RAG stream
+            if (Bun.env.RAG_PIPELINE === 'AWS_KNOWLEDGE_BASE' && chatService) {
+              log("🤖 [Server] Using Bedrock conversation mode", {
                 messageCount: conversationMessages.length,
                 conversationHistory: conversationMessages.map(msg => `${msg.role}: ${msg.content.substring(0, 50)}...`)
               });
               
-              // Create conversation messages with context for Bedrock
-              const contextContent = context?.map(c => c.text).join('\n\n') || 'No additional context available.';
-              
-              log("🔍 [Server] Context content for Bedrock:", {
-                contextItems: context?.length || 0,
-                contextPreview: contextContent.substring(0, 500) + (contextContent.length > 500 ? '...' : ''),
-                totalContextLength: contextContent.length
-              });
-              
-              const systemMessage = `You are a helpful assistant for Couchbase Capella, a cloud database service. Use the following context to help answer questions accurately and comprehensively.
-
-Context: ${contextContent}
-
-Please provide helpful, accurate responses about Couchbase Capella based on the context provided.`;
-              
-              // Format conversation messages properly for Bedrock
-              // Bedrock requires conversations to start with a user message, so filter out initial assistant greetings and empty messages
-              const conversationMessagesForBedrock = conversationMessages.filter((msg, index) => {
-                // Filter out empty or meaningless content
-                const content = msg.content?.trim();
-                if (!content || content === '...' || content === '') {
-                  return false;
-                }
-                
-                // Keep all user messages (they should always have content)
-                if (msg.role === 'user') return true;
-                
-                // For assistant messages, only keep them if there's a user message before them
-                const hasUserMessageBefore = conversationMessages.slice(0, index).some(m => m.role === 'user');
-                return hasUserMessageBefore;
-              });
-              
               const conversationForBedrock = [
                 { role: 'system', content: systemMessage },
-                ...conversationMessagesForBedrock.map(msg => ({
+                ...conversationMessages.map(msg => ({
                   role: msg.role === 'user' ? 'user' : 'assistant',
                   content: msg.content
                 }))
               ];
-              
-              log("🔄 [Server] Sending to Bedrock chat service", {
-                originalMessageCount: conversationMessages.length,
-                filteredMessageCount: conversationMessagesForBedrock.length,
-                totalMessages: conversationForBedrock.length,
-                messageRoles: conversationForBedrock.map(msg => msg.role),
-                filteredOutCount: conversationMessages.length - conversationMessagesForBedrock.length,
-                conversationPreview: conversationForBedrock.slice(1).map(msg => `${msg.role}: ${msg.content.substring(0, 100)}...`),
-                systemMessageLength: conversationForBedrock[0]?.content?.length || 0,
-                systemMessagePreview: conversationForBedrock[0]?.content?.substring(0, 300) + "..."
-              });
               
               // Use chat service directly for conversation
               const conversationStream = chatService.createChatCompletion(conversationForBedrock, {
@@ -217,30 +231,36 @@ Please provide helpful, accurate responses about Couchbase Capella based on the 
                 chunkCount++;
                 if (chunk) {
                   fullResponse += chunk;
+                  
+                  // Check if tools are being executed
+                  if (chunk.includes("[Executing tools...]")) {
+                    toolsWereExecuted = true;
+                    log("🔧 [Server] Tools execution detected in stream");
+                  }
+                  
                   const jsonLine = JSON.stringify({ content: chunk }) + "\n";
                   controller.enqueue(new TextEncoder().encode(jsonLine));
                 }
               }
             } else {
-              // Use regular RAG stream for single message or non-Bedrock providers
+              // Use regular RAG stream
               for await (const chunk of stream) {
                 chunkCount++;
                 let content = "";
 
                 if (typeof chunk === "string") {
-                  // Bedrock format - chunk is already a string
                   content = chunk;
                 } else if (chunk.choices && chunk.choices[0]?.delta?.content) {
-                  // OpenAI format - extract from choices
                   content = chunk.choices[0].delta.content;
-                  log("📤 [Server] OpenAI chunk:", {
-                    chunkType: "object",
-                    length: content.length,
-                  });
                 }
 
                 if (content) {
                   fullResponse += content;
+                  
+                  if (content.includes("[Executing tools...]")) {
+                    toolsWereExecuted = true;
+                  }
+                  
                   const jsonLine = JSON.stringify({ content }) + "\n";
                   controller.enqueue(new TextEncoder().encode(jsonLine));
                 }
@@ -252,86 +272,31 @@ Please provide helpful, accurate responses about Couchbase Capella based on the 
               responseLength: fullResponse.length,
             });
 
-            // Handle references differently for conversation mode
-            const sourceReferences =
-              context
-                ?.slice(0, 3)
-                .map((c) => ({
-                  filename: c.filename || "Unknown",
-                  pageNumber: c.pageNumber || 1,
-                  score: 0, // We don't have score in context, but keeping structure consistent
-                }))
-                .filter(
-                  (source, index, self) =>
-                    // Remove duplicates by page number
-                    index ===
-                    self.findIndex((s) => s.pageNumber === source.pageNumber),
-                )
-                .sort((a, b) => a.pageNumber - b.pageNumber) || [];
-
-            // For conversation mode with AWS Knowledge Base, don't append references as they're already in context
-            const shouldAppendReferences = !(Bun.env.RAG_PIPELINE === 'AWS_KNOWLEDGE_BASE' && conversationMessages.length > 1);
-
-            log("🔍 [Debug] Source references processing:", {
-              contextLength: context?.length || 0,
-              sourceReferencesLength: sourceReferences.length,
-              hasReferencesInResponse: fullResponse.includes("References:"),
-              shouldAppendReferences,
-              conversationMode: conversationMessages.length > 1
-            });
-
-            // Remove any basic "References:" section from the AI response and replace with page-numbered version
-            let processedResponse = fullResponse;
-
-            // Simple approach: find the last occurrence of "References:" and remove everything after it
-            const referencesIndex =
-              processedResponse.lastIndexOf("References:");
-            log("🔍 [Debug] References processing:", {
-              referencesIndex,
-              originalLength: fullResponse.length,
-              foundReferences: referencesIndex !== -1,
-            });
-
-            if (referencesIndex !== -1) {
-              processedResponse = processedResponse
-                .substring(0, referencesIndex)
-                .trim();
-              log("🔍 [Debug] Processed response after removing references:", {
-                newLength: processedResponse.length,
-                wasModified: processedResponse !== fullResponse,
-              });
-            }
-
-            // Only append references if not in conversation mode or using non-Bedrock provider
-            if (shouldAppendReferences) {
-              const enhancedReferences =
-                sourceReferences.length > 0
-                  ? `\n\nReferences:\n${sourceReferences
-                      .map((ref) => `${ref.filename} (Page ${ref.pageNumber})`)
-                      .join("\n")}`
-                  : `\n\nReferences:\n${context
-                      ?.slice(0, 3)
-                      .map((c) => c.filename)
-                      .join("\n")}`;
-
-              // Send the processed response without basic references
-              if (processedResponse !== fullResponse) {
-                // Response was modified, send the corrected content
-                controller.enqueue(
-                  new TextEncoder().encode(
-                    JSON.stringify({
-                      content: processedResponse + enhancedReferences,
-                    }) + "\n",
-                  ),
-                );
-              } else {
-                // No modification needed, just append enhanced references
-                controller.enqueue(
-                  new TextEncoder().encode(
-                    JSON.stringify({ content: enhancedReferences }) + "\n",
-                  ),
-                );
+            // Add references if no tools were executed and we have context
+            if (!toolsWereExecuted && context && context.length > 0) {
+              // Remove any existing "References:" section from the response
+              let processedResponse = fullResponse;
+              const referencesIndex = processedResponse.lastIndexOf("References:");
+              if (referencesIndex !== -1) {
+                processedResponse = processedResponse.substring(0, referencesIndex).trim();
               }
+
+              // Create clean reference list from top 3 context items
+              const sourceReferences = context
+                .slice(0, 3)
+                .map((c) => `${c.filename || "Unknown"} (Page ${c.pageNumber || 1})`)
+                .filter((ref, index, self) => self.indexOf(ref) === index) // Remove duplicates
+                .join("\n");
+
+              const enhancedReferences = `\n\nReferences:\n${sourceReferences}`;
+              
+              controller.enqueue(
+                new TextEncoder().encode(
+                  JSON.stringify({ content: enhancedReferences }) + "\n",
+                ),
+              );
+              
+              log("📚 [Server] Added references:", { count: context.slice(0, 3).length });
             }
 
             const doneMessage = JSON.stringify({ done: true }) + "\n";
@@ -343,11 +308,26 @@ Please provide helpful, accurate responses about Couchbase Capella based on the 
             controller.close();
             log("🔒 [Server] Stream closed");
           } catch (error) {
-            log("❌ Stream processing error:", { 
-              errorMessage: error instanceof Error ? error.message : String(error),
-              errorType: error instanceof Error ? error.constructor.name : typeof error
-            });
-            controller.error(error);
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            
+            log("❌ Stream processing error:", { errorMessage });
+            
+            // Send user-friendly error message to client
+            const userFriendlyError = getUserFriendlyErrorMessage(errorMessage);
+            const errorJsonLine = JSON.stringify({ 
+              content: userFriendlyError,
+              error: true 
+            }) + "\n";
+            
+            try {
+              controller.enqueue(new TextEncoder().encode(errorJsonLine));
+              const doneMessage = JSON.stringify({ done: true }) + "\n";
+              controller.enqueue(new TextEncoder().encode(doneMessage));
+              controller.close();
+            } catch (controllerError) {
+              log("❌ Failed to send error message to client:", { error: controllerError });
+              controller.error(error);
+            }
           }
         },
       }),
@@ -361,11 +341,28 @@ Please provide helpful, accurate responses about Couchbase Capella based on the 
       },
     );
   } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    
     err("❌ [Server] Error in chat API:", {
-      error: error.message,
-      stack: error.stack,
+      error: errorMessage,
+      stack: error instanceof Error ? error.stack : undefined,
       timestamp: new Date().toISOString(),
     });
-    throw error;
+    
+    // Return user-friendly error response instead of throwing
+    const userFriendlyError = getUserFriendlyErrorMessage(errorMessage);
+    
+    return new Response(
+      JSON.stringify({ 
+        error: true, 
+        message: userFriendlyError 
+      }),
+      {
+        status: 500,
+        headers: {
+          "Content-Type": "application/json"
+        }
+      }
+    );
   }
 };
