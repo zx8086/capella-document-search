@@ -9,10 +9,10 @@ import {
   type ContentBlock,
 } from "@aws-sdk/client-bedrock-runtime";
 import { NodeHttpHandler } from "@smithy/node-http-handler";
-import { log, err } from '$utils/unifiedLogger';
-import { 
-  systemVitalsQuery, 
-  systemNodesQuery, 
+import { log, err } from "$utils/unifiedLogger";
+import {
+  systemVitalsQuery,
+  systemNodesQuery,
   n1qlQueryFatalRequests,
   mostExpensiveQueries,
   n1qlLongestRunningQueries,
@@ -25,24 +25,25 @@ import {
   n1qlPreparedStatements,
   n1qlIndexesToDrop,
   detailedPreparedStatementsQuery,
-  detailedIndexesQuery
-} from '../../tools/queryAnalysis/analysisQueries';
-import { clusterConn } from '$lib/couchbaseConnector';
-import { backendConfig } from '../../backend-config';
-import { traceable } from 'langsmith/traceable';
+  detailedIndexesQuery,
+} from "../../tools/queryAnalysis/analysisQueries";
+import { clusterConn } from "$lib/couchbaseConnector";
+import { backendConfig } from "../../backend-config";
+import { traceable } from "langsmith/traceable";
 
-// AWS Documentation: Correct tool definition matching docs exactly
 const getSystemVitalsTool: Tool = {
   toolSpec: {
     name: "get_system_vitals",
-    description: "Get detailed system vitals and performance metrics for the Couchbase cluster including CPU, memory, disk usage, and operational metrics",
+    description:
+      "Get detailed system vitals and performance metrics for the Couchbase cluster including CPU, memory, disk usage, and operational metrics",
     inputSchema: {
       json: {
         type: "object",
         properties: {
           node_filter: {
             type: "string",
-            description: "Optional filter by node name (e.g., 'node1.example.com:8091'). If not provided, returns vitals for all nodes.",
+            description:
+              "Optional filter by node name (e.g., 'node1.example.com:8091'). If not provided, returns vitals for all nodes.",
           },
         },
         required: [],
@@ -54,14 +55,16 @@ const getSystemVitalsTool: Tool = {
 const getSystemNodesTool: Tool = {
   toolSpec: {
     name: "get_system_nodes",
-    description: "Get information about all nodes in the Couchbase cluster including their services, status, and configuration",
+    description:
+      "Get information about all nodes in the Couchbase cluster including their services, status, and configuration",
     inputSchema: {
       json: {
         type: "object",
         properties: {
           service_filter: {
             type: "string",
-            description: "Optional filter by service type (e.g., 'n1ql', 'kv', 'index', 'fts'). If not provided, returns all nodes.",
+            description:
+              "Optional filter by service type (e.g., 'n1ql', 'kv', 'index', 'fts'). If not provided, returns all nodes.",
           },
         },
         required: [],
@@ -73,7 +76,8 @@ const getSystemNodesTool: Tool = {
 const getFatalRequestsTool: Tool = {
   toolSpec: {
     name: "get_fatal_requests",
-    description: "Get information about failed/fatal N1QL queries including error details and performance metrics",
+    description:
+      "Get information about failed/fatal N1QL queries including error details and performance metrics",
     inputSchema: {
       json: {
         type: "object",
@@ -81,11 +85,14 @@ const getFatalRequestsTool: Tool = {
           period: {
             type: "string",
             enum: ["day", "week", "month", "quarter"],
-            description: "Time period to analyze (day, week, month, quarter). Defaults to week if not specified.",
+            description:
+              "Time period to analyze (day, week, month, quarter). Defaults to week if not specified.",
           },
           limit: {
             type: "number",
-            description: "Optional limit for the number of results to return. If not specified, returns all results.",
+            description:
+              "Optional limit for the number of results to return. If not specified, returns all results.",
+            default: 5,
           },
         },
         required: [],
@@ -97,7 +104,8 @@ const getFatalRequestsTool: Tool = {
 const getMostExpensiveQueriesTool: Tool = {
   toolSpec: {
     name: "get_most_expensive_queries",
-    description: "Get the most expensive queries based on execution time and resource usage",
+    description:
+      "Get the most expensive queries based on execution time and resource usage",
     inputSchema: {
       json: {
         type: "object",
@@ -105,6 +113,7 @@ const getMostExpensiveQueriesTool: Tool = {
           limit: {
             type: "number",
             description: "Optional limit for the number of results to return.",
+            default: 5,
           },
           period: {
             type: "string",
@@ -129,6 +138,7 @@ const getLongestRunningQueriesTool: Tool = {
           limit: {
             type: "number",
             description: "Optional limit for the number of results to return.",
+            default: 5,
           },
         },
         required: [],
@@ -148,6 +158,7 @@ const getMostFrequentQueriesTool: Tool = {
           limit: {
             type: "number",
             description: "Optional limit for the number of results to return.",
+            default: 5,
           },
         },
         required: [],
@@ -167,6 +178,7 @@ const getLargestResultSizeQueriesTool: Tool = {
           limit: {
             type: "number",
             description: "Optional limit for the number of results to return.",
+            default: 5,
           },
         },
         required: [],
@@ -186,6 +198,7 @@ const getLargestResultCountQueriesTool: Tool = {
           limit: {
             type: "number",
             description: "Optional limit for the number of results to return.",
+            default: 5,
           },
         },
         required: [],
@@ -205,6 +218,7 @@ const getPrimaryIndexQueriesTool: Tool = {
           limit: {
             type: "number",
             description: "Optional limit for the number of results to return.",
+            default: 5,
           },
         },
         required: [],
@@ -238,6 +252,7 @@ const getCompletedRequestsTool: Tool = {
           limit: {
             type: "number",
             description: "Optional limit for the number of results to return.",
+            default: 5,
           },
         },
         required: [],
@@ -305,7 +320,8 @@ const getDetailedPreparedStatementsTool: Tool = {
 const getSchemaForCollectionTool: Tool = {
   toolSpec: {
     name: "get_schema_for_collection",
-    description: "Get the structure and schema for a specific collection by sampling a document",
+    description:
+      "Get the structure and schema for a specific collection by sampling a document",
     inputSchema: {
       json: {
         type: "object",
@@ -328,7 +344,8 @@ const getSchemaForCollectionTool: Tool = {
 const runSqlPlusPlusQueryTool: Tool = {
   toolSpec: {
     name: "run_sql_plus_plus_query",
-    description: "Execute SQL++ queries on a specified scope. Use only collection names in FROM clauses when using scope context.",
+    description:
+      "Execute SQL++ queries on a specified scope. Use only collection names in FROM clauses when using scope context.",
     inputSchema: {
       json: {
         type: "object",
@@ -339,7 +356,8 @@ const runSqlPlusPlusQueryTool: Tool = {
           },
           query: {
             type: "string",
-            description: "SQL++ query to execute. Use only the collection name in the FROM clause if using scope context (e.g., SELECT * FROM `_default` NOT FROM `bucket`.`scope`.`collection`)",
+            description:
+              "SQL++ query to execute. Use only the collection name in the FROM clause if using scope context (e.g., SELECT * FROM `_default` NOT FROM `bucket`.`scope`.`collection`)",
           },
         },
         required: ["scope_name", "query"],
@@ -348,13 +366,12 @@ const runSqlPlusPlusQueryTool: Tool = {
   },
 };
 
-
 export class BedrockChatService {
   private client: BedrockRuntimeClient;
   private modelId: string;
   private tools: Tool[] = [
-    getSystemVitalsTool, 
-    getSystemNodesTool, 
+    getSystemVitalsTool,
+    getSystemNodesTool,
     getFatalRequestsTool,
     getMostExpensiveQueriesTool,
     getLongestRunningQueriesTool,
@@ -369,181 +386,197 @@ export class BedrockChatService {
     getDetailedIndexesTool,
     getDetailedPreparedStatementsTool,
     getSchemaForCollectionTool,
-    runSqlPlusPlusQueryTool
+    runSqlPlusPlusQueryTool,
   ];
 
   constructor(region: string = "eu-central-1") {
-    log('🔧 [BedrockChat] Constructor called', { 
+    log("🔧 [BedrockChat] Constructor called", {
       region,
-      approach: 'using global connection'
+      approach: "using global connection",
     });
-    
+
     // Build credentials object safely
     const credentials: any = {
       accessKeyId: Bun.env.AWS_ACCESS_KEY_ID || "DUMMY",
       secretAccessKey: Bun.env.AWS_SECRET_ACCESS_KEY || "DUMMY",
     };
-    
+
     // Only add sessionToken if it exists and is not empty
-    if (Bun.env.AWS_BEARER_TOKEN_BEDROCK && Bun.env.AWS_BEARER_TOKEN_BEDROCK.trim()) {
+    if (
+      Bun.env.AWS_BEARER_TOKEN_BEDROCK &&
+      Bun.env.AWS_BEARER_TOKEN_BEDROCK.trim()
+    ) {
       credentials.sessionToken = Bun.env.AWS_BEARER_TOKEN_BEDROCK;
     }
-    
+
     this.client = new BedrockRuntimeClient({
       region,
       credentials,
-      // Use maxAttempts to handle transient network issues
       maxAttempts: 3,
-      // Add retry configuration
-      retryMode: 'adaptive',
+      retryMode: "adaptive",
       // Use HTTP/1.1 handler to avoid Bun HTTP/2 compatibility issues
       requestHandler: new NodeHttpHandler({
         httpAgent: { keepAlive: false },
-        httpsAgent: { keepAlive: false }
-      })
+        httpsAgent: { keepAlive: false },
+      }),
     });
     this.modelId = Bun.env.BEDROCK_CHAT_MODEL || "eu.amazon.nova-pro-v1:0";
   }
 
-  private executeGetSystemVitals = async (node_filter?: string): Promise<any> => {
+  private executeGetSystemVitals = async (
+    node_filter?: string,
+  ): Promise<any> => {
     try {
-      log('🔍 [Tool] Executing get_system_vitals', { 
+      log("🔍 [Tool] Executing get_system_vitals", {
         node_filter,
-        approach: 'using global connection'
+        approach: "using global connection",
       });
-      
-      const startTime = Date.now();
-      
-      // Use the global connection approach (same as test endpoint)
-      log('🔍 [Tool] Getting cluster connection...');
-      const cluster = await clusterConn();
-      
-      log('✅ [Tool] Got cluster, building query');
 
-      // Build the query based on parameters
+      const startTime = Date.now();
+
+      log("🔍 [Tool] Getting cluster connection...");
+      const cluster = await clusterConn();
+
+      log("✅ [Tool] Got cluster, building query");
+
       let query = systemVitalsQuery;
-      
+
       // Apply node filter if specified
       if (node_filter) {
         query = query.replace(
           "SELECT * FROM system:vitals;",
-          `SELECT * FROM system:vitals WHERE node LIKE "%${node_filter}%";`
+          `SELECT * FROM system:vitals WHERE node LIKE "%${node_filter}%";`,
         );
       }
 
-      log('📝 [Tool] Executing query', { query: query.substring(0, 100) + '...' });
+      log("📝 [Tool] Executing query", {
+        query: query.substring(0, 100) + "...",
+      });
 
       // Execute the query directly through the cluster (same as test endpoint)
       const result = await cluster.query(query);
-      
-      log('✅ [Tool] Query executed, processing results');
+
+      log("✅ [Tool] Query executed, processing results");
       const rows = await result.rows;
-      
+
       const executionTime = Date.now() - startTime;
-      
-      log('📊 [Tool] Query results', { 
+
+      log("📊 [Tool] Query results", {
         rowCount: rows.length,
         executionTimeMs: executionTime,
-        hasFilter: !!node_filter
+        hasFilter: !!node_filter,
       });
 
       // Format the response
-      const responseText = `# Couchbase System Vitals (${rows.length} result${rows.length !== 1 ? 's' : ''})\n\n` +
-        (rows.length === 0 ? "No results found for this query." : `\`\`\`json\n${JSON.stringify(rows, null, 2)}\n\`\`\``);
+      const responseText =
+        `# Couchbase System Vitals (${rows.length} result${rows.length !== 1 ? "s" : ""})\n\n` +
+        (rows.length === 0
+          ? "No results found for this query."
+          : `\`\`\`json\n${JSON.stringify(rows, null, 2)}\n\`\`\``);
 
       return {
         success: true,
         content: responseText,
-        data: { rows, count: rows.length, executionTimeMs: executionTime }
+        data: { rows, count: rows.length, executionTimeMs: executionTime },
       };
     } catch (error) {
-      err('❌ [Tool] Get system vitals failed', { error: error.message });
-      return { 
+      err("❌ [Tool] Get system vitals failed", { error: error.message });
+      return {
         success: false,
         error: error.message,
-        content: `System vitals query failed: ${error.message}`
+        content: `System vitals query failed: ${error.message}`,
       };
     }
   };
 
-  private executeGetSystemNodes = async (service_filter?: string): Promise<any> => {
+  private executeGetSystemNodes = async (
+    service_filter?: string,
+  ): Promise<any> => {
     try {
-      log('🔍 [Tool] Executing get_system_nodes', { 
+      log("🔍 [Tool] Executing get_system_nodes", {
         service_filter,
-        approach: 'using global connection'
+        approach: "using global connection",
       });
-      
+
       const startTime = Date.now();
-      
+
       // Use the global connection approach
       const cluster = await clusterConn();
-      
+
       // Build the query based on parameters
       let query = systemNodesQuery;
-      
+
       // Apply service filter if specified
       if (service_filter) {
         query = query.replace(
           "SELECT * FROM system:nodes;",
-          `SELECT * FROM system:nodes WHERE ANY s IN services SATISFIES s = "${service_filter}" END;`
+          `SELECT * FROM system:nodes WHERE ANY s IN services SATISFIES s = "${service_filter}" END;`,
         );
       }
 
-      log('📝 [Tool] Executing nodes query', { query: query.substring(0, 100) + '...' });
+      log("📝 [Tool] Executing nodes query", {
+        query: query.substring(0, 100) + "...",
+      });
 
       // Execute the query
       const result = await cluster.query(query);
       const rows = await result.rows;
-      
+
       const executionTime = Date.now() - startTime;
-      
-      log('📊 [Tool] Nodes query results', { 
+
+      log("📊 [Tool] Nodes query results", {
         rowCount: rows.length,
         executionTimeMs: executionTime,
-        hasServiceFilter: !!service_filter
+        hasServiceFilter: !!service_filter,
       });
 
       // Format the response
-      const responseText = `# Couchbase Cluster Nodes (${rows.length} result${rows.length !== 1 ? 's' : ''})\n\n` +
-        (rows.length === 0 ? "No results found for this query." : `\`\`\`json\n${JSON.stringify(rows, null, 2)}\n\`\`\``);
+      const responseText =
+        `# Couchbase Cluster Nodes (${rows.length} result${rows.length !== 1 ? "s" : ""})\n\n` +
+        (rows.length === 0
+          ? "No results found for this query."
+          : `\`\`\`json\n${JSON.stringify(rows, null, 2)}\n\`\`\``);
 
       return {
         success: true,
         content: responseText,
-        data: { rows, count: rows.length, executionTimeMs: executionTime }
+        data: { rows, count: rows.length, executionTimeMs: executionTime },
       };
     } catch (error) {
-      err('❌ [Tool] Get system nodes failed', { error: error.message });
-      return { 
+      err("❌ [Tool] Get system nodes failed", { error: error.message });
+      return {
         success: false,
         error: error.message,
-        content: `System nodes query failed: ${error.message}`
+        content: `System nodes query failed: ${error.message}`,
       };
     }
   };
 
-  private executeGetFatalRequests = async (period?: string, limit?: number): Promise<any> => {
+  private executeGetFatalRequests = async (
+    period?: string,
+    limit?: number,
+  ): Promise<any> => {
     try {
-      log('🔍 [Tool] Executing get_fatal_requests', { 
+      log("🔍 [Tool] Executing get_fatal_requests", {
         period,
         limit,
-        approach: 'using global connection'
+        approach: "using global connection",
       });
-      
+
       const startTime = Date.now();
-      
+
       // Use the global connection approach
       const cluster = await clusterConn();
-      
+
       // Build the query based on parameters
       let query = n1qlQueryFatalRequests;
       let appliedFilters = [];
-      
+
       // Apply period filter if specified
       if (period) {
         let periodValue: number;
         let periodUnit: string;
-        
+
         switch (period) {
           case "day":
             periodValue = 1;
@@ -565,69 +598,81 @@ export class BedrockChatService {
             periodValue = 1;
             periodUnit = "week";
         }
-        
+
         appliedFilters.push(`period: ${period}`);
-        
+
         // Replace the DATE_ADD_STR period in the query
         query = query.replace(
           /DATE_ADD_STR\(NOW_STR\(\), -\d+, '\w+'\)/,
-          `DATE_ADD_STR(NOW_STR(), -${periodValue}, '${periodUnit}')`
-        );
-      }
-      
-      // Apply limit if specified
-      if (limit && limit > 0) {
-        appliedFilters.push(`limit: ${limit}`);
-        // Add limit to the end of the query
-        query = query.replace(
-          "ORDER BY requestTime DESC;",
-          `ORDER BY requestTime DESC LIMIT ${limit};`
+          `DATE_ADD_STR(NOW_STR(), -${periodValue}, '${periodUnit}')`,
         );
       }
 
-      log('📝 [Tool] Executing fatal requests query', { query: query.substring(0, 100) + '...' });
+      // Apply limit if specified, otherwise use default of 5
+      const effectiveLimit = limit && limit > 0 ? limit : 5;
+      appliedFilters.push(`limit: ${effectiveLimit}`);
+      // Add limit to the end of the query
+      query = query.replace(
+        "ORDER BY requestTime DESC;",
+        `ORDER BY requestTime DESC LIMIT ${effectiveLimit};`,
+      );
+
+      log("📝 [Tool] Executing fatal requests query", {
+        query: query.substring(0, 100) + "...",
+      });
 
       // Execute the query
       const result = await cluster.query(query);
       const rows = await result.rows;
-      
+
       const executionTime = Date.now() - startTime;
-      
-      log('📊 [Tool] Fatal requests query results', { 
+
+      log("📊 [Tool] Fatal requests query results", {
         rowCount: rows.length,
         executionTimeMs: executionTime,
-        appliedFilters: appliedFilters.join(', ') || 'none'
+        appliedFilters: appliedFilters.join(", ") || "none",
       });
 
       // Format the response
-      const responseText = `# Fatal Query Requests (${rows.length} result${rows.length !== 1 ? 's' : ''})\n\n` +
-        (rows.length === 0 ? "No fatal requests found for the specified period." : `\`\`\`json\n${JSON.stringify(rows, null, 2)}\n\`\`\``);
+      const responseText =
+        `# Fatal Query Requests (${rows.length} result${rows.length !== 1 ? "s" : ""})\n\n` +
+        (rows.length === 0
+          ? "No fatal requests found for the specified period."
+          : `\`\`\`json\n${JSON.stringify(rows, null, 2)}\n\`\`\``);
 
       return {
         success: true,
         content: responseText,
-        data: { rows, count: rows.length, executionTimeMs: executionTime, appliedFilters }
+        data: {
+          rows,
+          count: rows.length,
+          executionTimeMs: executionTime,
+          appliedFilters,
+        },
       };
     } catch (error) {
-      err('❌ [Tool] Get fatal requests failed', { error: error.message });
-      return { 
+      err("❌ [Tool] Get fatal requests failed", { error: error.message });
+      return {
         success: false,
         error: error.message,
-        content: `Fatal requests query failed: ${error.message}`
+        content: `Fatal requests query failed: ${error.message}`,
       };
     }
   };
 
-  private executeGetMostExpensiveQueries = async (limit?: number, period?: string): Promise<any> => {
+  private executeGetMostExpensiveQueries = async (
+    limit?: number,
+    period?: string,
+  ): Promise<any> => {
     try {
-      log('🔍 [Tool] Executing get_most_expensive_queries', { limit, period });
-      
+      log("🔍 [Tool] Executing get_most_expensive_queries", { limit, period });
+
       const startTime = Date.now();
       const cluster = await clusterConn();
-      
+
       let query = mostExpensiveQueries;
       let appliedFilters = [];
-      
+
       if (period) {
         appliedFilters.push(`period: ${period}`);
         let periodClause: string;
@@ -639,316 +684,519 @@ export class BedrockChatService {
             periodClause = "requestTime >= DATE_ADD_STR(NOW_STR(), -1, 'week')";
             break;
           case "month":
-            periodClause = "requestTime >= DATE_ADD_STR(NOW_STR(), -1, 'month')";
+            periodClause =
+              "requestTime >= DATE_ADD_STR(NOW_STR(), -1, 'month')";
             break;
           default:
             periodClause = "requestTime >= DATE_ADD_STR(NOW_STR(), -1, 'week')";
         }
-        query = query.replace("WHERE LOWER(statement)", `WHERE ${periodClause} AND LOWER(statement)`);
+        query = query.replace(
+          "WHERE LOWER(statement)",
+          `WHERE ${periodClause} AND LOWER(statement)`,
+        );
       }
-      
-      if (limit && limit > 0) {
-        appliedFilters.push(`limit: ${limit}`);
-        query = query.replace(/;\s*$/, ` LIMIT ${limit};`);
-      }
+
+      // Apply limit if specified, otherwise use default of 5
+      const effectiveLimit = limit && limit > 0 ? limit : 5;
+      appliedFilters.push(`limit: ${effectiveLimit}`);
+      query = query.replace(/;\s*$/, ` LIMIT ${effectiveLimit};`);
 
       const result = await cluster.query(query);
       const rows = await result.rows;
-      
+
       const executionTime = Date.now() - startTime;
-      const totalCost = rows.reduce((sum, row) => sum + (row.totalElapsedTime || 0), 0);
-      
-      log('📊 [Tool] Most expensive queries results', {
+      const totalCost = rows.reduce(
+        (sum, row) => sum + (row.totalElapsedTime || 0),
+        0,
+      );
+
+      log("📊 [Tool] Most expensive queries results", {
         rowCount: rows.length,
         executionTimeMs: executionTime,
         totalCostMs: totalCost,
-        appliedFilters: appliedFilters.join(', ') || 'none'
+        appliedFilters: appliedFilters.join(", ") || "none",
       });
-      
-      const responseText = `# Most Expensive Queries (${rows.length} result${rows.length !== 1 ? 's' : ''})\n\n` +
-        (rows.length === 0 ? "No expensive queries found." : `\`\`\`json\n${JSON.stringify(rows, null, 2)}\n\`\`\``);
 
-      return { 
-        success: true, 
-        content: responseText, 
-        data: { rows, count: rows.length, executionTimeMs: executionTime, totalCostMs: totalCost, appliedFilters } 
+      const responseText =
+        `# Most Expensive Queries (${rows.length} result${rows.length !== 1 ? "s" : ""})\n\n` +
+        (rows.length === 0
+          ? "No expensive queries found."
+          : `\`\`\`json\n${JSON.stringify(rows, null, 2)}\n\`\`\``);
+
+      return {
+        success: true,
+        content: responseText,
+        data: {
+          rows,
+          count: rows.length,
+          executionTimeMs: executionTime,
+          totalCostMs: totalCost,
+          appliedFilters,
+        },
       };
     } catch (error) {
-      err('❌ [Tool] Get most expensive queries failed', { error: error.message });
-      return { success: false, error: error.message, content: `Query failed: ${error.message}` };
+      err("❌ [Tool] Get most expensive queries failed", {
+        error: error.message,
+      });
+      return {
+        success: false,
+        error: error.message,
+        content: `Query failed: ${error.message}`,
+      };
     }
   };
 
-  private executeGetLongestRunningQueries = async (limit?: number): Promise<any> => {
+  private executeGetLongestRunningQueries = async (
+    limit?: number,
+  ): Promise<any> => {
     try {
-      log('🔍 [Tool] Executing get_longest_running_queries', { limit });
+      log("🔍 [Tool] Executing get_longest_running_queries", { limit });
       const startTime = Date.now();
       const cluster = await clusterConn();
-      
+
       let query = n1qlLongestRunningQueries;
       let appliedFilters = [];
-      if (limit && limit > 0) {
-        appliedFilters.push(`limit: ${limit}`);
-        query = query.replace(/;\s*$/, ` LIMIT ${limit};`);
-      }
+      // Apply limit if specified, otherwise use default of 5
+      const effectiveLimit = limit && limit > 0 ? limit : 5;
+      appliedFilters.push(`limit: ${effectiveLimit}`);
+      query = query.replace(/;\s*$/, ` LIMIT ${effectiveLimit};`);
 
       const result = await cluster.query(query);
       const rows = await result.rows;
       const executionTime = Date.now() - startTime;
-      
-      const responseText = `# Longest Running Queries (${rows.length} result${rows.length !== 1 ? 's' : ''})\n\n` +
-        (rows.length === 0 ? "No queries found." : `\`\`\`json\n${JSON.stringify(rows, null, 2)}\n\`\`\``);
 
-      return { success: true, content: responseText, data: { rows, count: rows.length, executionTimeMs: executionTime, appliedFilters } };
+      const responseText =
+        `# Longest Running Queries (${rows.length} result${rows.length !== 1 ? "s" : ""})\n\n` +
+        (rows.length === 0
+          ? "No queries found."
+          : `\`\`\`json\n${JSON.stringify(rows, null, 2)}\n\`\`\``);
+
+      return {
+        success: true,
+        content: responseText,
+        data: {
+          rows,
+          count: rows.length,
+          executionTimeMs: executionTime,
+          appliedFilters,
+        },
+      };
     } catch (error) {
-      err('❌ [Tool] Get longest running queries failed', { error: error.message });
-      return { success: false, error: error.message, content: `Query failed: ${error.message}` };
+      err("❌ [Tool] Get longest running queries failed", {
+        error: error.message,
+      });
+      return {
+        success: false,
+        error: error.message,
+        content: `Query failed: ${error.message}`,
+      };
     }
   };
 
-  private executeGetMostFrequentQueries = async (limit?: number): Promise<any> => {
+  private executeGetMostFrequentQueries = async (
+    limit?: number,
+  ): Promise<any> => {
     try {
-      log('🔍 [Tool] Executing get_most_frequent_queries', { limit });
+      log("🔍 [Tool] Executing get_most_frequent_queries", { limit });
       const startTime = Date.now();
       const cluster = await clusterConn();
-      
+
       let query = n1qlMostFrequentQueries;
       let appliedFilters = [];
-      if (limit && limit > 0) {
-        appliedFilters.push(`limit: ${limit}`);
-        query = query.replace(/;\s*$/, ` LIMIT ${limit};`);
-      }
+      // Apply limit if specified, otherwise use default of 5
+      const effectiveLimit = limit && limit > 0 ? limit : 5;
+      appliedFilters.push(`limit: ${effectiveLimit}`);
+      query = query.replace(/;\s*$/, ` LIMIT ${effectiveLimit};`);
 
       const result = await cluster.query(query);
       const rows = await result.rows;
       const executionTime = Date.now() - startTime;
-      
-      const responseText = `# Most Frequent Queries (${rows.length} result${rows.length !== 1 ? 's' : ''})\n\n` +
-        (rows.length === 0 ? "No queries found." : `\`\`\`json\n${JSON.stringify(rows, null, 2)}\n\`\`\``);
 
-      return { success: true, content: responseText, data: { rows, count: rows.length, executionTimeMs: executionTime, appliedFilters } };
+      const responseText =
+        `# Most Frequent Queries (${rows.length} result${rows.length !== 1 ? "s" : ""})\n\n` +
+        (rows.length === 0
+          ? "No queries found."
+          : `\`\`\`json\n${JSON.stringify(rows, null, 2)}\n\`\`\``);
+
+      return {
+        success: true,
+        content: responseText,
+        data: {
+          rows,
+          count: rows.length,
+          executionTimeMs: executionTime,
+          appliedFilters,
+        },
+      };
     } catch (error) {
-      err('❌ [Tool] Get most frequent queries failed', { error: error.message });
-      return { success: false, error: error.message, content: `Query failed: ${error.message}` };
+      err("❌ [Tool] Get most frequent queries failed", {
+        error: error.message,
+      });
+      return {
+        success: false,
+        error: error.message,
+        content: `Query failed: ${error.message}`,
+      };
     }
   };
 
-  private executeGetLargestResultSizeQueries = async (limit?: number): Promise<any> => {
+  private executeGetLargestResultSizeQueries = async (
+    limit?: number,
+  ): Promise<any> => {
     try {
-      log('🔍 [Tool] Executing get_largest_result_size_queries', { limit });
+      log("🔍 [Tool] Executing get_largest_result_size_queries", { limit });
       const startTime = Date.now();
       const cluster = await clusterConn();
-      
+
       let query = n1qlLargestResultSizeQueries;
       let appliedFilters = [];
-      if (limit && limit > 0) {
-        appliedFilters.push(`limit: ${limit}`);
-        query = query.replace(/;\s*$/, ` LIMIT ${limit};`);
-      }
+      // Apply limit if specified, otherwise use default of 5
+      const effectiveLimit = limit && limit > 0 ? limit : 5;
+      appliedFilters.push(`limit: ${effectiveLimit}`);
+      query = query.replace(/;\s*$/, ` LIMIT ${effectiveLimit};`);
 
       const result = await cluster.query(query);
       const rows = await result.rows;
       const executionTime = Date.now() - startTime;
-      
-      const responseText = `# Largest Result Size Queries (${rows.length} result${rows.length !== 1 ? 's' : ''})\n\n` +
-        (rows.length === 0 ? "No queries found." : `\`\`\`json\n${JSON.stringify(rows, null, 2)}\n\`\`\``);
 
-      return { success: true, content: responseText, data: { rows, count: rows.length, executionTimeMs: executionTime, appliedFilters } };
+      const responseText =
+        `# Largest Result Size Queries (${rows.length} result${rows.length !== 1 ? "s" : ""})\n\n` +
+        (rows.length === 0
+          ? "No queries found."
+          : `\`\`\`json\n${JSON.stringify(rows, null, 2)}\n\`\`\``);
+
+      return {
+        success: true,
+        content: responseText,
+        data: {
+          rows,
+          count: rows.length,
+          executionTimeMs: executionTime,
+          appliedFilters,
+        },
+      };
     } catch (error) {
-      err('❌ [Tool] Get largest result size queries failed', { error: error.message });
-      return { success: false, error: error.message, content: `Query failed: ${error.message}` };
+      err("❌ [Tool] Get largest result size queries failed", {
+        error: error.message,
+      });
+      return {
+        success: false,
+        error: error.message,
+        content: `Query failed: ${error.message}`,
+      };
     }
   };
 
-  private executeGetLargestResultCountQueries = async (limit?: number): Promise<any> => {
+  private executeGetLargestResultCountQueries = async (
+    limit?: number,
+  ): Promise<any> => {
     try {
-      log('🔍 [Tool] Executing get_largest_result_count_queries', { limit });
+      log("🔍 [Tool] Executing get_largest_result_count_queries", { limit });
       const startTime = Date.now();
       const cluster = await clusterConn();
-      
+
       let query = n1qlLargestResultCountQueries;
       let appliedFilters = [];
-      if (limit && limit > 0) {
-        appliedFilters.push(`limit: ${limit}`);
-        query = query.replace(/;\s*$/, ` LIMIT ${limit};`);
-      }
+      // Apply limit if specified, otherwise use default of 5
+      const effectiveLimit = limit && limit > 0 ? limit : 5;
+      appliedFilters.push(`limit: ${effectiveLimit}`);
+      query = query.replace(/;\s*$/, ` LIMIT ${effectiveLimit};`);
 
       const result = await cluster.query(query);
       const rows = await result.rows;
       const executionTime = Date.now() - startTime;
-      
-      const responseText = `# Largest Result Count Queries (${rows.length} result${rows.length !== 1 ? 's' : ''})\n\n` +
-        (rows.length === 0 ? "No queries found." : `\`\`\`json\n${JSON.stringify(rows, null, 2)}\n\`\`\``);
 
-      return { success: true, content: responseText, data: { rows, count: rows.length, executionTimeMs: executionTime, appliedFilters } };
+      const responseText =
+        `# Largest Result Count Queries (${rows.length} result${rows.length !== 1 ? "s" : ""})\n\n` +
+        (rows.length === 0
+          ? "No queries found."
+          : `\`\`\`json\n${JSON.stringify(rows, null, 2)}\n\`\`\``);
+
+      return {
+        success: true,
+        content: responseText,
+        data: {
+          rows,
+          count: rows.length,
+          executionTimeMs: executionTime,
+          appliedFilters,
+        },
+      };
     } catch (error) {
-      err('❌ [Tool] Get largest result count queries failed', { error: error.message });
-      return { success: false, error: error.message, content: `Query failed: ${error.message}` };
+      err("❌ [Tool] Get largest result count queries failed", {
+        error: error.message,
+      });
+      return {
+        success: false,
+        error: error.message,
+        content: `Query failed: ${error.message}`,
+      };
     }
   };
 
-  private executeGetPrimaryIndexQueries = async (limit?: number): Promise<any> => {
+  private executeGetPrimaryIndexQueries = async (
+    limit?: number,
+  ): Promise<any> => {
     try {
-      log('🔍 [Tool] Executing get_primary_index_queries', { limit });
+      log("🔍 [Tool] Executing get_primary_index_queries", { limit });
       const startTime = Date.now();
       const cluster = await clusterConn();
-      
+
       let query = n1qlPrimaryIndexes;
       let appliedFilters = [];
-      if (limit && limit > 0) {
-        appliedFilters.push(`limit: ${limit}`);
-        query = query.replace(/;\s*$/, ` LIMIT ${limit};`);
-      }
+      // Apply limit if specified, otherwise use default of 5
+      const effectiveLimit = limit && limit > 0 ? limit : 5;
+      appliedFilters.push(`limit: ${effectiveLimit}`);
+      query = query.replace(/;\s*$/, ` LIMIT ${effectiveLimit};`);
 
       const result = await cluster.query(query);
       const rows = await result.rows;
       const executionTime = Date.now() - startTime;
-      
-      const responseText = `# Primary Index Queries (${rows.length} result${rows.length !== 1 ? 's' : ''})\n\n` +
-        (rows.length === 0 ? "No primary index queries found." : `\`\`\`json\n${JSON.stringify(rows, null, 2)}\n\`\`\``);
 
-      return { success: true, content: responseText, data: { rows, count: rows.length, executionTimeMs: executionTime, appliedFilters } };
+      const responseText =
+        `# Primary Index Queries (${rows.length} result${rows.length !== 1 ? "s" : ""})\n\n` +
+        (rows.length === 0
+          ? "No primary index queries found."
+          : `\`\`\`json\n${JSON.stringify(rows, null, 2)}\n\`\`\``);
+
+      return {
+        success: true,
+        content: responseText,
+        data: {
+          rows,
+          count: rows.length,
+          executionTimeMs: executionTime,
+          appliedFilters,
+        },
+      };
     } catch (error) {
-      err('❌ [Tool] Get primary index queries failed', { error: error.message });
-      return { success: false, error: error.message, content: `Query failed: ${error.message}` };
+      err("❌ [Tool] Get primary index queries failed", {
+        error: error.message,
+      });
+      return {
+        success: false,
+        error: error.message,
+        content: `Query failed: ${error.message}`,
+      };
     }
   };
 
   private executeGetSystemIndexes = async (): Promise<any> => {
     try {
-      log('🔍 [Tool] Executing get_system_indexes');
+      log("🔍 [Tool] Executing get_system_indexes");
       const startTime = Date.now();
       const cluster = await clusterConn();
-      
+
       const result = await cluster.query(n1qlSystemIndexes);
       const rows = await result.rows;
       const executionTime = Date.now() - startTime;
-      
-      const responseText = `# System Indexes (${rows.length} result${rows.length !== 1 ? 's' : ''})\n\n` +
-        (rows.length === 0 ? "No system indexes found." : `\`\`\`json\n${JSON.stringify(rows, null, 2)}\n\`\`\``);
 
-      return { success: true, content: responseText, data: { rows, count: rows.length, executionTimeMs: executionTime } };
+      const responseText =
+        `# System Indexes (${rows.length} result${rows.length !== 1 ? "s" : ""})\n\n` +
+        (rows.length === 0
+          ? "No system indexes found."
+          : `\`\`\`json\n${JSON.stringify(rows, null, 2)}\n\`\`\``);
+
+      return {
+        success: true,
+        content: responseText,
+        data: { rows, count: rows.length, executionTimeMs: executionTime },
+      };
     } catch (error) {
-      err('❌ [Tool] Get system indexes failed', { error: error.message });
-      return { success: false, error: error.message, content: `Query failed: ${error.message}` };
+      err("❌ [Tool] Get system indexes failed", { error: error.message });
+      return {
+        success: false,
+        error: error.message,
+        content: `Query failed: ${error.message}`,
+      };
     }
   };
 
-  private executeGetCompletedRequests = async (limit?: number): Promise<any> => {
+  private executeGetCompletedRequests = async (
+    limit?: number,
+  ): Promise<any> => {
     try {
-      log('🔍 [Tool] Executing get_completed_requests', { limit });
+      log("🔍 [Tool] Executing get_completed_requests", { limit });
       const startTime = Date.now();
       const cluster = await clusterConn();
-      
+
       let query = n1qlCompletedRequests;
       let appliedFilters = [];
-      if (limit && limit > 0) {
-        appliedFilters.push(`limit: ${limit}`);
-        query = query.replace(/;\s*$/, ` LIMIT ${limit};`);
-      }
+      // Apply limit if specified, otherwise use default of 5
+      const effectiveLimit = limit && limit > 0 ? limit : 5;
+      appliedFilters.push(`limit: ${effectiveLimit}`);
+      query = query.replace(/;\s*$/, ` LIMIT ${effectiveLimit};`);
 
       const result = await cluster.query(query);
       const rows = await result.rows;
       const executionTime = Date.now() - startTime;
-      
-      const responseText = `# Completed Requests (${rows.length} result${rows.length !== 1 ? 's' : ''})\n\n` +
-        (rows.length === 0 ? "No completed requests found." : `\`\`\`json\n${JSON.stringify(rows, null, 2)}\n\`\`\``);
 
-      return { success: true, content: responseText, data: { rows, count: rows.length, executionTimeMs: executionTime, appliedFilters } };
+      const responseText =
+        `# Completed Requests (${rows.length} result${rows.length !== 1 ? "s" : ""})\n\n` +
+        (rows.length === 0
+          ? "No completed requests found."
+          : `\`\`\`json\n${JSON.stringify(rows, null, 2)}\n\`\`\``);
+
+      return {
+        success: true,
+        content: responseText,
+        data: {
+          rows,
+          count: rows.length,
+          executionTimeMs: executionTime,
+          appliedFilters,
+        },
+      };
     } catch (error) {
-      err('❌ [Tool] Get completed requests failed', { error: error.message });
-      return { success: false, error: error.message, content: `Query failed: ${error.message}` };
+      err("❌ [Tool] Get completed requests failed", { error: error.message });
+      return {
+        success: false,
+        error: error.message,
+        content: `Query failed: ${error.message}`,
+      };
     }
   };
 
   private executeGetPreparedStatements = async (): Promise<any> => {
     try {
-      log('🔍 [Tool] Executing get_prepared_statements');
+      log("🔍 [Tool] Executing get_prepared_statements");
       const startTime = Date.now();
       const cluster = await clusterConn();
-      
+
       const result = await cluster.query(n1qlPreparedStatements);
       const rows = await result.rows;
       const executionTime = Date.now() - startTime;
-      
-      const responseText = `# Prepared Statements (${rows.length} result${rows.length !== 1 ? 's' : ''})\n\n` +
-        (rows.length === 0 ? "No prepared statements found." : `\`\`\`json\n${JSON.stringify(rows, null, 2)}\n\`\`\``);
 
-      return { success: true, content: responseText, data: { rows, count: rows.length, executionTimeMs: executionTime } };
+      const responseText =
+        `# Prepared Statements (${rows.length} result${rows.length !== 1 ? "s" : ""})\n\n` +
+        (rows.length === 0
+          ? "No prepared statements found."
+          : `\`\`\`json\n${JSON.stringify(rows, null, 2)}\n\`\`\``);
+
+      return {
+        success: true,
+        content: responseText,
+        data: { rows, count: rows.length, executionTimeMs: executionTime },
+      };
     } catch (error) {
-      err('❌ [Tool] Get prepared statements failed', { error: error.message });
-      return { success: false, error: error.message, content: `Query failed: ${error.message}` };
+      err("❌ [Tool] Get prepared statements failed", { error: error.message });
+      return {
+        success: false,
+        error: error.message,
+        content: `Query failed: ${error.message}`,
+      };
     }
   };
 
   private executeGetIndexesToDrop = async (): Promise<any> => {
     try {
-      log('🔍 [Tool] Executing get_indexes_to_drop');
+      log("🔍 [Tool] Executing get_indexes_to_drop");
       const startTime = Date.now();
       const cluster = await clusterConn();
-      
+
       const result = await cluster.query(n1qlIndexesToDrop);
       const rows = await result.rows;
       const executionTime = Date.now() - startTime;
-      
-      const responseText = `# Indexes to Drop (${rows.length} result${rows.length !== 1 ? 's' : ''})\n\n` +
-        (rows.length === 0 ? "No unused indexes found." : `\`\`\`json\n${JSON.stringify(rows, null, 2)}\n\`\`\``);
 
-      return { success: true, content: responseText, data: { rows, count: rows.length, executionTimeMs: executionTime } };
+      const responseText =
+        `# Indexes to Drop (${rows.length} result${rows.length !== 1 ? "s" : ""})\n\n` +
+        (rows.length === 0
+          ? "No unused indexes found."
+          : `\`\`\`json\n${JSON.stringify(rows, null, 2)}\n\`\`\``);
+
+      return {
+        success: true,
+        content: responseText,
+        data: { rows, count: rows.length, executionTimeMs: executionTime },
+      };
     } catch (error) {
-      err('❌ [Tool] Get indexes to drop failed', { error: error.message });
-      return { success: false, error: error.message, content: `Query failed: ${error.message}` };
+      err("❌ [Tool] Get indexes to drop failed", { error: error.message });
+      return {
+        success: false,
+        error: error.message,
+        content: `Query failed: ${error.message}`,
+      };
     }
   };
 
   private executeGetDetailedIndexes = async (): Promise<any> => {
     try {
-      log('🔍 [Tool] Executing get_detailed_indexes');
+      log("🔍 [Tool] Executing get_detailed_indexes");
       const startTime = Date.now();
       const cluster = await clusterConn();
-      
+
       const result = await cluster.query(detailedIndexesQuery);
       const rows = await result.rows;
       const executionTime = Date.now() - startTime;
-      
-      const responseText = `# Detailed Indexes (${rows.length} result${rows.length !== 1 ? 's' : ''})\n\n` +
-        (rows.length === 0 ? "No indexes found." : `\`\`\`json\n${JSON.stringify(rows, null, 2)}\n\`\`\``);
 
-      return { success: true, content: responseText, data: { rows, count: rows.length, executionTimeMs: executionTime } };
+      const responseText =
+        `# Detailed Indexes (${rows.length} result${rows.length !== 1 ? "s" : ""})\n\n` +
+        (rows.length === 0
+          ? "No indexes found."
+          : `\`\`\`json\n${JSON.stringify(rows, null, 2)}\n\`\`\``);
+
+      return {
+        success: true,
+        content: responseText,
+        data: { rows, count: rows.length, executionTimeMs: executionTime },
+      };
     } catch (error) {
-      err('❌ [Tool] Get detailed indexes failed', { error: error.message });
-      return { success: false, error: error.message, content: `Query failed: ${error.message}` };
+      err("❌ [Tool] Get detailed indexes failed", { error: error.message });
+      return {
+        success: false,
+        error: error.message,
+        content: `Query failed: ${error.message}`,
+      };
     }
   };
 
   private executeGetDetailedPreparedStatements = async (): Promise<any> => {
     try {
-      log('🔍 [Tool] Executing get_detailed_prepared_statements');
+      log("🔍 [Tool] Executing get_detailed_prepared_statements");
       const startTime = Date.now();
       const cluster = await clusterConn();
-      
+
       const result = await cluster.query(detailedPreparedStatementsQuery);
       const rows = await result.rows;
       const executionTime = Date.now() - startTime;
-      
-      const responseText = `# Detailed Prepared Statements (${rows.length} result${rows.length !== 1 ? 's' : ''})\n\n` +
-        (rows.length === 0 ? "No prepared statements found." : `\`\`\`json\n${JSON.stringify(rows, null, 2)}\n\`\`\``);
 
-      return { success: true, content: responseText, data: { rows, count: rows.length, executionTimeMs: executionTime } };
+      const responseText =
+        `# Detailed Prepared Statements (${rows.length} result${rows.length !== 1 ? "s" : ""})\n\n` +
+        (rows.length === 0
+          ? "No prepared statements found."
+          : `\`\`\`json\n${JSON.stringify(rows, null, 2)}\n\`\`\``);
+
+      return {
+        success: true,
+        content: responseText,
+        data: { rows, count: rows.length, executionTimeMs: executionTime },
+      };
     } catch (error) {
-      err('❌ [Tool] Get detailed prepared statements failed', { error: error.message });
-      return { success: false, error: error.message, content: `Query failed: ${error.message}` };
+      err("❌ [Tool] Get detailed prepared statements failed", {
+        error: error.message,
+      });
+      return {
+        success: false,
+        error: error.message,
+        content: `Query failed: ${error.message}`,
+      };
     }
   };
 
-  private executeGetSchemaForCollection = async (scope_name: string, collection_name: string): Promise<any> => {
+  private executeGetSchemaForCollection = async (
+    scope_name: string,
+    collection_name: string,
+  ): Promise<any> => {
     try {
-      log('🔍 [Tool] Executing get_schema_for_collection', { scope_name, collection_name });
-      
+      log("🔍 [Tool] Executing get_schema_for_collection", {
+        scope_name,
+        collection_name,
+      });
+
       const startTime = Date.now();
       const cluster = await clusterConn();
       const bucket = cluster.bucket(backendConfig.capella.BUCKET);
-      
+
       // Check if scope and collection exist
       const collectionMgr = bucket.collections();
       const scopes = await collectionMgr.getAllScopes();
@@ -957,67 +1205,82 @@ export class BedrockChatService {
         return {
           success: false,
           error: `Scope "${scope_name}" does not exist`,
-          content: `❌ Error: Scope "${scope_name}" does not exist`
+          content: `❌ Error: Scope "${scope_name}" does not exist`,
         };
       }
-      
-      const foundCollection = foundScope.collections.find((c) => c.name === collection_name);
+
+      const foundCollection = foundScope.collections.find(
+        (c) => c.name === collection_name,
+      );
       if (!foundCollection) {
         return {
           success: false,
           error: `Collection "${collection_name}" does not exist in scope "${scope_name}"`,
-          content: `❌ Error: Collection "${collection_name}" does not exist in scope "${scope_name}"`
+          content: `❌ Error: Collection "${collection_name}" does not exist in scope "${scope_name}"`,
         };
       }
 
       // Sample a document to infer schema
-      const result = await bucket.scope(scope_name).query("SELECT * FROM `" + collection_name + "` LIMIT 1");
+      const result = await bucket
+        .scope(scope_name)
+        .query("SELECT * FROM `" + collection_name + "` LIMIT 1");
       const rows = await result.rows;
-      
+
       const executionTime = Date.now() - startTime;
 
       if (rows.length === 0) {
-        log('⚠️ [Tool] No documents found for schema inference', {
+        log("⚠️ [Tool] No documents found for schema inference", {
           scope_name,
           collection_name,
-          executionTimeMs: executionTime
+          executionTimeMs: executionTime,
         });
         return {
           success: true,
           content: "❌ No documents found in collection to infer schema",
-          data: { rows: [], count: 0, executionTimeMs: executionTime }
+          data: { rows: [], count: 0, executionTimeMs: executionTime },
         };
       }
 
       // Count schema fields
       const fieldCount = Object.keys(rows[0]).length;
       const docSize = JSON.stringify(rows[0]).length;
-      
-      log('📋 [Tool] Schema inference complete', {
+
+      log("📋 [Tool] Schema inference complete", {
         scope_name,
         collection_name,
         fieldCount,
         docSizeBytes: docSize,
-        executionTimeMs: executionTime
+        executionTimeMs: executionTime,
       });
 
       // Format schema
       const formatSchema = (doc: any): string => {
         let formattedText = "📋 Collection Schema:\n\n";
-        const formatField = (key: string, value: unknown, indent: number = 0): string => {
+        const formatField = (
+          key: string,
+          value: unknown,
+          indent: number = 0,
+        ): string => {
           const padding = "  ".repeat(indent);
-          const type = value === null ? "null" : Array.isArray(value) ? "array" : typeof value;
+          const type =
+            value === null
+              ? "null"
+              : Array.isArray(value)
+                ? "array"
+                : typeof value;
           let fieldText = `${padding}${key}: ${type}`;
-          
+
           if (typeof value === "object" && value !== null) {
             if (Array.isArray(value)) {
               if (value.length > 0) {
                 fieldText += `\n${padding}  Example: ${JSON.stringify(value)}`;
               }
             } else if (Object.keys(value as object).length > 0) {
-              fieldText += "\n" + Object.entries(value as object)
-                .map(([k, v]) => formatField(k, v, indent + 1))
-                .join("\n");
+              fieldText +=
+                "\n" +
+                Object.entries(value as object)
+                  .map(([k, v]) => formatField(k, v, indent + 1))
+                  .join("\n");
             }
           } else if (value !== null) {
             fieldText += ` (Example: ${JSON.stringify(value)})`;
@@ -1034,115 +1297,145 @@ export class BedrockChatService {
       return {
         success: true,
         content: formatSchema(rows[0]),
-        data: { rows: [rows[0]], count: 1, executionTimeMs: executionTime, fieldCount, docSizeBytes: docSize }
+        data: {
+          rows: [rows[0]],
+          count: 1,
+          executionTimeMs: executionTime,
+          fieldCount,
+          docSizeBytes: docSize,
+        },
       };
     } catch (error) {
       if (error.message && error.message.includes("index")) {
         return {
           success: false,
           error: "Index failure",
-          content: "❌ Database error: index failure. Please create a primary index on this collection to enable schema inference. Example:\n\nCREATE PRIMARY INDEX ON `bucket`.`scope`.`collection`;"
+          content:
+            "❌ Database error: index failure. Please create a primary index on this collection to enable schema inference. Example:\n\nCREATE PRIMARY INDEX ON `bucket`.`scope`.`collection`;",
         };
       }
-      err('❌ [Tool] Get schema for collection failed', { error: error.message });
+      err("❌ [Tool] Get schema for collection failed", {
+        error: error.message,
+      });
       return {
         success: false,
         error: error.message,
-        content: `Schema query failed: ${error.message}`
+        content: `Schema query failed: ${error.message}`,
       };
     }
   };
 
-  private executeRunSqlPlusPlusQuery = async (scope_name: string, query: string): Promise<any> => {
+  private executeRunSqlPlusPlusQuery = async (
+    scope_name: string,
+    query: string,
+  ): Promise<any> => {
     try {
-      log('🔍 [Tool] Executing run_sql_plus_plus_query', { scope_name, query: query.substring(0, 100) + '...' });
-      
+      log("🔍 [Tool] Executing run_sql_plus_plus_query", {
+        scope_name,
+        query: query.substring(0, 100) + "...",
+      });
+
       const startTime = Date.now();
       const cluster = await clusterConn();
       const bucket = cluster.bucket(backendConfig.capella.BUCKET);
-      
+
       const queryLength = query.length;
-      const queryType = query.trim().split(' ')[0].toUpperCase();
+      const queryType = query.trim().split(" ")[0].toUpperCase();
 
       // Validate query doesn't use full bucket.scope.collection path
       if (/from\s+[`\w]+\.[`\w]+\.[`\w]+/i.test(query)) {
         return {
           success: false,
           error: "Invalid query format",
-          content: "❌ Error: Query uses full bucket.scope.collection path. When using scope context, only use the collection name in the query. For example: SELECT COUNT(*) FROM `_default`"
+          content:
+            "❌ Error: Query uses full bucket.scope.collection path. When using scope context, only use the collection name in the query. For example: SELECT COUNT(*) FROM `_default`",
         };
       }
 
       // Execute query in scope context
       const result = await bucket.scope(scope_name).query(query);
       const rows = await result.rows;
-      
+
       const executionTime = Date.now() - startTime;
       const resultSize = JSON.stringify(rows).length;
-      
-      log('✅ [Tool] SQL++ query executed', {
+
+      log("✅ [Tool] SQL++ query executed", {
         scope_name,
         queryType,
         queryLength,
         rowCount: rows.length,
         resultSizeBytes: resultSize,
-        executionTimeMs: executionTime
+        executionTimeMs: executionTime,
       });
 
       // Handle special case for distinct_source_count
-      if (rows.length === 1 && 'distinct_source_count' in rows[0]) {
+      if (rows.length === 1 && "distinct_source_count" in rows[0]) {
         return {
           success: true,
           content: `Found ${rows[0].distinct_source_count} distinct sources`,
-          data: { rows, count: rows.length, executionTimeMs: executionTime, queryType, resultSizeBytes: resultSize }
+          data: {
+            rows,
+            count: rows.length,
+            executionTimeMs: executionTime,
+            queryType,
+            resultSizeBytes: resultSize,
+          },
         };
       }
 
-      const responseText = `# SQL++ Query Results (${rows.length} result${rows.length !== 1 ? 's' : ''})\n\n` +
+      const responseText =
+        `# SQL++ Query Results (${rows.length} result${rows.length !== 1 ? "s" : ""})\n\n` +
         `**Query:** \`${query}\`\n\n` +
         `**Scope:** \`${scope_name}\`\n\n` +
-        (rows.length === 0 ? "No results found." : `\`\`\`json\n${JSON.stringify(rows, null, 2)}\n\`\`\``);
+        (rows.length === 0
+          ? "No results found."
+          : `\`\`\`json\n${JSON.stringify(rows, null, 2)}\n\`\`\``);
 
       return {
         success: true,
         content: responseText,
-        data: { rows, count: rows.length, executionTimeMs: executionTime, queryType, resultSizeBytes: resultSize }
+        data: {
+          rows,
+          count: rows.length,
+          executionTimeMs: executionTime,
+          queryType,
+          resultSizeBytes: resultSize,
+        },
       };
     } catch (error) {
-      err('❌ [Tool] Run SQL++ query failed', { error: error.message });
+      err("❌ [Tool] Run SQL++ query failed", { error: error.message });
       return {
         success: false,
         error: error.message,
-        content: `SQL++ query failed: ${error.message}`
+        content: `SQL++ query failed: ${error.message}`,
       };
     }
   };
 
-
   // Function to create a streaming chat completion using Converse API
-  private async* _createChatCompletion(
+  private async *_createChatCompletion(
     messages: Array<{ role: string; content: string }>,
     options: {
       temperature?: number;
       max_tokens?: number;
-    } = {}
+    } = {},
   ): AsyncGenerator<string, void, unknown> {
     try {
       // Separate system messages from conversation messages
-      const systemMessages = messages.filter(m => m.role === 'system');
-      const conversationMessages = messages.filter(m => m.role !== 'system');
+      const systemMessages = messages.filter((m) => m.role === "system");
+      const conversationMessages = messages.filter((m) => m.role !== "system");
 
       // Combine system messages
-      const systemPrompt = systemMessages.map(m => m.content).join('\n\n');
+      const systemPrompt = systemMessages.map((m) => m.content).join("\n\n");
 
       // Convert conversation messages to Converse API format
-      const converseMessages: Message[] = conversationMessages.map(msg => ({
-        role: msg.role === 'user' ? 'user' : 'assistant',
+      const converseMessages: Message[] = conversationMessages.map((msg) => ({
+        role: msg.role === "user" ? "user" : "assistant",
         content: [
           {
-            text: msg.content
-          }
-        ]
+            text: msg.content,
+          },
+        ],
       }));
 
       // AWS Documentation: Include tools with corrected schema
@@ -1160,10 +1453,10 @@ export class BedrockChatService {
         },
       });
 
-      log('🚀 [BedrockChat] Starting Converse stream', {
+      log("🚀 [BedrockChat] Starting Converse stream", {
         modelId: this.modelId,
         messagesCount: converseMessages.length,
-        hasSystem: !!systemPrompt
+        hasSystem: !!systemPrompt,
       });
 
       let response;
@@ -1171,19 +1464,26 @@ export class BedrockChatService {
         response = await this.client.send(command);
       } catch (sendError) {
         // Check if this is the HTTP/2 destructuring issue
-        if (sendError.message && sendError.message.includes('Right side of assignment cannot be destructured')) {
-          err('❌ [BedrockChat] HTTP/2 destructuring issue during send', {
+        if (
+          sendError.message &&
+          sendError.message.includes(
+            "Right side of assignment cannot be destructured",
+          )
+        ) {
+          err("❌ [BedrockChat] HTTP/2 destructuring issue during send", {
             modelId: this.modelId,
-            error: sendError.message
+            error: sendError.message,
           });
-          yield '❌ Error: HTTP/2 compatibility issue with AWS SDK. Please try again.';
+          yield "❌ Error: HTTP/2 compatibility issue with AWS SDK. Please try again.";
           return;
         }
         throw sendError;
       }
 
       if (!response.stream) {
-        throw new Error('No response stream received from Bedrock Converse API');
+        throw new Error(
+          "No response stream received from Bedrock Converse API",
+        );
       }
 
       // AWS Documentation: Handle both text and tool responses
@@ -1196,13 +1496,15 @@ export class BedrockChatService {
         for await (const event of response.stream) {
           try {
             // Defensive check for $unknown property issues
-            if (!event || typeof event !== 'object') {
+            if (!event || typeof event !== "object") {
               continue;
             }
 
             // Skip events with $unknown properties that cause parsing issues
-            if ('$unknown' in event) {
-              log('⚠️ [BedrockChat] Skipping $unknown event', { eventKeys: Object.keys(event) });
+            if ("$unknown" in event) {
+              log("⚠️ [BedrockChat] Skipping $unknown event", {
+                eventKeys: Object.keys(event),
+              });
               continue;
             }
 
@@ -1233,29 +1535,51 @@ export class BedrockChatService {
                 assistantMessage.content[currentContentIndex] = { text: "" };
               }
 
-              if (delta?.text && assistantMessage.content[currentContentIndex]?.text !== undefined) {
+              if (
+                delta?.text &&
+                assistantMessage.content[currentContentIndex]?.text !==
+                  undefined
+              ) {
                 chunkCount++;
                 yield delta.text;
-                assistantMessage.content[currentContentIndex].text += delta.text;
-              } else if (delta?.toolUse?.input && assistantMessage.content[currentContentIndex]?.toolUse) {
+                assistantMessage.content[currentContentIndex].text +=
+                  delta.text;
+              } else if (
+                delta?.toolUse?.input &&
+                assistantMessage.content[currentContentIndex]?.toolUse
+              ) {
                 try {
                   // Handle potential string vs object input
                   let inputData = delta.toolUse.input;
-                  if (typeof inputData === 'string') {
+                  if (typeof inputData === "string") {
                     inputData = JSON.parse(inputData);
                   }
-                  assistantMessage.content[currentContentIndex].toolUse.input = inputData;
+                  assistantMessage.content[currentContentIndex].toolUse.input =
+                    inputData;
                 } catch (e) {
                   // Accumulate input if it's being streamed in parts
-                  if (!assistantMessage.content[currentContentIndex].toolUse.inputBuffer) {
-                    assistantMessage.content[currentContentIndex].toolUse.inputBuffer = "";
+                  if (
+                    !assistantMessage.content[currentContentIndex].toolUse
+                      .inputBuffer
+                  ) {
+                    assistantMessage.content[
+                      currentContentIndex
+                    ].toolUse.inputBuffer = "";
                   }
-                  assistantMessage.content[currentContentIndex].toolUse.inputBuffer += delta.toolUse.input;
+                  assistantMessage.content[
+                    currentContentIndex
+                  ].toolUse.inputBuffer += delta.toolUse.input;
 
                   try {
-                    const parsedInput = JSON.parse(assistantMessage.content[currentContentIndex].toolUse.inputBuffer);
-                    assistantMessage.content[currentContentIndex].toolUse.input = parsedInput;
-                    delete assistantMessage.content[currentContentIndex].toolUse.inputBuffer;
+                    const parsedInput = JSON.parse(
+                      assistantMessage.content[currentContentIndex].toolUse
+                        .inputBuffer,
+                    );
+                    assistantMessage.content[
+                      currentContentIndex
+                    ].toolUse.input = parsedInput;
+                    delete assistantMessage.content[currentContentIndex].toolUse
+                      .inputBuffer;
                   } catch (e) {
                     // Still accumulating
                   }
@@ -1263,17 +1587,17 @@ export class BedrockChatService {
               }
             } else if (event.messageStop) {
               stopReason = event.messageStop.stopReason || "";
-              log('✅ [BedrockChat] Converse stream completed', {
+              log("✅ [BedrockChat] Converse stream completed", {
                 totalChunks: chunkCount,
-                stopReason
+                stopReason,
               });
               break;
             }
           } catch (eventError) {
             // Log event processing errors but continue stream to prevent $unknown crashes
-            log('⚠️ [BedrockChat] Event processing error, continuing...', { 
+            log("⚠️ [BedrockChat] Event processing error, continuing...", {
               error: eventError.message,
-              eventKeys: Object.keys(event || {})
+              eventKeys: Object.keys(event || {}),
             });
             continue;
           }
@@ -1291,112 +1615,143 @@ export class BedrockChatService {
             if (content.toolUse) {
               const { toolUseId, name, input } = content.toolUse;
               toolsExecuted++;
-              
-              log('🔧 [Tool] Executing tool', { 
-                name, 
-                input: JSON.stringify(input).substring(0, 100) + '...',
-                toolIndex: toolsExecuted
+
+              log("🔧 [Tool] Executing tool", {
+                name,
+                input: JSON.stringify(input).substring(0, 100) + "...",
+                toolIndex: toolsExecuted,
               });
 
               const toolStart = Date.now();
               let result;
-              
+
               // Wrap tool execution in a child trace
-              const executeToolInContext = traceable(async () => {
-                switch (name) {
-                  case "get_system_vitals":
-                    result = await this.executeGetSystemVitals(input?.node_filter);
-                    break;
-                  case "get_system_nodes":
-                    result = await this.executeGetSystemNodes(input?.service_filter);
-                    break;
-                  case "get_fatal_requests":
-                    result = await this.executeGetFatalRequests(input?.period, input?.limit);
-                    break;
-                  case "get_most_expensive_queries":
-                    result = await this.executeGetMostExpensiveQueries(input?.limit, input?.period);
-                    break;
-                  case "get_longest_running_queries":
-                    result = await this.executeGetLongestRunningQueries(input?.limit);
-                    break;
-                  case "get_most_frequent_queries":
-                    result = await this.executeGetMostFrequentQueries(input?.limit);
-                    break;
-                  case "get_largest_result_size_queries":
-                    result = await this.executeGetLargestResultSizeQueries(input?.limit);
-                    break;
-                  case "get_largest_result_count_queries":
-                    result = await this.executeGetLargestResultCountQueries(input?.limit);
-                    break;
-                  case "get_primary_index_queries":
-                    result = await this.executeGetPrimaryIndexQueries(input?.limit);
-                    break;
-                  case "get_system_indexes":
-                    result = await this.executeGetSystemIndexes();
-                    break;
-                  case "get_completed_requests":
-                    result = await this.executeGetCompletedRequests(input?.limit);
-                    break;
-                  case "get_prepared_statements":
-                    result = await this.executeGetPreparedStatements();
-                    break;
-                  case "get_indexes_to_drop":
-                    result = await this.executeGetIndexesToDrop();
-                    break;
-                  case "get_detailed_indexes":
-                    result = await this.executeGetDetailedIndexes();
-                    break;
-                  case "get_detailed_prepared_statements":
-                    result = await this.executeGetDetailedPreparedStatements();
-                    break;
-                  case "get_schema_for_collection":
-                    result = await this.executeGetSchemaForCollection(input?.scope_name, input?.collection_name);
-                    break;
-                  case "run_sql_plus_plus_query":
-                    result = await this.executeRunSqlPlusPlusQuery(input?.scope_name, input?.query);
-                    break;
-                  default:
-                    result = { 
-                      success: false, 
-                      error: `Unknown tool: ${name}`,
-                      content: `Error: Unknown tool '${name}'. Available tools: get_system_vitals, get_system_nodes, get_fatal_requests, get_most_expensive_queries, get_longest_running_queries, get_most_frequent_queries, get_largest_result_size_queries, get_largest_result_count_queries, get_primary_index_queries, get_system_indexes, get_completed_requests, get_prepared_statements, get_indexes_to_drop, get_detailed_indexes, get_detailed_prepared_statements, get_schema_for_collection, run_sql_plus_plus_query`
-                    };
-                }
-                return result;
-              }, {
-                run_type: "tool",
-                name: name,
-                tags: ["database-tool", "nested-execution", "bedrock-tool"],
-              });
-              
+              const executeToolInContext = traceable(
+                async () => {
+                  switch (name) {
+                    case "get_system_vitals":
+                      result = await this.executeGetSystemVitals(
+                        input?.node_filter,
+                      );
+                      break;
+                    case "get_system_nodes":
+                      result = await this.executeGetSystemNodes(
+                        input?.service_filter,
+                      );
+                      break;
+                    case "get_fatal_requests":
+                      result = await this.executeGetFatalRequests(
+                        input?.period,
+                        input?.limit,
+                      );
+                      break;
+                    case "get_most_expensive_queries":
+                      result = await this.executeGetMostExpensiveQueries(
+                        input?.limit,
+                        input?.period,
+                      );
+                      break;
+                    case "get_longest_running_queries":
+                      result = await this.executeGetLongestRunningQueries(
+                        input?.limit,
+                      );
+                      break;
+                    case "get_most_frequent_queries":
+                      result = await this.executeGetMostFrequentQueries(
+                        input?.limit,
+                      );
+                      break;
+                    case "get_largest_result_size_queries":
+                      result = await this.executeGetLargestResultSizeQueries(
+                        input?.limit,
+                      );
+                      break;
+                    case "get_largest_result_count_queries":
+                      result = await this.executeGetLargestResultCountQueries(
+                        input?.limit,
+                      );
+                      break;
+                    case "get_primary_index_queries":
+                      result = await this.executeGetPrimaryIndexQueries(
+                        input?.limit,
+                      );
+                      break;
+                    case "get_system_indexes":
+                      result = await this.executeGetSystemIndexes();
+                      break;
+                    case "get_completed_requests":
+                      result = await this.executeGetCompletedRequests(
+                        input?.limit,
+                      );
+                      break;
+                    case "get_prepared_statements":
+                      result = await this.executeGetPreparedStatements();
+                      break;
+                    case "get_indexes_to_drop":
+                      result = await this.executeGetIndexesToDrop();
+                      break;
+                    case "get_detailed_indexes":
+                      result = await this.executeGetDetailedIndexes();
+                      break;
+                    case "get_detailed_prepared_statements":
+                      result =
+                        await this.executeGetDetailedPreparedStatements();
+                      break;
+                    case "get_schema_for_collection":
+                      result = await this.executeGetSchemaForCollection(
+                        input?.scope_name,
+                        input?.collection_name,
+                      );
+                      break;
+                    case "run_sql_plus_plus_query":
+                      result = await this.executeRunSqlPlusPlusQuery(
+                        input?.scope_name,
+                        input?.query,
+                      );
+                      break;
+                    default:
+                      result = {
+                        success: false,
+                        error: `Unknown tool: ${name}`,
+                        content: `Error: Unknown tool '${name}'. Available tools: get_system_vitals, get_system_nodes, get_fatal_requests, get_most_expensive_queries, get_longest_running_queries, get_most_frequent_queries, get_largest_result_size_queries, get_largest_result_count_queries, get_primary_index_queries, get_system_indexes, get_completed_requests, get_prepared_statements, get_indexes_to_drop, get_detailed_indexes, get_detailed_prepared_statements, get_schema_for_collection, run_sql_plus_plus_query`,
+                      };
+                  }
+                  return result;
+                },
+                {
+                  run_type: "tool",
+                  name: name,
+                  tags: ["database-tool", "nested-execution", "bedrock-tool"],
+                },
+              );
+
               try {
                 // Execute the tool with tracing metadata but within the parent context
                 result = await executeToolInContext();
-                
+
                 const toolExecutionTime = Date.now() - toolStart;
-                
-                log('✅ [Tool] Tool execution complete', {
+
+                log("✅ [Tool] Tool execution complete", {
                   name,
                   success: result.success,
                   executionTimeMs: toolExecutionTime,
                   resultSize: result.data?.count || 0,
-                  toolIndex: toolsExecuted
+                  toolIndex: toolsExecuted,
                 });
-                
               } catch (toolError) {
                 const toolExecutionTime = Date.now() - toolStart;
-                
-                err('❌ [Tool] Tool execution failed', {
+
+                err("❌ [Tool] Tool execution failed", {
                   name,
                   error: toolError.message,
                   executionTimeMs: toolExecutionTime,
-                  toolIndex: toolsExecuted
+                  toolIndex: toolsExecuted,
                 });
-                
+
                 result = {
                   success: false,
                   error: toolError.message,
-                  content: `Tool execution failed: ${toolError.message}`
+                  content: `Tool execution failed: ${toolError.message}`,
                 };
               }
 
@@ -1404,18 +1759,20 @@ export class BedrockChatService {
                 toolResult: {
                   toolUseId,
                   content: [{ text: result.content || JSON.stringify(result) }],
-                  status: result.success ? "success" : "error"
-                }
+                  status: result.success ? "success" : "error",
+                },
               });
             }
           }
-          
+
           const totalToolExecutionTime = Date.now() - toolExecutionStart;
-          
-          log('🏁 [Tool] All tools executed', {
+
+          log("🏁 [Tool] All tools executed", {
             toolsExecuted,
             totalExecutionTimeMs: totalToolExecutionTime,
-            averageExecutionTimeMs: Math.round(totalToolExecutionTime / toolsExecuted)
+            averageExecutionTimeMs: Math.round(
+              totalToolExecutionTime / toolsExecuted,
+            ),
           });
 
           // Continue conversation with tool results
@@ -1447,21 +1804,26 @@ export class BedrockChatService {
           }
         }
       } catch (streamError) {
-        log('⚠️ [BedrockChat] Stream processing warning:', { error: streamError.message });
+        log("⚠️ [BedrockChat] Stream processing warning:", {
+          error: streamError.message,
+        });
       }
     } catch (error) {
-      err('❌ [BedrockChat] Failed to create chat completion with Converse API', {
-        modelId: this.modelId,
-        error: error.message
-      });
+      err(
+        "❌ [BedrockChat] Failed to create chat completion with Converse API",
+        {
+          modelId: this.modelId,
+          error: error.message,
+        },
+      );
       throw error;
     }
   }
 
   // Public method - no traceable wrapper to allow inheritance from parent trace
   createChatCompletion = (
-    messages: Array<{ role: string; content: string }>, 
-    options: { temperature?: number; max_tokens?: number; } = {}
+    messages: Array<{ role: string; content: string }>,
+    options: { temperature?: number; max_tokens?: number } = {},
   ) => {
     return this._createChatCompletion(messages, options);
   };
@@ -1470,7 +1832,7 @@ export class BedrockChatService {
   getModelInfo() {
     return {
       provider: "AWS Bedrock",
-      model: this.modelId
+      model: this.modelId,
     };
   }
 
@@ -1496,15 +1858,15 @@ export class BedrockChatService {
           stream?: boolean;
         }) => {
           if (!options.stream) {
-            throw new Error('Non-streaming chat completions not yet supported');
+            throw new Error("Non-streaming chat completions not yet supported");
           }
 
           return this.createChatCompletion(options.messages, {
             temperature: options.temperature,
-            max_tokens: options.max_tokens
+            max_tokens: options.max_tokens,
           });
-        }
-      }
+        },
+      },
     };
   }
 }

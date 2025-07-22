@@ -41,51 +41,57 @@ export class AWSKnowledgeBaseRAGProvider implements RAGProvider {
     this.knowledgeBaseId = backendConfig.rag.KNOWLEDGE_BASE_ID;
   }
 
-
   // Helper function to calculate text similarity (simple Jaccard similarity)
   private calculateTextSimilarity(text1: string, text2: string): number {
-    const words1 = new Set(text1.split(' ').filter(w => w.length > 3)); // Filter short words
-    const words2 = new Set(text2.split(' ').filter(w => w.length > 3));
-    
-    const intersection = new Set([...words1].filter(word => words2.has(word)));
+    const words1 = new Set(text1.split(" ").filter((w) => w.length > 3)); // Filter short words
+    const words2 = new Set(text2.split(" ").filter((w) => w.length > 3));
+
+    const intersection = new Set(
+      [...words1].filter((word) => words2.has(word)),
+    );
     const union = new Set([...words1, ...words2]);
-    
+
     return union.size > 0 ? intersection.size / union.size : 0;
   }
 
   // Helper function to deduplicate similar context items to prevent repetitive responses
   private deduplicateContext(context: any[]): any[] {
     if (!context || context.length === 0) return [];
-    
+
     const uniqueItems: any[] = [];
     const seenContent = new Set<string>();
-    
+
     for (const item of context) {
       if (!item.text) continue;
-      
+
       // Create a normalized version for comparison (remove extra spaces, normalize text)
       const normalizedText = item.text
         .toLowerCase()
-        .replace(/\s+/g, ' ')
+        .replace(/\s+/g, " ")
         .trim();
-      
+
       // Check for substantial overlap with existing content
       let isDuplicate = false;
       for (const existingText of seenContent) {
-        const similarity = this.calculateTextSimilarity(normalizedText, existingText);
-        if (similarity > 0.8) { // 80% similarity threshold
+        const similarity = this.calculateTextSimilarity(
+          normalizedText,
+          existingText,
+        );
+        if (similarity > 0.8) {
           isDuplicate = true;
           break;
         }
       }
-      
+
       if (!isDuplicate) {
         uniqueItems.push(item);
         seenContent.add(normalizedText);
       }
     }
-    
-    log(`🔄 [AWSKnowledgeBase] Context deduplication: ${context.length} -> ${uniqueItems.length} items`);
+
+    log(
+      `🔄 [AWSKnowledgeBase] Context deduplication: ${context.length} -> ${uniqueItems.length} items`,
+    );
     return uniqueItems;
   }
 
@@ -97,9 +103,8 @@ export class AWSKnowledgeBaseRAGProvider implements RAGProvider {
       });
 
       try {
-        // Use the original query without hardcoded enhancements
         const enhancedQuery = message;
-        
+
         const command = new RetrieveCommand({
           knowledgeBaseId: this.knowledgeBaseId,
           retrievalQuery: {
@@ -107,8 +112,8 @@ export class AWSKnowledgeBaseRAGProvider implements RAGProvider {
           },
           retrievalConfiguration: {
             vectorSearchConfiguration: {
-              numberOfResults: 10,  // Increased from 5 to get more diverse results
-              overrideSearchType: "SEMANTIC",  // Keep as SEMANTIC as required by knowledge base
+              numberOfResults: 10,
+              overrideSearchType: "SEMANTIC",
             },
           },
         });
@@ -170,64 +175,48 @@ export class AWSKnowledgeBaseRAGProvider implements RAGProvider {
           return { context: [], processingTime: 0, totalChars: 0, avgScore: 0 };
         }
 
-        // Extract context from AWS Knowledge Base response with correct page numbers
         const rawContext =
           response.retrievalResults
-            ?.map((result, index) => {
-              const contextItem = {
-                text: result.content?.text || "",
-                filename: this.extractFilename(
-                  result.location?.s3Location?.uri || "Unknown source",
-                ),
-                pageNumber: this.extractPageNumberFromMetadata(result.metadata) || this.extractPageNumber(result.location?.s3Location?.uri),
-                chunkIndex: undefined, // AWS Knowledge Base doesn't provide chunk index
-                metadata: {
-                  score: result.score,
-                  uri: result.location?.s3Location?.uri,
-                  type: result.location?.type,
-                  ...result.metadata,
-                },
-              };
-              
-              // DEBUG: Log document text content to check for URLs
-              if (index < 3) { // Only log first 3 items to avoid spam
-                log(`🔍 [Debug] AWS KB Document ${index + 1} content analysis:`, {
-                  filename: contextItem.filename,
-                  pageNumber: contextItem.pageNumber,
-                  textLength: contextItem.text.length,
-                  textPreview: contextItem.text.substring(0, 200) + (contextItem.text.length > 200 ? "..." : ""),
-                  hasURLs: /https?:\/\/[^\s]+/.test(contextItem.text),
-                  urlsInText: contextItem.text.match(/https?:\/\/[^\s]+/g) || [],
-                  metadataKeys: Object.keys(contextItem.metadata),
-                  metadataWithURLs: Object.entries(contextItem.metadata)
-                    .filter(([key, value]) => typeof value === 'string' && /https?:\/\//.test(value))
-                    .reduce((acc, [key, value]) => ({ ...acc, [key]: value }), {})
-                });
-              }
-              
-              return contextItem;
-            })
+            ?.map((result) => ({
+              text: result.content?.text || "",
+              filename: this.extractFilename(
+                result.location?.s3Location?.uri || "Unknown source",
+              ),
+              pageNumber:
+                this.extractPageNumberFromMetadata(result.metadata) ||
+                this.extractPageNumber(result.location?.s3Location?.uri),
+              chunkIndex: undefined,
+              metadata: {
+                score: result.score,
+                uri: result.location?.s3Location?.uri,
+                type: result.location?.type,
+                ...result.metadata,
+              },
+            }))
             .filter((item) => item.text.trim().length > 0) || [];
 
         // Apply deduplication to prevent repetitive responses
         const dedupedContext = this.deduplicateContext(rawContext);
-        
+
         // Sort by relevance score first
-        const sortedContext = dedupedContext.sort((a, b) => 
-          (b.metadata.score || 0) - (a.metadata.score || 0)
+        const sortedContext = dedupedContext.sort(
+          (a, b) => (b.metadata.score || 0) - (a.metadata.score || 0),
         );
-        
+
         // Take top results, preferring higher scores but ensuring diversity
         const context = sortedContext.slice(0, 8); // Take top 8 from 10 retrieved
-        
+
         log("📊 [AWSKnowledgeBase] Context selection", {
           totalRetrieved: rawContext.length,
           afterDedup: dedupedContext.length,
           selected: context.length,
-          scoreRange: context.length > 0 ? {
-            highest: context[0]?.metadata.score || 0,
-            lowest: context[context.length - 1]?.metadata.score || 0
-          } : null
+          scoreRange:
+            context.length > 0
+              ? {
+                  highest: context[0]?.metadata.score || 0,
+                  lowest: context[context.length - 1]?.metadata.score || 0,
+                }
+              : null,
         });
 
         const processingTime = Date.now() - startTime;
@@ -313,39 +302,23 @@ export class AWSKnowledgeBaseRAGProvider implements RAGProvider {
           messageLength: message.length,
         });
 
-        // Generate completion using Bedrock
         const stream = await this.chatService.createChatCompletion(
           [
             {
               role: "system",
-              content: `You are a helpful assistant for Couchbase. Use the following context to answer the user's question. If you cannot answer the question based on the context, say so.
-
-CRITICAL INSTRUCTION - READ CAREFULLY:
-You must NEVER include any URLs, links, references, or source citations in your response. This is absolutely forbidden. References will be automatically added after your response.
-
-FORBIDDEN CONTENT - DO NOT INCLUDE ANY OF THESE:
-- URLs (like https://www.couchbase.com/customers/anything)
-- Website links of any kind
-- References sections
-- Source document names
-- Page numbers
-- Phrases like "References:", "Sources:", "For more information"
-- Any text that looks like: "References:\nfilename.pdf (Page X)"
+              content: `You are a helpful assistant for Couchbase. Use the following context to answer the user's question. Do not include references in your response as they will be added automatically. If you cannot answer the question based on the context, say so.
 
 IMPORTANT TERMINOLOGY:
 - Couchbase and Capella are interchangeable terms - Capella is Couchbase's cloud database platform
 - When users ask about "Couchbase", this includes information about "Capella" and vice versa
 - Couchbase Server is the core database technology, Capella is the cloud-based platform built on Couchbase
 
-RESPONSE INSTRUCTIONS:
+IMPORTANT INSTRUCTIONS:
 - DO NOT show your thinking process or reasoning steps
 - DO NOT include phrases like "The context mentions..." or "I will..." or "Based on the context..."
 - Start your response directly with the answer
 - When showing query results or data, display ALL items - do not summarize or show only one example
 - Treat questions about Couchbase and Capella as referring to the same technology platform
-- End your response with a period, nothing else
-
-REMINDER: NO URLS, NO LINKS, NO REFERENCES IN YOUR RESPONSE. PERIOD.
 
 When the user asks "How can I see [something]" or "How do I find [something]", they want to know the N1QL query syntax/code, not execute it. In those cases, show them the query code like in the context provided.`,
             },
@@ -459,7 +432,6 @@ When the user asks "How can I see [something]" or "How do I find [something]", t
     },
   );
 
-
   async initialize() {
     log("🚀 [AWSKnowledgeBaseProvider] Starting initialization with config", {
       knowledgeBaseId: this.knowledgeBaseId,
@@ -545,7 +517,6 @@ When the user asks "How can I see [something]" or "How do I find [something]", t
           ...metadata,
           queryStartTime: queryStart,
           messageLength: message.length,
-          // Thread identification as per LangSmith docs
           thread_id: threadId,
           session_id: threadId,
           conversation_id: threadId,
@@ -553,28 +524,22 @@ When the user asks "How can I see [something]" or "How do I find [something]", t
           environment: metadata.environment,
         },
         tags: [
-          // Core operation tags
           "rag-pipeline",
           "aws-knowledge-base",
           "chat-completion",
 
-          // Context tags
           "thread-enabled",
           metadata.environment,
 
-          // User classification
           `user:${metadata.userId}`,
-          `session:${threadId.split("-").pop()}`, // Just timestamp part
+          `session:${threadId.split("-").pop()}`,
 
-          // Message characteristics
           `msg-length:${message.length > 100 ? "long" : message.length > 50 ? "medium" : "short"}`,
           `msg-count:${metadata.messageCount}`,
 
-          // Performance tags
           "streaming",
           "retrieval-augmented",
 
-          // Version tracking
           "v2.0.2",
         ],
       });
@@ -600,7 +565,7 @@ When the user asks "How can I see [something]" or "How do I find [something]", t
         userId: metadata.userId,
         environment: metadata.environment,
         timestamp: new Date().toISOString(),
-        stackTrace: error.stack?.split("\n").slice(0, 5).join("\n"), // First 5 lines of stack
+        stackTrace: error.stack?.split("\n").slice(0, 5).join("\n"),
       };
 
       err(
@@ -642,13 +607,11 @@ When the user asks "How can I see [something]" or "How do I find [something]", t
     if (!metadata) return undefined;
 
     try {
-      // AWS Knowledge Base provides page number in metadata
       const pageNumber = metadata["x-amz-bedrock-kb-document-page-number"];
       if (pageNumber && typeof pageNumber === "number" && pageNumber > 0) {
         return pageNumber;
       }
 
-      // Try string conversion if it's a string
       if (pageNumber && typeof pageNumber === "string") {
         const parsed = parseInt(pageNumber, 10);
         if (!isNaN(parsed) && parsed > 0) {
@@ -669,14 +632,10 @@ When the user asks "How can I see [something]" or "How do I find [something]", t
     if (!uri) return undefined;
 
     try {
-      // Try to extract page number from URI if it contains page information
-      // This is a best-effort approach as page numbers might be embedded in different ways
       const pageMatch = uri.match(/page[_-]?(\d+)/i);
       if (pageMatch && pageMatch[1]) {
         return parseInt(pageMatch[1], 10);
       }
-
-      // Default to page 1 if no page number is found
       return 1;
     } catch (error) {
       log("⚠️ [AWSKnowledgeBase] Failed to extract page number from URI", {
