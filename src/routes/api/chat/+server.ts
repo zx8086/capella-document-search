@@ -192,9 +192,14 @@ export const POST: RequestHandler = async ({ fetch, request }) => {
               totalContextLength: contextContent.length
             });
             
-            const systemMessage = `You are a helpful assistant for Couchbase Capella, a cloud database service. Use the following context to answer questions accurately and comprehensively.
+            const systemMessage = `You are a helpful assistant for Couchbase. Use the following context to answer questions accurately and comprehensively.
 
 Context: ${contextContent}
+
+IMPORTANT TERMINOLOGY:
+- Couchbase and Capella are interchangeable terms - Capella is Couchbase's cloud database platform
+- When users ask about "Couchbase", this includes information about "Capella" and vice versa
+- Couchbase Server is the core database technology, Capella is the cloud-based platform built on Couchbase
 
 IMPORTANT INSTRUCTIONS:
 - Provide a clear response based ONLY on the context provided
@@ -204,7 +209,10 @@ IMPORTANT INSTRUCTIONS:
 - DO NOT repeat or re-display tool results that were already shown to the user
 - When tools have been executed, provide analysis and insights about the results, not a duplicate display
 - Start your response directly with the answer, not with explanatory text
-- Structure your response clearly without repetitive statements`;
+- Structure your response clearly without repetitive statements
+- Treat questions about Couchbase and Capella as referring to the same technology platform
+- NEVER include URLs, links, or references in your response - references will be added automatically
+- DO NOT add a "References:" section or any source citations to your answer`;
 
             // Use either Bedrock conversation mode or regular RAG stream
             if (Bun.env.RAG_PIPELINE === 'AWS_KNOWLEDGE_BASE' && chatService) {
@@ -232,8 +240,26 @@ IMPORTANT INSTRUCTIONS:
                 if (chunk) {
                   fullResponse += chunk;
                   
-                  // Check if tools are being executed
-                  if (chunk.includes("[Executing tools...]")) {
+                  // Check if tools are being executed - comprehensive tool detection
+                  if (chunk.includes("[Executing tools...]") || 
+                      chunk.includes("get_system_vitals") ||
+                      chunk.includes("get_system_nodes") ||
+                      chunk.includes("get_fatal_requests") ||
+                      chunk.includes("get_most_expensive_queries") ||
+                      chunk.includes("get_longest_running_queries") ||
+                      chunk.includes("get_most_frequent_queries") ||
+                      chunk.includes("get_largest_result_size_queries") ||
+                      chunk.includes("get_largest_result_count_queries") ||
+                      chunk.includes("get_primary_index_queries") ||
+                      chunk.includes("get_system_indexes") ||
+                      chunk.includes("get_completed_requests") ||
+                      chunk.includes("get_prepared_statements") ||
+                      chunk.includes("get_indexes_to_drop") ||
+                      chunk.includes("get_detailed_indexes") ||
+                      chunk.includes("get_detailed_prepared_statements") ||
+                      chunk.includes("get_schema_for_collection") ||
+                      chunk.includes("run_sql_plus_plus_query") ||
+                      chunk.includes("<thinking>")) {
                     toolsWereExecuted = true;
                     log("🔧 [Server] Tools execution detected in stream");
                   }
@@ -270,22 +296,41 @@ IMPORTANT INSTRUCTIONS:
             log("🛑 [Server] Stream iteration complete", {
               totalChunks: chunkCount,
               responseLength: fullResponse.length,
+              toolsWereExecuted
             });
 
-            // Add references if no tools were executed and we have context
+            // Add references only if no tools were executed and we have context
             if (!toolsWereExecuted && context && context.length > 0) {
-              // Remove any existing "References:" section from the response
+              // Remove any existing references section from the response (multiple patterns)
               let processedResponse = fullResponse;
-              const referencesIndex = processedResponse.lastIndexOf("References:");
-              if (referencesIndex !== -1) {
-                processedResponse = processedResponse.substring(0, referencesIndex).trim();
+              
+              // Remove references sections with various patterns
+              const referencePatterns = [
+                /\n\n?References?:\s*[\s\S]*$/i,
+                /\n\n?Sources?:\s*[\s\S]*$/i,
+                /\n\n?- https?:\/\/[\s\S]*$/i,
+                /\n\n?For more information[\s\S]*$/i
+              ];
+              
+              for (const pattern of referencePatterns) {
+                processedResponse = processedResponse.replace(pattern, '');
               }
+              
+              processedResponse = processedResponse.trim();
 
-              // Create clean reference list from top 3 context items
+              // Create clean reference list from top 5 context items with diversity
               const sourceReferences = context
-                .slice(0, 3)
-                .map((c) => `${c.filename || "Unknown"} (Page ${c.pageNumber || 1})`)
-                .filter((ref, index, self) => self.indexOf(ref) === index) // Remove duplicates
+                .slice(0, 5)  // Increased from 3 to show more sources
+                .map((c) => ({
+                  ref: `${c.filename || "Unknown"} (Page ${c.pageNumber || 1})`,
+                  filename: c.filename || "Unknown"
+                }))
+                .filter((item, index, self) => 
+                  // Remove exact duplicates but allow different pages from same document
+                  index === self.findIndex(i => i.ref === item.ref)
+                )
+                .slice(0, 5)  // Limit to 5 unique references
+                .map(item => item.ref)
                 .join("\n");
 
               const enhancedReferences = `\n\nReferences:\n${sourceReferences}`;
