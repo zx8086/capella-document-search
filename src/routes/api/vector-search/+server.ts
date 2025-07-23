@@ -14,10 +14,11 @@ export const POST: RequestHandler = async ({ request }) => {
         // Use the service to handle the search
         const results = await handleVectorSearch(vector);
         
-        log(`✅ [Vector Search] Search complete, found ${results.length} results`);
+        log(`✅ [Vector Search] Search complete, found ${Array.isArray(results) ? results.length : 'unknown count'} results`);
         return json({ success: true, results });
     } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
         err('❌ [Vector Search] Failed:', error);
-        return json({ success: false, error: error.message }, { status: 500 });
+        return json({ success: false, error: errorMessage }, { status: 500 });
     }
 }; 

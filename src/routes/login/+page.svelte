@@ -24,7 +24,8 @@
                 await initTrackerWithUser($userAccount);
             }
         } catch (error) {
-            console.error('Login failed:', error?.message || error);
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            console.error('Login failed:', errorMessage);
         } finally {
             $isLoading = false;
         }
@@ -118,15 +119,20 @@
             const styleCheck = {
                 totalStylesheets: styleSheets.length,
                 loadedStylesheets: styleSheets.filter(s => s.loaded).length,
-                tailwindLoaded: styleSheets.some(s => 
-                    s.rules && Array.from(s.rules).some(rule => 
-                        rule.cssText?.includes('@tailwind') || 
-                        rule.cssText?.includes('--tw-') ||
-                        rule.cssText?.includes('container') ||
-                        rule.cssText?.includes('text-white') ||
-                        rule.cssText?.includes('bg-[#00174f]')
-                    )
-                ),
+                tailwindLoaded: styleSheets.some(s => {
+                    if (!s.rules || typeof s.rules === 'number') return false;
+                    try {
+                        return Array.from(s.rules as any).some((rule: any) => 
+                            rule?.cssText?.includes('@tailwind') || 
+                            rule?.cssText?.includes('--tw-') ||
+                            rule?.cssText?.includes('container') ||
+                            rule?.cssText?.includes('text-white') ||
+                            rule?.cssText?.includes('bg-[#00174f]')
+                        );
+                    } catch {
+                        return false;
+                    }
+                }),
                 criticalStylesApplied: computedStyles.every(style => 
                     style.backgroundColor !== 'rgba(0, 0, 0, 0)' || 
                     style.color !== 'rgb(0, 0, 0)' ||
