@@ -709,10 +709,10 @@
                     />
                   {/if}
                   
-                  <!-- Only show response content after thinking is complete -->
+                  <!-- Only show response content when there's actual text to display -->
                   {#if message.type === 'bot' && message.isLoading && !messageThinking.has(message.id)}
                     <!-- Don't show response while thinking -->
-                  {:else if message.type === 'bot' || message.type === 'user'}
+                  {:else if (message.type === 'bot' && message.text.trim()) || message.type === 'user'}
                     <div class="rounded-lg px-4 py-2 {message.type === 'user' ? 'bg-[#00174f] text-white' : 'bg-gray-100 dark:bg-gray-800'}">
                       <div class="prose prose-sm max-w-none dark:prose-invert prose-pre:bg-gray-900 prose-pre:text-gray-100 overflow-x-auto">
                         {#if message.type === 'bot'}

@@ -18,7 +18,7 @@
 </script>
 
 {#if thinkingText && !isThinking}
-  <div class="thinking-section border-l-4 border-blue-500 bg-blue-50 dark:bg-blue-900/20 dark:border-blue-400 rounded-r-md my-2">
+  <div class="thinking-section border-l-4 border-blue-500 bg-blue-50 dark:bg-blue-900/20 dark:border-blue-400 rounded-r-md my-2 w-full">
     <button 
       type="button"
       onclick={toggleExpanded}
@@ -44,18 +44,35 @@
       </svg>
     </button>
     
-    {#if expanded}
+    <div class="thinking-content {expanded ? 'expanded' : 'collapsed'}">
       <div class="px-3 pb-3">
         <div class="text-sm text-blue-700 dark:text-blue-300 whitespace-pre-wrap bg-white dark:bg-gray-800 p-3 rounded border border-blue-200 dark:border-blue-700">
           {thinkingText}
         </div>
       </div>
-    {/if}
+    </div>
   </div>
 {/if}
 
 <style>
   .thinking-section {
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    width: 100%;
+    min-width: 300px;
+  }
+  
+  .thinking-content {
+    transition: max-height 0.3s ease-in-out, opacity 0.3s ease-in-out;
+    overflow: hidden;
+  }
+  
+  .thinking-content.collapsed {
+    max-height: 0;
+    opacity: 0;
+  }
+  
+  .thinking-content.expanded {
+    max-height: 500px; /* Adjust based on expected content height */
+    opacity: 1;
   }
 </style>
