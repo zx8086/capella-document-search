@@ -266,10 +266,11 @@ function createChatStore() {
 export const chatStore = createChatStore();
 
 // Helper function to format messages for display (compatible with existing ChatbotPopup)
-export function formatMessagesForDisplay(conversation: Conversation | null): Array<{ type: 'user' | 'bot'; text: string; isLoading?: boolean }> {
+export function formatMessagesForDisplay(conversation: Conversation | null): Array<{ id: string; type: 'user' | 'bot'; text: string; isLoading?: boolean }> {
   if (!conversation) return [];
 
   return conversation.messages.map(msg => ({
+    id: msg.id,
     type: msg.role === 'user' ? 'user' : 'bot',
     text: msg.content,
     isLoading: msg.isLoading

@@ -12,6 +12,7 @@
   import { chatStore, formatMessagesForDisplay, type Conversation } from '$lib/stores/chatStore';
   import { getMsalInstance } from '$lib/config/authConfig';
   import { marked } from 'marked';
+  import ThinkingSection from './ThinkingSection.svelte';
   import hljs from 'highlight.js/lib/core';
   import 'highlight.js/styles/github-dark.css';
   
@@ -49,6 +50,38 @@
     gfm: true
   });
   
+  // Function to extract thinking content and clean response
+  function extractThinkingContent(text: string): { thinking: string, cleanedText: string } {
+    const thinkingRegex = /<thinking>([\s\S]*?)<\/thinking>/g;
+    let thinking = '';
+    let cleanedText = text;
+    
+    // Extract thinking content
+    let match;
+    while ((match = thinkingRegex.exec(text)) !== null) {
+      thinking += match[1].trim();
+      if (thinking && !thinking.endsWith('\n')) {
+        thinking += '\n\n';
+      }
+    }
+    
+    // Check for tool execution markers
+    if (text.includes('[Executing tools...]')) {
+      if (thinking) thinking += '\n\n';
+      thinking += 'Executing tools to get live system data...';
+    }
+    
+    // Remove thinking tags and tool execution markers from the main response
+    cleanedText = text
+      .replace(/<thinking>[\s\S]*?<\/thinking>/g, '')
+      .replace(/\[Executing tools\.\.\.\]/g, '')
+      // Also remove incomplete thinking tags during streaming
+      .replace(/<thinking>[\s\S]*$/g, '')
+      .trim();
+    
+    return { thinking: thinking.trim(), cleanedText };
+  }
+
   // Function to copy text to clipboard
   async function copyToClipboard(text: string) {
     try {
@@ -155,6 +188,10 @@
   let trackerReady = $state(false);
   let isInitialized = $state(false);
   let conversation = $state<Conversation | null>(null);
+  let currentThinking = $state('');
+  let isThinking = $state(false);
+  // Track thinking content per message
+  let messageThinking = $state<Map<string, string>>(new Map());
   
   // Use derived with safe access to avoid initialization issues
   let messages = $derived(formatMessagesForDisplay(conversation));
@@ -293,6 +330,8 @@
     const userMessage = newMessage.trim();
     newMessage = '';
     isLoading = true;
+    isThinking = true;
+    currentThinking = `Analyzing your question: "${userMessage}"\n\nProcessing context and searching relevant information...`;
     
     try {
         // Add user message to conversation
@@ -351,6 +390,8 @@
         let accumulatedResponse = '';
         let buffer = '';
         const decoder = new TextDecoder();
+        let extractedThinking = '';
+        let cleanedResponse = '';
 
         console.log('🔄 Starting stream processing');
 
@@ -395,7 +436,7 @@
                             if (data.error) {
                                 console.error('❌ Received error from server:', data.content);
                                 accumulatedResponse = data.content || 'An error occurred while processing your request.';
-                                chatStore.updateMessage(loadingMessageId, accumulatedResponse, false);
+                                chatStore.updateMessage(loadingMessageId, accumulatedResponse, true);
                                 streamComplete = true;
                                 break;
                             }
@@ -403,7 +444,18 @@
                             if (data.content) {
                                 accumulatedResponse += data.content;
                                 console.log('💬 Updated response:', accumulatedResponse);
-                                chatStore.updateMessage(loadingMessageId, accumulatedResponse, false);
+                                
+                                // Extract thinking content and clean response
+                                const { thinking, cleanedText } = extractThinkingContent(accumulatedResponse);
+                                
+                                // Store thinking but don't update the display yet (avoid jarring transition)
+                                if (thinking) {
+                                    messageThinking.set(loadingMessageId, thinking);
+                                    // Keep isThinking = true to avoid jarring switch during streaming
+                                }
+                                
+                                // Update message with cleaned response but keep loading state
+                                chatStore.updateMessage(loadingMessageId, cleanedText, true);
                                 // Force scroll on content updates to ensure visibility
                                 forceScrollToBottom();
                             }
@@ -429,15 +481,33 @@
                     const data = JSON.parse(buffer);
                     if (data.content) {
                         accumulatedResponse += data.content;
-                        chatStore.updateMessage(loadingMessageId, accumulatedResponse, false);
                     }
                 } catch (e) {
                     console.warn('⚠️ Failed to parse final buffer:', buffer, e);
                 }
             }
             
-            // Ensure final message state is set
-            chatStore.updateMessage(loadingMessageId, accumulatedResponse, false);
+            // Final extraction of thinking content and cleaning
+            const { thinking, cleanedText } = extractThinkingContent(accumulatedResponse);
+            
+            // Update final thinking state for this message
+            if (thinking) {
+                messageThinking.set(loadingMessageId, thinking);
+                currentThinking = thinking;
+            } else if (!messageThinking.has(loadingMessageId)) {
+                // Fallback thinking if none was extracted
+                const fallbackThinking = `Analyzed: "${userMessage}"\n\nSearched knowledge base and formulated response based on Couchbase documentation and best practices.`;
+                messageThinking.set(loadingMessageId, fallbackThinking);
+                currentThinking = fallbackThinking;
+            }
+            
+            // Ensure final message state is set with cleaned response
+            chatStore.updateMessage(loadingMessageId, cleanedText, false);
+            
+            // Stop thinking when response is complete - add small delay for smoother transition
+            setTimeout(() => {
+                isThinking = false;
+            }, 300);
             
             // Final scroll to ensure all content is visible
             setTimeout(() => forceScrollToBottom(), 200);
@@ -462,6 +532,14 @@
         }
         
         chatStore.updateMessage(loadingMessageId, errorMessage, false);
+        
+        // Stop thinking on error - add small delay for smoother transition
+        const errorThinking = `Error processing: "${userMessage}"\n\nEncountered an issue while processing your request.`;
+        messageThinking.set(loadingMessageId, errorThinking);
+        currentThinking = errorThinking;
+        setTimeout(() => {
+            isThinking = false;
+        }, 300);
     } finally {
         isLoading = false;
     }
@@ -479,6 +557,11 @@
     }
     
     chatStore.startNewConversation($userAccount?.name);
+    
+    // Clear thinking state
+    isThinking = false;
+    currentThinking = '';
+    messageThinking.clear();
   }
 
   $effect(() => {
@@ -525,7 +608,7 @@
     <button
       type="button"
       onclick={toggleChat}
-      class="fixed bottom-24 right-6 z-[45] rounded-full bg-[#00174f] p-4 text-white shadow-lg hover:bg-[#00174f]/90 hover:ring-2 hover:ring-red-500 hover:ring-offset-2 transition-all duration-300"
+      class="fixed bottom-24 right-6 z-[45] rounded-full bg-[#00174f] p-4 sm:p-5 text-white shadow-lg hover:bg-[#00174f]/90 hover:ring-2 hover:ring-red-500 hover:ring-offset-2 transition-all duration-300 touch-manipulation"
       aria-label="Toggle chat"
       data-transaction-name="Chat Assistant Toggle"
     >
@@ -550,7 +633,7 @@
         data-transaction-name="Chat Assistant Close"
       ></button>
       <div 
-        class="fixed bottom-40 right-6 w-[600px] max-w-[calc(100vw-3rem)] z-[46] rounded-lg border border-gray-200 bg-white shadow-xl dark:border-gray-800 dark:bg-gray-900"
+        class="fixed bottom-40 right-6 sm:right-4 sm:left-4 md:right-6 md:left-auto w-[800px] max-w-[calc(100vw-3rem)] xl:max-w-[calc(100vw-6rem)] sm:max-w-none md:max-w-[calc(100vw-3rem)] z-[46] rounded-lg border border-gray-200 bg-white shadow-xl dark:border-gray-800 dark:bg-gray-900"
         role="dialog"
         aria-modal="true"
         aria-label="Chat window"
@@ -608,28 +691,46 @@
                     </svg>
                   </div>
                 {/if}
-                <div class="rounded-lg px-4 py-2 max-w-[80%] {message.type === 'user' ? 'bg-[#00174f] text-white' : 'bg-gray-100 dark:bg-gray-800'}">
-                  {#if message.isLoading}
-                    <div class="flex items-center justify-center p-2">
-                      <div class="animate-spin rounded-full h-5 w-5 border-2 border-gray-500 border-t-transparent"></div>
+                <div class="flex flex-col max-w-[80%]">
+                  <!-- Show simple spinner during thinking, then AI Reasoning when complete -->
+                  {#if message.type === 'bot' && message.isLoading && !messageThinking.has(message.id)}
+                    <!-- Simple thinking spinner -->
+                    <div class="flex items-center gap-2 mb-2 text-blue-600 dark:text-blue-400">
+                      <div class="animate-spin rounded-full h-4 w-4 border-2 border-blue-500 border-t-transparent flex-shrink-0"></div>
+                      <span class="text-sm font-medium">Thinking...</span>
                     </div>
-                  {:else}
-                    <div class="prose prose-sm max-w-none dark:prose-invert prose-pre:bg-gray-900 prose-pre:text-gray-100 overflow-x-auto">
-                      {#if message.type === 'bot'}
-                        {#if message.text.includes('References:')}
-                          {@html renderMarkdown(message.text.split('References:')[0])}
-                          <div class="mt-2 text-sm text-gray-600 dark:text-gray-400 border-t border-gray-200 dark:border-gray-700 pt-2">
-                            References:
-                            {#each message.text.split('References:')[1].trim().split('\n').filter(ref => ref.trim()) as ref}
-                              <div class="break-all">- {ref.trim()}</div>
-                            {/each}
-                          </div>
+                  {/if}
+                  
+                  {#if message.type === 'bot' && messageThinking.has(message.id)}
+                    <!-- AI Reasoning (collapsed by default) -->
+                    <ThinkingSection 
+                      isThinking={false}
+                      thinkingText={messageThinking.get(message.id) || ''}
+                    />
+                  {/if}
+                  
+                  <!-- Only show response content after thinking is complete -->
+                  {#if message.type === 'bot' && message.isLoading && !messageThinking.has(message.id)}
+                    <!-- Don't show response while thinking -->
+                  {:else if message.type === 'bot' || message.type === 'user'}
+                    <div class="rounded-lg px-4 py-2 {message.type === 'user' ? 'bg-[#00174f] text-white' : 'bg-gray-100 dark:bg-gray-800'}">
+                      <div class="prose prose-sm max-w-none dark:prose-invert prose-pre:bg-gray-900 prose-pre:text-gray-100 overflow-x-auto">
+                        {#if message.type === 'bot'}
+                          {#if message.text.includes('References:')}
+                            {@html renderMarkdown(message.text.split('References:')[0])}
+                            <div class="mt-2 text-sm text-gray-600 dark:text-gray-400 border-t border-gray-200 dark:border-gray-700 pt-2">
+                              References:
+                              {#each message.text.split('References:')[1].trim().split('\n').filter(ref => ref.trim()) as ref}
+                                <div class="break-all">- {ref.trim()}</div>
+                              {/each}
+                            </div>
+                          {:else}
+                            {@html renderMarkdown(message.text)}
+                          {/if}
                         {:else}
-                          {@html renderMarkdown(message.text)}
+                          <div class="whitespace-pre-wrap break-words">{message.text}</div>
                         {/if}
-                      {:else}
-                        <div class="whitespace-pre-wrap break-words">{message.text}</div>
-                      {/if}
+                      </div>
                     </div>
                   {/if}
                 </div>
@@ -658,12 +759,12 @@
                 bind:value={newMessage}
                 placeholder={inputPlaceholder}
                 disabled={isLoading}
-                class="flex-1 rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring focus:ring-tommy-red/50 dark:border-gray-700 bg-white text-black dark:bg-white dark:text-black disabled:opacity-50"
+                class="flex-1 rounded-md border border-gray-300 px-3 py-2 sm:py-3 text-sm focus:outline-none focus:ring focus:ring-tommy-red/50 dark:border-gray-700 bg-white text-black dark:bg-white dark:text-black disabled:opacity-50 touch-manipulation"
                 aria-label="Message input"
               />
               <Button 
                 type="submit" 
-                class="bg-[#00174f] hover:bg-[#00174f]/90 hover:ring-2 hover:ring-red-500 hover:ring-offset-2 transition-all duration-300 disabled:opacity-50"
+                class="bg-[#00174f] hover:bg-[#00174f]/90 hover:ring-2 hover:ring-red-500 hover:ring-offset-2 transition-all duration-300 disabled:opacity-50 touch-manipulation sm:px-6 sm:py-3"
                 disabled={isLoading}
                 aria-label="Send message"
                 data-transaction-name="Send Chat Query"
@@ -723,8 +824,10 @@
   :global(.code-block-wrapper) {
     position: relative !important;
     margin: 0.5rem 0 !important;
-    overflow-x: auto !important;
+    overflow: hidden !important;
     max-width: 100% !important;
+    border-radius: 0.375rem !important;
+    background-color: #1f2937 !important;
   }
   
   :global(.prose pre) {
@@ -735,21 +838,43 @@
     padding-top: 2.5rem !important; /* Make room for copy button */
     margin: 0 !important;
     overflow-x: auto !important;
-    white-space: pre !important;
-    word-wrap: normal !important;
-    min-width: max-content !important;
+    white-space: pre-wrap !important;
+    word-wrap: break-word !important;
+    max-width: 100% !important;
+    /* Allow scrolling only when content truly exceeds container */
+    scrollbar-width: thin !important;
+    scrollbar-color: #4b5563 #374151 !important;
   }
   
   /* Improve styling for long lines in tool responses */
   :global(.prose code:not(pre code)) {
-    white-space: nowrap !important;
-    word-break: break-all !important;
+    white-space: normal !important;
+    word-break: break-word !important;
+    background-color: #f3f4f6 !important;
+    color: #374151 !important;
+    padding: 0.125rem 0.25rem !important;
+    border-radius: 0.25rem !important;
+    font-size: 0.875em !important;
   }
   
   /* Handle long lines in regular text */
   :global(.prose p) {
     overflow-wrap: break-word !important;
     word-break: break-word !important;
+    line-height: 1.6 !important;
+  }
+  
+  /* Improve handling of long URLs and technical content */
+  :global(.prose a) {
+    word-break: break-all !important;
+    overflow-wrap: break-word !important;
+    color: #2563eb !important;
+    text-decoration: underline !important;
+    text-decoration-color: #93c5fd !important;
+  }
+  
+  :global(.prose a:hover) {
+    text-decoration-color: #2563eb !important;
   }
   
   /* Better handling for numbered lists with long text */
@@ -787,13 +912,6 @@
     transform: scale(1.05) !important;
   }
   
-  :global(.prose code) {
-    background-color: #f3f4f6 !important;
-    color: #374151 !important;
-    padding: 0.125rem 0.25rem !important;
-    border-radius: 0.25rem !important;
-    font-size: 0.875em !important;
-  }
   
   :global(.prose pre code) {
     background-color: transparent !important;
@@ -811,5 +929,77 @@
     padding-left: 1rem !important;
     font-style: italic !important;
     margin: 0.5rem 0 !important;
+  }
+  
+  /* Improve table styling for technical content */
+  :global(.prose table) {
+    width: 100% !important;
+    max-width: 100% !important;
+    overflow-x: auto !important;
+    border-collapse: collapse !important;
+    margin: 0.5rem 0 !important;
+  }
+  
+  :global(.prose th, .prose td) {
+    border: 1px solid #d1d5db !important;
+    padding: 0.5rem !important;
+    text-align: left !important;
+    word-break: break-word !important;
+    overflow-wrap: break-word !important;
+  }
+  
+  :global(.prose th) {
+    background-color: #f9fafb !important;
+    font-weight: 600 !important;
+  }
+  
+  :global(.prose tbody tr:nth-child(even)) {
+    background-color: #f9fafb !important;
+  }
+  
+  /* Better spacing for technical lists */
+  :global(.prose ul li, .prose ol li) {
+    margin: 0.25rem 0 !important;
+    overflow-wrap: break-word !important;
+    word-break: break-word !important;
+  }
+  
+  /* Improve technical term readability */
+  :global(.prose em) {
+    font-style: italic !important;
+    color: #6b7280 !important;
+  }
+  
+  /* Better handling for inline technical terms */
+  :global(.prose strong code) {
+    background-color: #fef3c7 !important;
+    color: #92400e !important;
+    font-weight: 600 !important;
+  }
+  
+  /* Mobile-specific improvements */
+  @media (max-width: 768px) {
+    :global(.prose pre) {
+      font-size: 0.75rem !important;
+      padding: 0.75rem !important;
+      padding-top: 2rem !important;
+    }
+    
+    :global(.copy-btn) {
+      padding: 0.375rem 0.5rem !important;
+      font-size: 0.75rem !important;
+      top: 0.25rem !important;
+      right: 0.25rem !important;
+    }
+    
+    :global(.prose) {
+      font-size: 0.875rem !important;
+    }
+    
+    :global(.prose h1, .prose h2, .prose h3, .prose h4, .prose h5, .prose h6) {
+      font-size: 1rem !important;
+      margin-top: 0.75rem !important;
+      margin-bottom: 0.375rem !important;
+    }
   }
 </style>
