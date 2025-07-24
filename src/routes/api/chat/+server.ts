@@ -10,6 +10,7 @@ import { clusterConn } from "$lib/couchbaseConnector";
 import { backendConfig } from "../../../backend-config";
 import { log, err } from "$utils/unifiedLogger";
 import { dev } from "$app/environment";
+import { traceable } from "langsmith/traceable";
 
 // Initialize provider lazily
 let ragProvider: any = null;
@@ -50,6 +51,43 @@ function getUserFriendlyErrorMessage(errorMessage: string): string {
 
   return "I apologize, but I encountered an unexpected error. Please try again, and if the problem persists, consider starting a new conversation.";
 }
+
+// Create traceable conversation handler - metadata must be passed properly per Langsmith docs
+const processConversation = traceable(
+  async (currentMessage: string, conversationMessages: any[], metadata: RAGMetadata, ragProvider: any) => {
+    log("🔄 [TRACE DEBUG] Processing conversation within trace context", {
+      messageLength: currentMessage.length,
+      conversationLength: conversationMessages.length,
+      userId: metadata.userId,
+      conversationId: metadata.conversationId,
+    });
+
+    // Debug: Check current run context
+    const { getCurrentRunTree } = await import("langsmith/traceable");
+    const currentRun = getCurrentRunTree();
+    log("🔍 [TRACE DEBUG] Current run tree in processConversation:", {
+      runId: currentRun?.id,
+      runName: currentRun?.name,
+      runType: currentRun?.run_type,
+      hasParent: !!currentRun?.parent_run_id,
+      parentId: currentRun?.parent_run_id,
+    });
+
+    // Execute RAG query within conversation trace context
+    const { stream, context } = await ragProvider.query(currentMessage, metadata);
+
+    log("✅ [TRACE DEBUG] RAG query completed within conversation trace", {
+      contextSize: context?.length || 0,
+      sourceFiles: context?.map((c) => c.filename).join(", "),
+    });
+
+    return { stream, context };
+  },
+  {
+    run_type: "chain",
+    name: "Chat Conversation",
+  },
+);
 
 export const POST: RequestHandler = async ({ fetch, request }) => {
   const startTime = Date.now();
@@ -105,7 +143,11 @@ export const POST: RequestHandler = async ({ fetch, request }) => {
       userEmail: user?.email || "anonymous"
     });
 
-    // Prepare metadata for tracing
+    // Generate thread/conversation ID for continuity
+    const conversationId = user?.conversationId || `conv-${user?.id || 'anon'}-${Date.now()}`;
+    const sessionId = user?.sessionId || `session-${user?.id || 'anon'}-${Date.now()}`;
+
+    // Prepare metadata for tracing with thread information
     const metadata: RAGMetadata = {
       // User Information
       userId: user?.id || "anonymous",
@@ -118,9 +160,11 @@ export const POST: RequestHandler = async ({ fetch, request }) => {
       environment: dev ? "development" : "production",
       pathname: user?.pathname || "unknown",
 
-      // Session Information
+      // Session Information - Enhanced for thread continuity
       sessionStartTime: user?.sessionStartTime,
       messageCount: user?.messageCount || 1,
+      sessionId: sessionId,
+      conversationId: conversationId,
 
       // Request Details
       clientTimestamp: user?.clientTimestamp,
@@ -132,18 +176,46 @@ export const POST: RequestHandler = async ({ fetch, request }) => {
       // Message Details
       messageLength: currentMessage.length,
       conversationLength: conversationMessages.length,
-      conversationId: user?.conversationId,
     };
 
     log("🔄 [Server] Executing RAG query with conversation context:", {
       messagesCount: conversationMessages.length,
       currentQuery: currentMessage.substring(0, 100) + (currentMessage.length > 100 ? '...' : ''),
-      fullConversation: conversationMessages.map((msg, i) => `${i+1}. ${msg.role}: ${msg.content.substring(0, 80)}...`)
+      fullConversation: conversationMessages.map((msg, i) => `${i+1}. ${msg.role}: ${msg.content.substring(0, 80)}...`),
+      conversationId: conversationId,
+      sessionId: sessionId,
     });
     
-    // For now, we use the current message for RAG retrieval
-    // Future enhancement: could combine recent messages for better context retrieval
-    const { stream, context } = await ragProvider.query(currentMessage, metadata);
+    // Execute within conversation trace context
+    // Pass Langsmith metadata correctly for thread continuity according to docs
+    log("🔍 [TRACE DEBUG] Preparing to call processConversation with metadata:", {
+      sessionId,
+      conversationId,
+      userId: user?.id || 'anonymous',
+      messageCount: metadata.messageCount,
+    });
+    
+    const { stream, context } = await processConversation(
+      currentMessage, 
+      conversationMessages, 
+      metadata,
+      ragProvider,
+      {
+        metadata: {
+          session_id: sessionId,
+          thread_id: conversationId,
+          conversation_id: conversationId,
+          user_id: user?.id || 'anonymous',
+          message_count: metadata.messageCount,
+        },
+        tags: [
+          "conversation",
+          "chat-session",
+          `user:${user?.id || 'anonymous'}`,
+          `conversation:${conversationId}`,
+        ],
+      }
+    );
 
     log("✅ [Server] Query completed:", {
       contextSize: context?.length || 0,
@@ -214,82 +286,48 @@ IMPORTANT INSTRUCTIONS:
 - NEVER include URLs, links, or references in your response - references will be added automatically
 - DO NOT add a "References:" section or any source citations to your answer`;
 
-            // Use either Bedrock conversation mode or regular RAG stream
-            if (Bun.env.RAG_PIPELINE === 'AWS_KNOWLEDGE_BASE' && chatService) {
-              log("🤖 [Server] Using Bedrock conversation mode", {
-                messageCount: conversationMessages.length,
-                conversationHistory: conversationMessages.map(msg => `${msg.role}: ${msg.content.substring(0, 50)}...`)
-              });
-              
-              const conversationForBedrock = [
-                { role: 'system', content: systemMessage },
-                ...conversationMessages.map(msg => ({
-                  role: msg.role === 'user' ? 'user' : 'assistant',
-                  content: msg.content
-                }))
-              ];
-              
-              // Use chat service directly for conversation
-              const conversationStream = chatService.createChatCompletion(conversationForBedrock, {
-                temperature: 0.7,
-                max_tokens: 2000
-              });
-              
-              for await (const chunk of conversationStream) {
-                chunkCount++;
-                if (chunk) {
-                  fullResponse += chunk;
-                  
-                  // Check if tools are being executed - comprehensive tool detection
-                  if (chunk.includes("[Executing tools...]") || 
-                      chunk.includes("get_system_vitals") ||
-                      chunk.includes("get_system_nodes") ||
-                      chunk.includes("get_fatal_requests") ||
-                      chunk.includes("get_most_expensive_queries") ||
-                      chunk.includes("get_longest_running_queries") ||
-                      chunk.includes("get_most_frequent_queries") ||
-                      chunk.includes("get_largest_result_size_queries") ||
-                      chunk.includes("get_largest_result_count_queries") ||
-                      chunk.includes("get_primary_index_queries") ||
-                      chunk.includes("get_system_indexes") ||
-                      chunk.includes("get_completed_requests") ||
-                      chunk.includes("get_prepared_statements") ||
-                      chunk.includes("get_indexes_to_drop") ||
-                      chunk.includes("get_detailed_indexes") ||
-                      chunk.includes("get_detailed_prepared_statements") ||
-                      chunk.includes("get_schema_for_collection") ||
-                      chunk.includes("run_sql_plus_plus_query") ||
-                      chunk.includes("<thinking>")) {
-                    toolsWereExecuted = true;
-                    log("🔧 [Server] Tools execution detected in stream");
-                  }
-                  
-                  const jsonLine = JSON.stringify({ content: chunk }) + "\n";
-                  controller.enqueue(new TextEncoder().encode(jsonLine));
-                }
+            // Use the RAG provider stream (contains proper trace headers and tool execution)
+            log("🌊 [Server] Starting to read stream with conversation context");
+            
+            for await (const chunk of stream) {
+              chunkCount++;
+              let content = "";
+
+              if (typeof chunk === "string") {
+                content = chunk;
+              } else if (chunk.choices && chunk.choices[0]?.delta?.content) {
+                content = chunk.choices[0].delta.content;
               }
-            } else {
-              // Use regular RAG stream
-              for await (const chunk of stream) {
-                chunkCount++;
-                let content = "";
 
-                if (typeof chunk === "string") {
-                  content = chunk;
-                } else if (chunk.choices && chunk.choices[0]?.delta?.content) {
-                  content = chunk.choices[0].delta.content;
+              if (content) {
+                fullResponse += content;
+                
+                // Check if tools are being executed - comprehensive tool detection
+                if (content.includes("[Executing tools...]") || 
+                    content.includes("get_system_vitals") ||
+                    content.includes("get_system_nodes") ||
+                    content.includes("get_fatal_requests") ||
+                    content.includes("get_most_expensive_queries") ||
+                    content.includes("get_longest_running_queries") ||
+                    content.includes("get_most_frequent_queries") ||
+                    content.includes("get_largest_result_size_queries") ||
+                    content.includes("get_largest_result_count_queries") ||
+                    content.includes("get_primary_index_queries") ||
+                    content.includes("get_system_indexes") ||
+                    content.includes("get_completed_requests") ||
+                    content.includes("get_prepared_statements") ||
+                    content.includes("get_indexes_to_drop") ||
+                    content.includes("get_detailed_indexes") ||
+                    content.includes("get_detailed_prepared_statements") ||
+                    content.includes("get_schema_for_collection") ||
+                    content.includes("run_sql_plus_plus_query") ||
+                    content.includes("<thinking>")) {
+                  toolsWereExecuted = true;
+                  log("🔧 [Server] Tools execution detected in stream");
                 }
-
-                if (content) {
-                  fullResponse += content;
-                  
-                  if (content.includes("[Executing tools...]")) {
-                    toolsWereExecuted = true;
-                  }
-                  
-                  const jsonLine = JSON.stringify({ content }) + "\n";
-                  controller.enqueue(new TextEncoder().encode(jsonLine));
-                }
+                
+                const jsonLine = JSON.stringify({ content }) + "\n";
+                controller.enqueue(new TextEncoder().encode(jsonLine));
               }
             }
 

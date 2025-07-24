@@ -30,6 +30,8 @@ import {
 import { clusterConn } from "$lib/couchbaseConnector";
 import { backendConfig } from "../../backend-config";
 import { traceable } from "langsmith/traceable";
+import { getCurrentRunTree, withRunTree } from "langsmith/singletons/traceable";
+import { RunTree } from "langsmith/run_trees";
 
 const getSystemVitalsTool: Tool = {
   toolSpec: {
@@ -422,6 +424,136 @@ export class BedrockChatService {
     });
     this.modelId = Bun.env.BEDROCK_CHAT_MODEL || "eu.amazon.nova-pro-v1:0";
   }
+
+  private executeToolInContext = async (name: string, input: any, parentRunTree?: RunTree): Promise<any> => {
+    // Try to get the current run tree context, or use the provided parent
+    let currentRunTree = parentRunTree;
+    if (!currentRunTree) {
+      try {
+        currentRunTree = getCurrentRunTree(true); // Allow absent run tree
+      } catch (error) {
+        // If we're not in a traceable context, currentRunTree will be undefined
+        currentRunTree = undefined;
+      }
+    }
+
+    log("🔧 [Tool] Setting up tool execution context", {
+      toolName: name,
+      hasParentContext: !!currentRunTree,
+      parentTraceId: currentRunTree?.id,
+      parentName: currentRunTree?.name,
+      inputKeys: Object.keys(input || {}),
+    });
+
+    // Execute tool function with tracing
+    const executeSpecificTool = traceable(
+      async (toolName: string, toolInput: any) => {
+        log("🔧 [TRACE DEBUG] Executing tool within trace context", {
+          toolName,
+          inputKeys: Object.keys(toolInput || {}),
+        });
+
+        const toolStartTime = Date.now();
+        
+        let result;
+        switch (toolName) {
+        case "get_system_vitals":
+          result = await this.executeGetSystemVitals(toolInput?.node_filter);
+          break;
+        case "get_system_nodes":
+          result = await this.executeGetSystemNodes(toolInput?.service_filter);
+          break;
+        case "get_fatal_requests":
+          result = await this.executeGetFatalRequests(toolInput?.period, toolInput?.limit);
+          break;
+        case "get_most_expensive_queries":
+          result = await this.executeGetMostExpensiveQueries(toolInput?.limit, toolInput?.period);
+          break;
+        case "get_longest_running_queries":
+          result = await this.executeGetLongestRunningQueries(toolInput?.limit);
+          break;
+        case "get_most_frequent_queries":
+          result = await this.executeGetMostFrequentQueries(toolInput?.limit);
+          break;
+        case "get_largest_result_size_queries":
+          result = await this.executeGetLargestResultSizeQueries(toolInput?.limit);
+          break;
+        case "get_largest_result_count_queries":
+          result = await this.executeGetLargestResultCountQueries(toolInput?.limit);
+          break;
+        case "get_primary_index_queries":
+          result = await this.executeGetPrimaryIndexQueries(toolInput?.limit);
+          break;
+        case "get_system_indexes":
+          result = await this.executeGetSystemIndexes();
+          break;
+        case "get_completed_requests":
+          result = await this.executeGetCompletedRequests(toolInput?.limit);
+          break;
+        case "get_prepared_statements":
+          result = await this.executeGetPreparedStatements();
+          break;
+        case "get_indexes_to_drop":
+          result = await this.executeGetIndexesToDrop();
+          break;
+        case "get_detailed_indexes":
+          result = await this.executeGetDetailedIndexes();
+          break;
+        case "get_detailed_prepared_statements":
+          result = await this.executeGetDetailedPreparedStatements();
+          break;
+        case "get_schema_for_collection":
+          result = await this.executeGetSchemaForCollection(toolInput?.scope_name, toolInput?.collection_name);
+          break;
+        case "run_sql_plus_plus_query":
+          result = await this.executeRunSqlPlusPlusQuery(toolInput?.scope_name, toolInput?.query);
+          break;
+        default:
+          result = {
+            success: false,
+            error: `Unknown tool: ${toolName}`,
+            content: `Error: Unknown tool '${toolName}'. Available tools: get_system_vitals, get_system_nodes, get_fatal_requests, get_most_expensive_queries, get_longest_running_queries, get_most_frequent_queries, get_largest_result_size_queries, get_largest_result_count_queries, get_primary_index_queries, get_system_indexes, get_completed_requests, get_prepared_statements, get_indexes_to_drop, get_detailed_indexes, get_detailed_prepared_statements, get_schema_for_collection, run_sql_plus_plus_query`,
+          };
+      }
+
+      const toolExecutionTime = Date.now() - toolStartTime;
+      
+      log("✅ [Tool] Tool execution completed within parent context", {
+        toolName,
+        success: result?.success,
+        executionTimeMs: toolExecutionTime,
+        hasParentContext: !!currentRunTree,
+        parentTraceId: currentRunTree?.id,
+        resultSize: result?.data?.count || 0,
+      });
+
+      return result;
+      },
+      {
+        name: `Tool: ${name}`,
+        run_type: "tool",
+      }
+    );
+
+    // Execute within parent trace context if available
+    if (currentRunTree) {
+      log("🔗 [Tool] Executing within parent trace context using withRunTree", {
+        toolName: name,
+        parentTraceId: currentRunTree.id,
+        parentName: currentRunTree.name,
+      });
+      
+      return await withRunTree(currentRunTree, async () => {
+        return await executeSpecificTool(name, input);
+      });
+    } else {
+      log("⚠️ [Tool] No parent trace context available, executing directly", {
+        toolName: name,
+      });
+      
+      return await executeSpecificTool(name, input);
+    }
+  };
 
   private executeGetSystemVitals = async (
     node_filter?: string,
@@ -1418,9 +1550,54 @@ export class BedrockChatService {
     options: {
       temperature?: number;
       max_tokens?: number;
+      traceHeaders?: Record<string, string>;
     } = {},
   ): AsyncGenerator<string, void, unknown> {
     try {
+      // Log trace headers for debugging
+      let parentRunTree: RunTree | undefined;
+      
+      log("🔧 [BedrockChat] Debug - Full options object", {
+        optionsKeys: Object.keys(options),
+        hasTraceHeaders: !!options.traceHeaders,
+        traceHeadersType: typeof options.traceHeaders,
+        optionsString: JSON.stringify(options, null, 2).substring(0, 500),
+      });
+      
+      if (options.traceHeaders) {
+        log("🔗 [BedrockChat] Received trace headers", {
+          headerKeys: Object.keys(options.traceHeaders),
+          traceHeadersReceived: true,
+          headerCount: Object.keys(options.traceHeaders).length,
+          langsmithTrace: options.traceHeaders["langsmith-trace"],
+          baggage: options.traceHeaders["baggage"],
+        });
+        try {
+          parentRunTree = await RunTree.fromHeaders(options.traceHeaders);
+          log("🔗 [BedrockChat] Successfully created RunTree from headers", {
+            traceId: parentRunTree?.id,
+            parentId: parentRunTree?.parent_run_id,
+            runTreeCreated: true,
+            name: parentRunTree?.name,
+            runType: parentRunTree?.run_type,
+            dotted_path: parentRunTree?.dotted_order,
+          });
+        } catch (error) {
+          log("⚠️ [BedrockChat] Failed to create RunTree from headers", {
+            error: error.message,
+            headers: Object.keys(options.traceHeaders || {}),
+            errorType: error.constructor.name,
+            stackTrace: error.stack?.substring(0, 300),
+            langsmithTrace: options.traceHeaders["langsmith-trace"],
+          });
+        }
+      } else {
+        log("ℹ️ [BedrockChat] No trace headers received", {
+          optionsKeys: Object.keys(options),
+          optionsString: JSON.stringify(options).substring(0, 200),
+        });
+      }
+
       // Separate system messages from conversation messages
       const systemMessages = messages.filter((m) => m.role === "system");
       const conversationMessages = messages.filter((m) => m.role !== "system");
@@ -1457,6 +1634,9 @@ export class BedrockChatService {
         modelId: this.modelId,
         messagesCount: converseMessages.length,
         hasSystem: !!systemPrompt,
+        toolsEnabled: true,
+        toolCount: this.tools.length,
+        availableTools: this.tools.map(t => t.toolSpec.name),
       });
 
       let response;
@@ -1605,6 +1785,13 @@ export class BedrockChatService {
 
         // AWS Documentation: Handle tool use
         if (stopReason === "tool_use") {
+          const toolCalls = assistantMessage.content.filter(c => c.toolUse);
+          log("🛠️ [BedrockChat] Tool use detected, preparing to execute tools", {
+            toolCallCount: toolCalls.length,
+            toolNames: toolCalls.map(c => c.toolUse?.name),
+            stopReason,
+          });
+          
           yield "\n\n[Executing tools...]\n";
 
           const toolResults: ContentBlock[] = [];
@@ -1625,135 +1812,33 @@ export class BedrockChatService {
               const toolStart = Date.now();
               let result;
 
-              // Wrap tool execution in a child trace
-              const executeToolInContext = traceable(
-                async () => {
-                  switch (name) {
-                    case "get_system_vitals":
-                      result = await this.executeGetSystemVitals(
-                        input?.node_filter,
-                      );
-                      break;
-                    case "get_system_nodes":
-                      result = await this.executeGetSystemNodes(
-                        input?.service_filter,
-                      );
-                      break;
-                    case "get_fatal_requests":
-                      result = await this.executeGetFatalRequests(
-                        input?.period,
-                        input?.limit,
-                      );
-                      break;
-                    case "get_most_expensive_queries":
-                      result = await this.executeGetMostExpensiveQueries(
-                        input?.limit,
-                        input?.period,
-                      );
-                      break;
-                    case "get_longest_running_queries":
-                      result = await this.executeGetLongestRunningQueries(
-                        input?.limit,
-                      );
-                      break;
-                    case "get_most_frequent_queries":
-                      result = await this.executeGetMostFrequentQueries(
-                        input?.limit,
-                      );
-                      break;
-                    case "get_largest_result_size_queries":
-                      result = await this.executeGetLargestResultSizeQueries(
-                        input?.limit,
-                      );
-                      break;
-                    case "get_largest_result_count_queries":
-                      result = await this.executeGetLargestResultCountQueries(
-                        input?.limit,
-                      );
-                      break;
-                    case "get_primary_index_queries":
-                      result = await this.executeGetPrimaryIndexQueries(
-                        input?.limit,
-                      );
-                      break;
-                    case "get_system_indexes":
-                      result = await this.executeGetSystemIndexes();
-                      break;
-                    case "get_completed_requests":
-                      result = await this.executeGetCompletedRequests(
-                        input?.limit,
-                      );
-                      break;
-                    case "get_prepared_statements":
-                      result = await this.executeGetPreparedStatements();
-                      break;
-                    case "get_indexes_to_drop":
-                      result = await this.executeGetIndexesToDrop();
-                      break;
-                    case "get_detailed_indexes":
-                      result = await this.executeGetDetailedIndexes();
-                      break;
-                    case "get_detailed_prepared_statements":
-                      result =
-                        await this.executeGetDetailedPreparedStatements();
-                      break;
-                    case "get_schema_for_collection":
-                      result = await this.executeGetSchemaForCollection(
-                        input?.scope_name,
-                        input?.collection_name,
-                      );
-                      break;
-                    case "run_sql_plus_plus_query":
-                      result = await this.executeRunSqlPlusPlusQuery(
-                        input?.scope_name,
-                        input?.query,
-                      );
-                      break;
-                    default:
-                      result = {
-                        success: false,
-                        error: `Unknown tool: ${name}`,
-                        content: `Error: Unknown tool '${name}'. Available tools: get_system_vitals, get_system_nodes, get_fatal_requests, get_most_expensive_queries, get_longest_running_queries, get_most_frequent_queries, get_largest_result_size_queries, get_largest_result_count_queries, get_primary_index_queries, get_system_indexes, get_completed_requests, get_prepared_statements, get_indexes_to_drop, get_detailed_indexes, get_detailed_prepared_statements, get_schema_for_collection, run_sql_plus_plus_query`,
-                      };
-                  }
-                  return result;
-                },
-                {
-                  run_type: "tool",
-                  name: name,
-                  tags: ["database-tool", "nested-execution", "bedrock-tool"],
-                },
-              );
-
+              // Execute tool with traceable wrapper for proper tracing
+              let executeResult;
               try {
-                // Execute the tool with tracing metadata but within the parent context
-                result = await executeToolInContext();
-
-                const toolExecutionTime = Date.now() - toolStart;
-
-                log("✅ [Tool] Tool execution complete", {
-                  name,
-                  success: result.success,
-                  executionTimeMs: toolExecutionTime,
-                  resultSize: result.data?.count || 0,
-                  toolIndex: toolsExecuted,
-                });
+                executeResult = await this.executeToolInContext(name, input, parentRunTree);
               } catch (toolError) {
-                const toolExecutionTime = Date.now() - toolStart;
-
-                err("❌ [Tool] Tool execution failed", {
+                err("❌ [Tool] Tool execution error", {
                   name,
                   error: toolError.message,
-                  executionTimeMs: toolExecutionTime,
-                  toolIndex: toolsExecuted,
                 });
-
-                result = {
+                executeResult = {
                   success: false,
                   error: toolError.message,
                   content: `Tool execution failed: ${toolError.message}`,
                 };
               }
+
+              result = executeResult;
+
+              const toolExecutionTime = Date.now() - toolStart;
+
+              log("✅ [Tool] Tool execution complete", {
+                name,
+                success: result.success,
+                executionTimeMs: toolExecutionTime,
+                resultSize: result.data?.count || 0,
+                toolIndex: toolsExecuted,
+              });
 
               toolResults.push({
                 toolResult: {
@@ -1823,7 +1908,7 @@ export class BedrockChatService {
   // Public method - no traceable wrapper to allow inheritance from parent trace
   createChatCompletion = (
     messages: Array<{ role: string; content: string }>,
-    options: { temperature?: number; max_tokens?: number } = {},
+    options: { temperature?: number; max_tokens?: number; traceHeaders?: Record<string, string> } = {},
   ) => {
     return this._createChatCompletion(messages, options);
   };

@@ -6,6 +6,7 @@ import {
 } from "@aws-sdk/client-bedrock-agent-runtime";
 import type { RAGProvider, RAGResponse, RAGMetadata } from "../types";
 import { traceable } from "langsmith/traceable";
+import { getCurrentRunTree } from "langsmith/singletons/traceable";
 import { BedrockChatService } from "../../services/bedrock-chat";
 import { backendConfig } from "../../../backend-config";
 import { log, err } from "../../../utils/unifiedLogger";
@@ -15,7 +16,7 @@ export class AWSKnowledgeBaseRAGProvider implements RAGProvider {
   private chatService: BedrockChatService;
   private client: BedrockAgentRuntimeClient;
   private knowledgeBaseId: string;
-  private traceablePipeline: any;
+  private ragPipeline: any;
 
   constructor() {
     log("🎯 [AWSKnowledgeBaseProvider] Constructor called");
@@ -95,8 +96,7 @@ export class AWSKnowledgeBaseRAGProvider implements RAGProvider {
     return uniqueItems;
   }
 
-  private tracedKnowledgeBaseRetrieval = traceable(
-    async (message: string) => {
+  private knowledgeBaseRetrieval = async (message: string) => {
       log("🔍 [AWSKnowledgeBase] Starting knowledge base retrieval", {
         messageLength: message.length,
         knowledgeBaseId: this.knowledgeBaseId,
@@ -145,23 +145,9 @@ export class AWSKnowledgeBaseRAGProvider implements RAGProvider {
         enhancedError.cause = error;
         throw enhancedError;
       }
-    },
-    {
-      run_type: "retriever",
-      name: "AWS Knowledge Base Retrieval",
-      tags: [
-        "retrieval",
-        "aws-knowledge-base",
-        "vector-search",
-        "semantic-search",
-        "document-retrieval",
-        "embeddings",
-      ],
-    },
-  );
+    };
 
-  private tracedContextProcessing = traceable(
-    async (response: any) => {
+  private contextProcessing = async (response: any) => {
       log("📝 [AWSKnowledgeBase] Starting context processing", {
         resultCount: response.retrievalResults?.length || 0,
       });
@@ -258,23 +244,9 @@ export class AWSKnowledgeBaseRAGProvider implements RAGProvider {
         enhancedError.cause = error;
         throw enhancedError;
       }
-    },
-    {
-      run_type: "parser",
-      name: "Context Processing",
-      tags: [
-        "context-processing",
-        "document-parsing",
-        "text-extraction",
-        "data-transformation",
-        "content-filtering",
-        "metadata-enrichment",
-      ],
-    },
-  );
+    };
 
-  private tracedLLMCompletion = traceable(
-    async (message: string, context: any[]) => {
+  private llmCompletion = async (message: string, context: any[]) => {
       log("🤖 [AWSKnowledgeBase] Starting LLM completion", {
         messageLength: message.length,
         contextItems: context.length,
@@ -302,35 +274,98 @@ export class AWSKnowledgeBaseRAGProvider implements RAGProvider {
           messageLength: message.length,
         });
 
+        // Get current run tree and convert to headers for distributed tracing BEFORE creating traceable wrapper
+        let traceHeaders: Record<string, string> | undefined;
+        try {
+          const currentRunTree = getCurrentRunTree(true);
+          if (currentRunTree) {
+            traceHeaders = currentRunTree.toHeaders();
+            log("🔗 [AWSKnowledgeBase] Passing trace context to BedrockChat", {
+              traceId: currentRunTree.id,
+              parentId: currentRunTree.parent_run_id,
+              headerKeys: Object.keys(traceHeaders),
+              traceHeadersValue: traceHeaders,
+            });
+          } else {
+            log("⚠️ [AWSKnowledgeBase] No current run tree found for trace headers");
+          }
+        } catch (error) {
+          log("⚠️ [AWSKnowledgeBase] Failed to get trace headers", {
+            error: error.message,
+          });
+        }
+
+        // Build options object with explicit traceHeaders check
+        const chatOptions: any = {
+          temperature: 0.7,
+          max_tokens: 2000,
+        };
+
+        // Only add traceHeaders if they exist to avoid undefined values
+        if (traceHeaders) {
+          chatOptions.traceHeaders = traceHeaders;
+          log("✅ [AWSKnowledgeBase] Including trace headers in chat options", {
+            headerKeys: Object.keys(traceHeaders),
+            optionsKeys: Object.keys(chatOptions),
+          });
+        } else {
+          log("⚠️ [AWSKnowledgeBase] No trace headers to include in chat options");
+        }
+
+        // Call chat service directly with trace headers (no traceable wrapper to avoid header blocking)
         const stream = await this.chatService.createChatCompletion(
           [
             {
               role: "system",
-              content: `You are a helpful assistant for Couchbase. Use the following context to answer the user's question. Do not include references in your response as they will be added automatically. If you cannot answer the question based on the context, say so.
+              content: `You are a helpful assistant for Couchbase with access to both documentation context and live database tools.
 
-IMPORTANT TERMINOLOGY:
-- Couchbase and Capella are interchangeable terms - Capella is Couchbase's cloud database platform
-- When users ask about "Couchbase", this includes information about "Capella" and vice versa
-- Couchbase Server is the core database technology, Capella is the cloud-based platform built on Couchbase
+🔴 TOOL USAGE GUIDELINES 🔴
 
-IMPORTANT INSTRUCTIONS:
-- DO NOT show your thinking process or reasoning steps
-- DO NOT include phrases like "The context mentions..." or "I will..." or "Based on the context..."
-- Start your response directly with the answer
-- When showing query results or data, display ALL items - do not summarize or show only one example
-- Treat questions about Couchbase and Capella as referring to the same technology platform
+ONLY USE TOOLS FOR LIVE SYSTEM DATA REQUESTS:
 
-When the user asks "How can I see [something]" or "How do I find [something]", they want to know the N1QL query syntax/code, not execute it. In those cases, show them the query code like in the context provided.`,
+🔧 USE TOOLS WHEN USER WANTS CURRENT/LIVE DATA:
+- "show me the longest running queries" → get_longest_running_queries()
+- "what are my system vitals" → get_system_vitals() 
+- "show me my nodes" / "list all nodes" → get_system_nodes()
+- "show me completed requests" → get_completed_requests()
+- "show me failed queries" → get_fatal_requests()
+- "show me expensive queries" → get_most_expensive_queries()
+- "show me system indexes" → get_system_indexes()
+
+🚫 DO NOT USE TOOLS FOR:
+- General questions about "how to" or "what is"
+- Requests for N1QL query syntax or examples
+- Conceptual questions about database operations
+- Questions that can be answered from documentation context
+
+🎯 DECISION LOGIC:
+- If user says "show me", "what are my", "do I have" → USE TOOLS
+- If user says "how to", "what is the query for", "how can I" → USE CONTEXT ONLY
+
+✅ CORRECT BEHAVIOR:
+1. For live data requests → Call appropriate tool function
+2. For conceptual/syntax questions → Use documentation context only
+3. Never fabricate system data or query results
+
+CONTEXT USAGE:
+Only use the provided context for:
+- General documentation questions
+- Explaining concepts and features  
+- Showing N1QL query syntax examples
+
+NEVER use context to answer questions about current system state, running queries, or live metrics.
+
+RESPONSE GUIDELINES:
+- Do not include references in your response as they will be added automatically
+- When showing live data from tools, display ALL items - do not summarize
+- If you cannot answer based on context or tools, say so clearly`,
             },
             {
               role: "user",
               content: `Context: ${contextText}\n\nQuestion: ${message}`,
             },
           ],
-          {
-            temperature: 0.7,
-            max_tokens: 2000,
-          },
+          chatOptions, // Pass the explicitly built options object
         );
 
         const llmTime = Date.now() - startTime;
@@ -358,79 +393,67 @@ When the user asks "How can I see [something]" or "How do I find [something]", t
         enhancedError.cause = error;
         throw enhancedError;
       }
-    },
-    {
-      run_type: "llm",
-      name: "Bedrock Chat Completion",
-      tags: [
-        "llm",
-        "bedrock",
-        "chat-completion",
-        "streaming",
-        "generation",
-        "aws-nova-pro",
-        "conversational-ai",
-      ],
-    },
-  );
+    };
 
-  private createTracedStreamWrapper = traceable(
-    async function* (stream: AsyncGenerator<string>, metadata: any) {
+  private createStreamWrapper(
+    stream: AsyncGenerator<string>,
+    metadata: any,
+  ): AsyncGenerator<string> {
+    // Simple logging function without separate trace
+    const logCompleteResponse = (streamContent: string[], metadata: any) => {
+      const responseContent = streamContent.join("");
+      const streamStats = {
+        response: responseContent,
+        chunkCount: streamContent.length,
+        responseLength: responseContent.length,
+        avgChunkSize: Math.round(responseContent.length / streamContent.length),
+        contextItems: metadata.contextItems,
+        avgRelevanceScore: metadata.avgRelevanceScore,
+        totalContextChars: metadata.totalContextChars,
+      };
+      
+      log("✅ [AWSKnowledgeBase] Response stream captured for tracing", {
+        ...streamStats,
+        responsePreview: responseContent.substring(0, 100) + "...",
+      });
+      
+      return streamStats;
+    };
+
+    // Return an async generator that captures content while streaming
+    return (async function* () {
       log("🌊 [AWSKnowledgeBase] Starting response stream capture", {
         contextItems: metadata.contextItems,
         totalContextChars: metadata.totalContextChars,
       });
 
-      let responseContent = "";
-      let chunkCount = 0;
+      const chunks: string[] = [];
       const startTime = Date.now();
 
       try {
         for await (const chunk of stream) {
-          responseContent += chunk;
-          chunkCount++;
+          chunks.push(chunk);
           yield chunk;
         }
 
         const streamTime = Date.now() - startTime;
-        const responseLength = responseContent.length;
-
-        log("✅ [AWSKnowledgeBase] Response stream complete", {
-          chunkCount,
-          responseLength,
+        
+        // Log the complete response without separate trace
+        logCompleteResponse(chunks, {
+          ...metadata,
           streamTimeMs: streamTime,
-          avgChunkSize: Math.round(responseLength / chunkCount),
         });
-
-        // Log the final response for LangSmith tracing
-        return {
-          response: responseContent,
-          chunkCount,
-          responseLength,
-          streamTimeMs: streamTime,
-          contextItems: metadata.contextItems,
-          avgRelevanceScore: metadata.avgRelevanceScore,
-        };
+        
       } catch (error) {
         err("❌ [AWSKnowledgeBase] Stream capture failed", {
           error: error.message,
-          chunkCount,
-          partialResponseLength: responseContent.length,
+          chunkCount: chunks.length,
+          partialResponseLength: chunks.join("").length,
         });
         throw error;
       }
-    },
-    {
-      run_type: "llm",
-      name: "Response Stream Capture",
-      tags: [
-        "response-capture",
-        "streaming",
-        "final-output",
-        "content-logging",
-      ],
-    },
-  );
+    })();
+  }
 
   async initialize() {
     log("🚀 [AWSKnowledgeBaseProvider] Starting initialization with config", {
@@ -443,36 +466,65 @@ When the user asks "How can I see [something]" or "How do I find [something]", t
       "📊 [AWSKnowledgeBase] Creating traceable pipeline with sub-components",
     );
 
-    // Create traced pipeline that orchestrates sub-components with individual tracing
-    this.traceablePipeline = traceable(
-      async (message: string) => {
-        log("🔄 [AWSKnowledgeBase] Starting RAG pipeline", {
-          messageLength: message.length,
-        });
+    // Create simple pipeline that executes within conversation trace context
+    // Create child traceable operations that will nest under the conversation trace
+    const tracedKnowledgeBaseRetrieval = traceable(
+      this.knowledgeBaseRetrieval,
+      {
+        name: "Knowledge Base Retrieval",
+        run_type: "retriever",
+      }
+    );
 
-        const pipelineStartTime = Date.now();
+    const tracedContextProcessing = traceable(
+      this.contextProcessing,
+      {
+        name: "Context Processing", 
+        run_type: "chain",
+      }
+    );
 
-        // Step 1: Knowledge Base Retrieval (with individual trace)
-        const { response, retrievalTime } =
-          await this.tracedKnowledgeBaseRetrieval(message);
+    const tracedLLMCompletion = traceable(
+      this.llmCompletion,
+      {
+        name: "LLM Completion",
+        run_type: "llm",
+      }
+    );
 
-        // Step 2: Context Processing (with individual trace)
-        const { context, processingTime, totalChars, avgScore } =
-          await this.tracedContextProcessing(response);
+    this.ragPipeline = async (message: string) => {
+      log("🔄 [TRACE DEBUG] Starting RAG pipeline within conversation trace", {
+        messageLength: message.length,
+      });
 
-        // Step 3: LLM Completion (with individual trace)
-        const { stream, llmTime } = await this.tracedLLMCompletion(
-          message,
-          context,
-        );
+      // Debug: Check current run context
+      const currentRun = getCurrentRunTree();
+      log("🔍 [TRACE DEBUG] Current run tree in RAG pipeline:", {
+        runId: currentRun?.id,
+        runName: currentRun?.name,
+        runType: currentRun?.run_type,
+        hasParent: !!currentRun?.parent_run_id,
+        parentId: currentRun?.parent_run_id,
+      });
 
-        // Create a traced stream wrapper to capture the final response
-        const tracedStream = this.createTracedStreamWrapper(stream, {
-          message,
-          contextItems: context.length,
-          totalContextChars: totalChars,
-          avgRelevanceScore: avgScore,
-        });
+      const pipelineStartTime = Date.now();
+
+      // Step 1: Knowledge Base Retrieval (child trace)
+      const { response, retrievalTime } = await tracedKnowledgeBaseRetrieval(message);
+
+      // Step 2: Context Processing (child trace)
+      const { context, processingTime, totalChars, avgScore } = await tracedContextProcessing(response);
+
+      // Step 3: LLM Completion (child trace)
+      const { stream, llmTime } = await tracedLLMCompletion(message, context);
+
+      // Create a simple stream wrapper to capture the final response
+      const wrappedStream = this.createStreamWrapper(stream, {
+        message,
+        contextItems: context.length,
+        totalContextChars: totalChars,
+        avgRelevanceScore: avgScore,
+      });
 
         const totalPipelineTime = Date.now() - pipelineStartTime;
 
@@ -486,14 +538,8 @@ When the user asks "How can I see [something]" or "How do I find [something]", t
           avgRelevanceScore: avgScore,
         });
 
-        return { stream: tracedStream, context };
-      },
-      {
-        run_type: "chain",
-        name: "AWS Knowledge Base RAG Pipeline",
-        tags: ["rag-pipeline", "aws-knowledge-base", "chat", "end-to-end"],
-      },
-    );
+      return { stream: wrappedStream, context };
+    };
 
     log("✅ [AWSKnowledgeBase] Initialization complete with enhanced tracing");
   }
@@ -512,37 +558,7 @@ When the user asks "How can I see [something]" or "How do I find [something]", t
       const threadId =
         metadata.sessionId || `session-${metadata.userId}-${Date.now()}`;
 
-      const result = await this.traceablePipeline(message, {
-        metadata: {
-          ...metadata,
-          queryStartTime: queryStart,
-          messageLength: message.length,
-          thread_id: threadId,
-          session_id: threadId,
-          conversation_id: threadId,
-          user_id: metadata.userId,
-          environment: metadata.environment,
-        },
-        tags: [
-          "rag-pipeline",
-          "aws-knowledge-base",
-          "chat-completion",
-
-          "thread-enabled",
-          metadata.environment,
-
-          `user:${metadata.userId}`,
-          `session:${threadId.split("-").pop()}`,
-
-          `msg-length:${message.length > 100 ? "long" : message.length > 50 ? "medium" : "short"}`,
-          `msg-count:${metadata.messageCount}`,
-
-          "streaming",
-          "retrieval-augmented",
-
-          "v2.0.2",
-        ],
-      });
+      const result = await this.ragPipeline(message);
 
       const queryEnd = Date.now();
       const totalQueryTime = queryEnd - queryStart;
