@@ -81,7 +81,8 @@ const processConversation = traceable(
       sourceFiles: context?.map((c) => c.filename).join(", "),
     });
 
-    return { stream, context };
+    // Return the run ID along with stream and context
+    return { stream, context, runId: currentRun?.id };
   },
   {
     run_type: "chain",
@@ -195,7 +196,7 @@ export const POST: RequestHandler = async ({ fetch, request }) => {
       messageCount: metadata.messageCount,
     });
     
-    const { stream, context } = await processConversation(
+    const { stream, context, runId } = await processConversation(
       currentMessage, 
       conversationMessages, 
       metadata,
@@ -222,12 +223,14 @@ export const POST: RequestHandler = async ({ fetch, request }) => {
       processingTime: Date.now() - startTime,
       provider: Bun.env.RAG_PIPELINE,
       sourceFiles: context?.map((c) => c.filename).join(", "),
+      runId: runId,
     });
 
     // Log context metrics
     log("📊 Query Context:", {
       contextSize: context?.length || 0,
       sourceFiles: context?.map((c) => c.filename).join(", "),
+      runId: runId,
     });
 
     // Debug: Log full context to see available metadata
@@ -408,11 +411,12 @@ IMPORTANT INSTRUCTIONS:
               log("📚 [Server] Added references:", { count: context.slice(0, 3).length });
             }
 
-            const doneMessage = JSON.stringify({ done: true }) + "\n";
+            const doneMessage = JSON.stringify({ done: true, runId: runId }) + "\n";
             controller.enqueue(new TextEncoder().encode(doneMessage));
             log("🏁 [Server] Sent done signal:", {
               doneMessage: doneMessage.trim(),
               finalResponseLength: fullResponse.length,
+              runId: runId,
             });
             controller.close();
             log("🔒 [Server] Stream closed");
@@ -430,7 +434,7 @@ IMPORTANT INSTRUCTIONS:
             
             try {
               controller.enqueue(new TextEncoder().encode(errorJsonLine));
-              const doneMessage = JSON.stringify({ done: true }) + "\n";
+              const doneMessage = JSON.stringify({ done: true, runId: runId }) + "\n";
               controller.enqueue(new TextEncoder().encode(doneMessage));
               controller.close();
             } catch (controllerError) {

@@ -9,6 +9,11 @@ export interface ChatMessage {
   content: string;
   timestamp: string;
   isLoading?: boolean;
+  runId?: string;
+  feedback?: {
+    score: -1 | 0 | 1;
+    submittedAt: string;
+  };
 }
 
 export interface Conversation {
@@ -108,8 +113,8 @@ function createChatStore() {
     },
 
     // Update a specific message (useful for streaming responses)
-    updateMessage: (messageId: string, content: string, isLoading = false) => {
-      console.log('🔄 ChatStore: updateMessage called', { messageId, contentLength: content.length, isLoading });
+    updateMessage: (messageId: string, content: string, isLoading = false, runId?: string) => {
+      console.log('🔄 ChatStore: updateMessage called', { messageId, contentLength: content.length, isLoading, runId });
       
       update(conversation => {
         if (!conversation) {
@@ -124,7 +129,7 @@ function createChatStore() {
           ...conversation,
           messages: conversation.messages.map(msg =>
             msg.id === messageId 
-              ? { ...msg, content, isLoading, timestamp: new Date().toISOString() }
+              ? { ...msg, content, isLoading, timestamp: new Date().toISOString(), ...(runId && { runId }) }
               : msg
           ),
           updatedAt: new Date().toISOString()
@@ -259,6 +264,40 @@ function createChatStore() {
       if (!conversation) return false;
       
       return conversation.messages.filter(msg => !msg.isLoading).length > MAX_CONTEXT_MESSAGES * 0.8;
+    },
+
+    // Update feedback for a specific message
+    updateFeedback: (messageId: string, score: -1 | 0 | 1) => {
+      console.log('👍👎 ChatStore: updateFeedback called', { messageId, score });
+      
+      update(conversation => {
+        if (!conversation) {
+          console.warn('⚠️ ChatStore: No conversation to update feedback');
+          return conversation;
+        }
+
+        const updated = {
+          ...conversation,
+          messages: conversation.messages.map(msg =>
+            msg.id === messageId 
+              ? { 
+                  ...msg, 
+                  feedback: { 
+                    score, 
+                    submittedAt: new Date().toISOString() 
+                  } 
+                }
+              : msg
+          ),
+          updatedAt: new Date().toISOString()
+        };
+
+        if (browser) {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+        }
+
+        return updated;
+      });
     }
   };
 }
@@ -266,13 +305,22 @@ function createChatStore() {
 export const chatStore = createChatStore();
 
 // Helper function to format messages for display (compatible with existing ChatbotPopup)
-export function formatMessagesForDisplay(conversation: Conversation | null): Array<{ id: string; type: 'user' | 'bot'; text: string; isLoading?: boolean }> {
+export function formatMessagesForDisplay(conversation: Conversation | null): Array<{ 
+  id: string; 
+  type: 'user' | 'bot'; 
+  text: string; 
+  isLoading?: boolean; 
+  runId?: string; 
+  feedback?: { score: -1 | 0 | 1; submittedAt: string } 
+}> {
   if (!conversation) return [];
 
   return conversation.messages.map(msg => ({
     id: msg.id,
     type: msg.role === 'user' ? 'user' : 'bot',
     text: msg.content,
-    isLoading: msg.isLoading
+    isLoading: msg.isLoading,
+    runId: msg.runId,
+    feedback: msg.feedback
   }));
 }
