@@ -190,6 +190,8 @@
   let conversation = $state<Conversation | null>(null);
   let currentThinking = $state('');
   let isThinking = $state(false);
+  let abortController = $state<AbortController | null>(null);
+  let currentLoadingMessageId = $state<string | null>(null);
   // Track thinking content per message
   let messageThinking = $state<Map<string, string>>(new Map());
   
@@ -322,7 +324,33 @@
         // Ensure body overflow is restored when component is destroyed
         document.body.style.overflow = '';
     }
+    // Clean up any pending request
+    if (abortController) {
+      abortController.abort();
+    }
   });
+
+  function handleAbort() {
+    console.log('🛑 handleAbort called, abortController:', !!abortController, 'loadingMessageId:', currentLoadingMessageId);
+    if (abortController) {
+      console.log('🛑 User requested to abort chat request');
+      abortController.abort();
+      abortController = null;
+      isLoading = false;
+      isThinking = false;
+      
+      // Use the stored loading message ID
+      if (currentLoadingMessageId) {
+        chatStore.updateMessage(currentLoadingMessageId, 'Request was cancelled by user.', false);
+        console.log('✅ Updated message with cancellation notice');
+        currentLoadingMessageId = null;
+      } else {
+        console.log('⚠️ No loading message ID stored');
+      }
+    } else {
+      console.log('⚠️ No abortController to abort');
+    }
+  }
 
   async function handleSubmit() {
     if (!newMessage.trim()) return;
@@ -333,12 +361,25 @@
     isThinking = true;
     currentThinking = `Analyzing your question: "${userMessage}"\n\nProcessing context and searching relevant information...`;
     
+    // Create new AbortController for this request
+    abortController = new AbortController();
+    
+    // Set up timeout (30 seconds)
+    const timeoutId = setTimeout(() => {
+      if (abortController) {
+        console.log('⏰ Chat request timed out after 30 seconds');
+        abortController.abort('timeout');
+      }
+    }, 30000);
+    
     try {
         // Add user message to conversation
         chatStore.addMessage('user', userMessage);
         
         // Add loading assistant message
         const loadingMessageId = chatStore.addMessage('assistant', '', true);
+        currentLoadingMessageId = loadingMessageId;
+        console.log('💬 Created loading message with ID:', loadingMessageId);
 
         const sessionStartTime = new Date().toISOString();
         const response = await fetch('/api/chat', {
@@ -346,6 +387,7 @@
             headers: {
                 'Content-Type': 'application/json'
             },
+            signal: abortController.signal,
             body: JSON.stringify({ 
                 messages: chatStore.getMessagesForAPI(),
                 user: $userAccount ? {
@@ -400,6 +442,13 @@
             let streamComplete = false;
             
             while (!streamComplete) {
+                // Check if aborted before reading next chunk
+                if (!abortController || abortController.signal.aborted) {
+                    console.log('🛑 Stream reading aborted');
+                    streamComplete = true;
+                    break;
+                }
+                
                 console.log('📥 Reading next chunk...');
                 const result = await reader.read();
                 console.log('📦 Read result:', { done: result.done, hasValue: !!result.value });
@@ -539,7 +588,16 @@
         let errorMessage = 'I apologize, but I encountered an error processing your request. Please try again.';
         
         // Handle specific error types
-        if (error instanceof TypeError && error.message.includes('fetch')) {
+        if (error instanceof Error && error.name === 'AbortError') {
+            // Check if it was a timeout or user-initiated abort
+            if (abortController?.signal.reason === 'timeout') {
+                errorMessage = 'Request timed out after 30 seconds. Please try a shorter question or try again.';
+                console.log('⏰ Request timed out');
+            } else {
+                errorMessage = 'Request was cancelled by user.';
+                console.log('🛑 Request was aborted by user');
+            }
+        } else if (error instanceof TypeError && error.message.includes('fetch')) {
             errorMessage = 'Unable to connect to the chat service. Please check your internet connection and try again.';
         } else if (error.message?.includes('Failed to fetch')) {
             errorMessage = 'Network error occurred. Please check your connection and try again.';
@@ -555,7 +613,12 @@
             isThinking = false;
         }, 300);
     } finally {
+        // Clear timeout and cleanup
+        clearTimeout(timeoutId);
+        abortController = null;
+        currentLoadingMessageId = null;
         isLoading = false;
+        console.log('🧹 Cleaned up: timeout cleared, controllers reset');
     }
   }
 
@@ -861,7 +924,14 @@
           <form 
             onsubmit={(e) => {
               e.preventDefault();
-              handleSubmit();
+              console.log('📋 Form submitted, isLoading:', isLoading, 'abortController:', !!abortController);
+              if (isLoading && abortController) {
+                console.log('🛑 Calling handleAbort from form submission');
+                handleAbort();
+              } else {
+                console.log('📤 Calling handleSubmit from form submission');
+                handleSubmit();
+              }
             }}
             class="border-t border-gray-200 p-4 dark:border-gray-800"
           >
@@ -876,13 +946,15 @@
               />
               <Button 
                 type="submit" 
-                class="bg-[#00174f] hover:bg-[#00174f]/90 hover:ring-2 hover:ring-red-500 hover:ring-offset-2 transition-all duration-300 disabled:opacity-50 touch-manipulation sm:px-6 sm:py-3"
-                disabled={isLoading}
-                aria-label="Send message"
-                data-transaction-name="Send Chat Query"
+                class={isLoading 
+                  ? "bg-red-600 hover:bg-red-700 hover:ring-2 hover:ring-red-500 hover:ring-offset-2 transition-all duration-300 touch-manipulation sm:px-6 sm:py-3"
+                  : "bg-[#00174f] hover:bg-[#00174f]/90 hover:ring-2 hover:ring-red-500 hover:ring-offset-2 transition-all duration-300 disabled:opacity-50 touch-manipulation sm:px-6 sm:py-3"}
+                disabled={isLoading && !abortController}
+                aria-label={isLoading ? "Stop request" : "Send message"}
+                data-transaction-name={isLoading ? "Stop Chat Query" : "Send Chat Query"}
               >
                 {#if isLoading}
-                  <div class="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
+                  Stop
                 {:else}
                   Send
                 {/if}

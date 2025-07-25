@@ -54,7 +54,7 @@ function getUserFriendlyErrorMessage(errorMessage: string): string {
 
 // Create traceable conversation handler - metadata must be passed properly per Langsmith docs
 const processConversation = traceable(
-  async (currentMessage: string, conversationMessages: any[], metadata: RAGMetadata, ragProvider: any) => {
+  async (currentMessage: string, conversationMessages: any[], metadata: RAGMetadata, ragProvider: any, signal?: AbortSignal) => {
     log("🔄 [TRACE DEBUG] Processing conversation within trace context", {
       messageLength: currentMessage.length,
       conversationLength: conversationMessages.length,
@@ -73,16 +73,24 @@ const processConversation = traceable(
       parentId: currentRun?.parent_run_id,
     });
 
-    // Execute RAG query within conversation trace context
-    const { stream, context } = await ragProvider.query(currentMessage, metadata);
+    try {
+      // Execute RAG query within conversation trace context
+      const { stream, context } = await ragProvider.query(currentMessage, metadata);
 
-    log("✅ [TRACE DEBUG] RAG query completed within conversation trace", {
-      contextSize: context?.length || 0,
-      sourceFiles: context?.map((c) => c.filename).join(", "),
-    });
+      log("✅ [TRACE DEBUG] RAG query completed within conversation trace", {
+        contextSize: context?.length || 0,
+        sourceFiles: context?.map((c) => c.filename).join(", "),
+      });
 
-    // Return the run ID along with stream and context
-    return { stream, context, runId: currentRun?.id };
+      // Return the run ID along with stream and context
+      return { stream, context, runId: currentRun?.id };
+    } catch (error) {
+      if (signal?.aborted) {
+        log("🛑 [Server] RAG query aborted in processConversation");
+        throw new Error('Request was aborted');
+      }
+      throw error;
+    }
   },
   {
     run_type: "chain",
@@ -93,6 +101,12 @@ const processConversation = traceable(
 export const POST: RequestHandler = async ({ fetch, request }) => {
   const startTime = Date.now();
   log("📥 [Server] Received request");
+
+  // Check if request was aborted early
+  if (request.signal?.aborted) {
+    log("🛑 [Server] Request aborted before processing");
+    return new Response(null, { status: 499 }); // Client Closed Request
+  }
 
   // Note: Only reset if needed to debug, but we want to maintain instance continuity
   // chatService = null;
@@ -115,6 +129,12 @@ export const POST: RequestHandler = async ({ fetch, request }) => {
 
     const requestBody = await request.json();
     const { message, messages, user } = requestBody;
+    
+    // Check if aborted after parsing request
+    if (request.signal?.aborted) {
+      log("🛑 [Server] Request aborted after parsing body");
+      return new Response(null, { status: 499 });
+    }
     
     // Handle both old single message format and new messages array format
     const conversationMessages = prepareConversationMessages(messages, message);
@@ -179,6 +199,12 @@ export const POST: RequestHandler = async ({ fetch, request }) => {
       conversationLength: conversationMessages.length,
     };
 
+    // Check if aborted before RAG query
+    if (request.signal?.aborted) {
+      log("🛑 [Server] Request aborted before RAG query");
+      return new Response(null, { status: 499 });
+    }
+
     log("🔄 [Server] Executing RAG query with conversation context:", {
       messagesCount: conversationMessages.length,
       currentQuery: currentMessage.substring(0, 100) + (currentMessage.length > 100 ? '...' : ''),
@@ -201,6 +227,7 @@ export const POST: RequestHandler = async ({ fetch, request }) => {
       conversationMessages, 
       metadata,
       ragProvider,
+      request.signal,
       {
         metadata: {
           session_id: sessionId,
@@ -258,6 +285,16 @@ export const POST: RequestHandler = async ({ fetch, request }) => {
             let chunkCount = 0;
             let toolsWereExecuted = false; // Track if any tools were executed
             
+            // Setup abort signal listener
+            const abortHandler = () => {
+              log("🛑 [Server] Request aborted during stream processing");
+              controller.error(new Error('Request was aborted'));
+            };
+            
+            if (request.signal) {
+              request.signal.addEventListener('abort', abortHandler);
+            }
+            
             // Create system message with context
             const contextContent = (context || []).map(c => c.text).join('\n\n') || 'No additional context available.';
             
@@ -293,6 +330,16 @@ IMPORTANT INSTRUCTIONS:
             log("🌊 [Server] Starting to read stream with conversation context");
             
             for await (const chunk of stream) {
+              // Check if request was aborted
+              if (request.signal?.aborted) {
+                log("🛑 [Server] Request aborted during stream iteration");
+                if (request.signal) {
+                  request.signal.removeEventListener('abort', abortHandler);
+                }
+                controller.close();
+                return;
+              }
+              
               chunkCount++;
               let content = "";
 
@@ -418,28 +465,52 @@ IMPORTANT INSTRUCTIONS:
               finalResponseLength: fullResponse.length,
               runId: runId,
             });
+            // Cleanup abort handler
+            if (request.signal) {
+              request.signal.removeEventListener('abort', abortHandler);
+            }
+            
             controller.close();
             log("🔒 [Server] Stream closed");
           } catch (error) {
             const errorMessage = error instanceof Error ? error.message : String(error);
             
-            log("❌ Stream processing error:", { errorMessage });
+            // Check if it's an abort error
+            if (errorMessage === 'Request was aborted') {
+              log("🛑 [Server] Stream processing aborted by client");
+            } else {
+              log("❌ Stream processing error:", { errorMessage });
+            }
             
-            // Send user-friendly error message to client
-            const userFriendlyError = getUserFriendlyErrorMessage(errorMessage);
-            const errorJsonLine = JSON.stringify({ 
-              content: userFriendlyError,
-              error: true 
-            }) + "\n";
+            // Cleanup abort handler
+            if (request.signal) {
+              request.signal.removeEventListener('abort', abortHandler);
+            }
             
-            try {
-              controller.enqueue(new TextEncoder().encode(errorJsonLine));
-              const doneMessage = JSON.stringify({ done: true, runId: runId }) + "\n";
-              controller.enqueue(new TextEncoder().encode(doneMessage));
-              controller.close();
-            } catch (controllerError) {
-              log("❌ Failed to send error message to client:", { error: controllerError });
-              controller.error(error);
+            // Send user-friendly error message to client (unless it was aborted)
+            if (errorMessage !== 'Request was aborted') {
+              const userFriendlyError = getUserFriendlyErrorMessage(errorMessage);
+              const errorJsonLine = JSON.stringify({ 
+                content: userFriendlyError,
+                error: true 
+              }) + "\n";
+              
+              try {
+                controller.enqueue(new TextEncoder().encode(errorJsonLine));
+                const doneMessage = JSON.stringify({ done: true, runId: runId }) + "\n";
+                controller.enqueue(new TextEncoder().encode(doneMessage));
+                controller.close();
+              } catch (controllerError) {
+                log("❌ Failed to send error message to client:", { error: controllerError });
+                controller.error(error);
+              }
+            } else {
+              // For aborted requests, just close the stream
+              try {
+                controller.close();
+              } catch {
+                // Stream might already be closed
+              }
             }
           }
         },
