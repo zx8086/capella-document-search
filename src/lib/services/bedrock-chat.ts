@@ -415,15 +415,22 @@ export class BedrockChatService {
   private client: BedrockRuntimeClient;
   private modelId: string;
   
+  // Simple token estimation for when AWS doesn't provide counts
+  private estimateTokens(text: string): number {
+    // Rough estimation: ~4 characters per token for English text
+    // This is a simplified approximation for Claude models
+    return Math.ceil(text.length / 4);
+  }
+  
   // Helper to get normalized model name for Langsmith
   private getNormalizedModelName(): string {
     // Map AWS Bedrock model IDs to Langsmith-recognized model names
     const modelMappings: { [key: string]: string } = {
-      // Claude 3.7 Sonnet - use the format Langsmith expects
-      "eu.anthropic.claude-3-7-sonnet-20250219-v1:0": "claude-3-7-sonnet",
+      // Claude 3.7 Sonnet - use the full version format that LangChain/LangSmith expects
+      "eu.anthropic.claude-3-7-sonnet-20250219-v1:0": "claude-3-7-sonnet-20250219",
       // Claude 3.5 Sonnet mappings
-      "anthropic.claude-3-5-sonnet-20241022-v2:0": "claude-3-5-sonnet",
-      "anthropic.claude-3-5-sonnet-20240620-v1:0": "claude-3-5-sonnet",
+      "anthropic.claude-3-5-sonnet-20241022-v2:0": "claude-3-5-sonnet-20241022",
+      "anthropic.claude-3-5-sonnet-20240620-v1:0": "claude-3-5-sonnet-20240620",
       // Amazon Nova Pro
       "eu.amazon.nova-pro-v1:0": "amazon.nova-pro-v1",
     };
@@ -1693,6 +1700,28 @@ export class BedrockChatService {
         },
       });
 
+      // Declare LLM run tree at method scope
+      let llmRunTree: RunTree | undefined;
+      
+      // Create LLM child run for proper token tracking
+      if (parentRunTree) {
+        llmRunTree = await parentRunTree.createChild({
+          name: this.getNormalizedModelName(),
+          run_type: "llm",
+          inputs: {
+            messages: converseMessages,
+          },
+          extra: {
+            metadata: {
+              ls_provider: 'amazon_bedrock',
+              ls_model_name: this.getNormalizedModelName(),
+              ls_model_type: 'llm',
+            }
+          }
+        });
+        await llmRunTree.postRun();
+      }
+
       log("🚀 [BedrockChat] Starting Converse stream", {
         modelId: this.modelId,
         messagesCount: converseMessages.length,
@@ -1700,6 +1729,7 @@ export class BedrockChatService {
         toolsEnabled: true,
         toolCount: this.tools.length,
         availableTools: this.tools.map(t => t.toolSpec.name),
+        hasLLMRunTree: !!llmRunTree,
       });
 
       let response;
@@ -1740,6 +1770,7 @@ export class BedrockChatService {
 
       // AWS Documentation: Handle both text and tool responses
       let assistantMessage: Message = { role: "assistant", content: [] };
+      let fullResponseText = ""; // Track full response for LLM run
       let currentContentIndex = -1;
       let stopReason = "";
       let chunkCount = 0;
@@ -1797,6 +1828,7 @@ export class BedrockChatService {
                 yield delta.text;
                 assistantMessage.content[currentContentIndex].text +=
                   delta.text;
+                fullResponseText += delta.text; // Track for LLM run
               } else if (
                 delta?.toolUse?.input &&
                 assistantMessage.content[currentContentIndex]?.toolUse
@@ -1943,95 +1975,138 @@ export class BedrockChatService {
 
         // Extract token usage from wherever we found it
         if (usageData) {
-          tokenUsage = {
-            inputTokens: usageData.inputTokens || usageData.input_tokens || 0,
-            outputTokens: usageData.outputTokens || usageData.output_tokens || 0,
-            totalTokens: usageData.totalTokens || usageData.total_tokens || 
-                        (usageData.inputTokens || usageData.input_tokens || 0) + 
-                        (usageData.outputTokens || usageData.output_tokens || 0),
-            model: this.modelId,
-            timestamp: new Date().toISOString(),
-          };
-          tokenUsage.estimatedCost = calculateCost(tokenUsage);
+          const inputTokens = usageData.inputTokens || usageData.input_tokens;
+          const outputTokens = usageData.outputTokens || usageData.output_tokens;
+          const totalTokens = usageData.totalTokens || usageData.total_tokens;
           
-          log("📊 [BedrockChat] Token usage extracted from " + usageSource, {
-            inputTokens: tokenUsage.inputTokens,
-            outputTokens: tokenUsage.outputTokens,
-            totalTokens: tokenUsage.totalTokens,
-            estimatedCost: tokenUsage.estimatedCost,
-            model: tokenUsage.model,
-            cacheReadInputTokens: usageData.cacheReadInputTokens || 0,
-            cacheWriteInputTokens: usageData.cacheWriteInputTokens || 0,
-            usageSource,
-          });
-          
-          // Add token usage to trace using LangSmith metadata format
-          if (parentRunTree) {
-            // Set token counts at root level of metadata as per LangSmith docs
-            parentRunTree.extra = {
-              ...parentRunTree.extra,
-              metadata: {
-                ...parentRunTree.extra?.metadata,
-                // Token counts at root level for LangSmith cost calculation
-                input_tokens: tokenUsage.inputTokens,
-                output_tokens: tokenUsage.outputTokens,
-                total_tokens: tokenUsage.totalTokens,
-                // Optional token details
-                input_token_details: {
-                  cache_creation: usageData.cacheWriteInputTokens || 0,
-                  cache_read: usageData.cacheReadInputTokens || 0
-                },
-                output_token_details: {},
-                // Model information
-                ls_provider: 'amazon_bedrock',
-                ls_model_name: this.getNormalizedModelName(),
-                ls_model_type: 'llm',
-                // Additional cost information
-                total_cost: tokenUsage.estimatedCost,
-                // Keep cache metrics for debugging
-                cache_metrics: {
-                  cache_read_input_tokens: usageData.cacheReadInputTokens || 0,
-                  cache_write_input_tokens: usageData.cacheWriteInputTokens || 0,
-                }
-              },
-              // Also keep legacy fields for debugging
-              tokenUsage,
-              llmCost: tokenUsage.estimatedCost,
+          // Only create tokenUsage if we have actual token values (not zeros)
+          if (inputTokens > 0 || outputTokens > 0 || totalTokens > 0) {
+            tokenUsage = {
+              inputTokens: inputTokens || 0,
+              outputTokens: outputTokens || 0,
+              totalTokens: totalTokens || (inputTokens || 0) + (outputTokens || 0),
               model: this.modelId,
-              cacheMetrics: {
-                cacheReadInputTokens: usageData.cacheReadInputTokens || 0,
-                cacheWriteInputTokens: usageData.cacheWriteInputTokens || 0,
-              }
+              timestamp: new Date().toISOString(),
             };
+            tokenUsage.estimatedCost = calculateCost(tokenUsage);
+          }
+          
+          if (tokenUsage) {
+            log("📊 [BedrockChat] Token usage extracted from " + usageSource, {
+              inputTokens: tokenUsage.inputTokens,
+              outputTokens: tokenUsage.outputTokens,
+              totalTokens: tokenUsage.totalTokens,
+              estimatedCost: tokenUsage.estimatedCost,
+              model: tokenUsage.model,
+              cacheReadInputTokens: usageData.cacheReadInputTokens || 0,
+              cacheWriteInputTokens: usageData.cacheWriteInputTokens || 0,
+              usageSource,
+            });
+          } else {
+            log("⚠️ [BedrockChat] Token usage data found but all values are zero or missing", {
+              usageSource,
+              usageDataKeys: Object.keys(usageData),
+              rawUsageData: JSON.stringify(usageData).substring(0, 200),
+            });
+          }
+        }
+          
+        // End the LLM run with or without token usage
+        if (llmRunTree) {
+          if (tokenUsage) {
+            // We have actual token usage - send it to Langsmith
+            await llmRunTree.end({
+              outputs: {
+                generations: [[{ text: fullResponseText }]]
+              },
+              extra: {
+                metadata: {
+                  // Token counts at root level for LangSmith cost calculation
+                  input_tokens: tokenUsage.inputTokens,
+                  output_tokens: tokenUsage.outputTokens,
+                  total_tokens: tokenUsage.totalTokens,
+                  // Optional token details
+                  input_token_details: usageData ? {
+                    cache_creation: usageData.cacheWriteInputTokens || 0,
+                    cache_read: usageData.cacheReadInputTokens || 0
+                  } : {},
+                  output_token_details: {},
+                  // Model information
+                  ls_provider: 'amazon_bedrock',
+                  ls_model_name: this.getNormalizedModelName(),
+                  ls_model_type: 'llm',
+                  // Additional cost information
+                  total_cost: tokenUsage.estimatedCost,
+                }
+              }
+            });
+            await llmRunTree.patchRun();
             
-            log("🔗 [BedrockChat] Added token usage to trace", {
-              traceId: parentRunTree.id,
+            log("🔗 [BedrockChat] Ended LLM run with token usage", {
+              llmRunTreeId: llmRunTree.id,
               tokenUsage: tokenUsage,
               sentToLangSmith: {
                 input_tokens: tokenUsage.inputTokens,
                 output_tokens: tokenUsage.outputTokens,
                 total_tokens: tokenUsage.totalTokens,
                 total_cost: tokenUsage.estimatedCost,
-                input_token_details: {
-                  cache_creation: usageData.cacheWriteInputTokens || 0,
-                  cache_read: usageData.cacheReadInputTokens || 0
-                },
                 ls_provider: 'amazon_bedrock',
                 ls_model_name: this.getNormalizedModelName(),
                 ls_model_type: 'llm',
-              },
-              metadataKeys: Object.keys(parentRunTree.extra?.metadata || {}),
-              validation: {
-                hasInputTokens: parentRunTree.extra?.metadata?.input_tokens > 0,
-                hasOutputTokens: parentRunTree.extra?.metadata?.output_tokens > 0,
-                hasModelName: !!parentRunTree.extra?.metadata?.ls_model_name,
-                hasProvider: !!parentRunTree.extra?.metadata?.ls_provider,
-                totalCostPresent: !!parentRunTree.extra?.metadata?.total_cost,
               }
             });
+          } else {
+            // No token usage from AWS - provide estimates for Langsmith
+            // Estimate tokens based on message content
+            const inputText = converseMessages.map(m => {
+              if (m.role === 'user' && m.content) {
+                return m.content.map(c => c.text || '').join(' ');
+              } else if (m.role === 'assistant' && m.content) {
+                return m.content.map(c => c.text || '').join(' ');
+              }
+              return '';
+            }).join(' ');
+            
+            const estimatedInputTokens = this.estimateTokens(inputText);
+            const estimatedOutputTokens = this.estimateTokens(fullResponseText);
+            const estimatedTotalTokens = estimatedInputTokens + estimatedOutputTokens;
+            
+            await llmRunTree.end({
+              outputs: {
+                generations: [[{ text: fullResponseText }]]
+              },
+              extra: {
+                metadata: {
+                  // Provide estimated token counts for Langsmith cost calculation
+                  input_tokens: estimatedInputTokens,
+                  output_tokens: estimatedOutputTokens,
+                  total_tokens: estimatedTotalTokens,
+                  // Model information
+                  ls_provider: 'amazon_bedrock',
+                  ls_model_name: this.getNormalizedModelName(),
+                  ls_model_type: 'llm',
+                  // Flag that these are estimates
+                  token_source: 'estimated',
+                }
+              }
+            });
+            await llmRunTree.patchRun();
+            
+            log("🔗 [BedrockChat] Ended LLM run with estimated tokens", {
+              llmRunTreeId: llmRunTree.id,
+              modelName: this.getNormalizedModelName(),
+              estimatedTokens: {
+                input: estimatedInputTokens,
+                output: estimatedOutputTokens,
+                total: estimatedTotalTokens,
+              },
+              responseLength: fullResponseText.length,
+            });
           }
+        }
           
-          // Record usage in tracking service
+        // Record usage in tracking service if we have it
+        if (tokenUsage) {
           try {
             await usageTracker.recordUsage({
               userId: options.userId,
@@ -2047,8 +2122,8 @@ export class BedrockChatService {
                 chunkCount,
                 hasTools: this.tools.length > 0,
                 traceId: parentRunTree?.id,
-                cacheReadInputTokens: usageData.cacheReadInputTokens || 0,
-                cacheWriteInputTokens: usageData.cacheWriteInputTokens || 0,
+                cacheReadInputTokens: usageData?.cacheReadInputTokens || 0,
+                cacheWriteInputTokens: usageData?.cacheWriteInputTokens || 0,
               }
             });
             
@@ -2064,39 +2139,33 @@ export class BedrockChatService {
               tokenUsage,
             });
           }
-        } else {
-          // Token usage not available - this should not happen with Claude models
-          log("⚠️ [BedrockChat] Token usage not available in streaming response", {
-            responseKeys: Object.keys(response),
-            hasStream: !!response.stream,
-            hasMetadata: !!response.metadata,
-            metadataKeys: response.metadata ? Object.keys(response.metadata) : [],
-            modelId: this.modelId,
-          });
         }
 
         // Final verification: Log what will be sent to LangSmith
-        if (parentRunTree) {
-          const metadata = parentRunTree.extra?.metadata || {};
-          log("📤 [BedrockChat] Final RunTree state before LangSmith submission", {
-            traceId: parentRunTree.id,
+        if (llmRunTree) {
+          const metadata = llmRunTree.extra?.metadata || {};
+          log("📤 [BedrockChat] Final LLM RunTree state before LangSmith submission", {
+            traceId: llmRunTree.id,
             hasTokenData: !!(metadata.input_tokens),
-            tokenData: {
+            tokenData: metadata.input_tokens ? {
               input_tokens: metadata.input_tokens,
               output_tokens: metadata.output_tokens,
               total_tokens: metadata.total_tokens,
               total_cost: metadata.total_cost,
-            },
+              token_source: metadata.token_source || 'aws',
+            } : "No token data provided",
             provider: metadata.ls_provider,
             modelName: metadata.ls_model_name,
             actualModelId: this.modelId,
-            extraKeys: Object.keys(parentRunTree.extra || {}),
+            extraKeys: Object.keys(llmRunTree.extra || {}),
             metadataKeys: Object.keys(metadata),
             langsmithFormat: {
-              hasRequiredFields: !!(metadata.input_tokens && metadata.output_tokens && metadata.ls_model_name),
-              message: metadata.input_tokens && metadata.output_tokens 
-                ? "✅ Token data properly formatted for LangSmith cost calculation" 
-                : "⚠️ Missing required token fields for LangSmith - Langsmith should auto-calculate if model is recognized"
+              hasRequiredFields: !!(metadata.ls_model_name && metadata.ls_provider && metadata.input_tokens),
+              message: metadata.token_source === 'estimated' 
+                ? "✅ Estimated token data provided for LangSmith cost calculation" 
+                : metadata.input_tokens && metadata.output_tokens 
+                  ? "✅ Actual token data provided for LangSmith cost calculation" 
+                  : "⚠️ No token data - cost calculation may not work"
             }
           });
         }
@@ -2202,6 +2271,7 @@ export class BedrockChatService {
             for await (const event of continueResponse.stream) {
               if (event.contentBlockDelta?.delta?.text) {
                 yield event.contentBlockDelta.delta.text;
+                fullResponseText += event.contentBlockDelta.delta.text; // Track continuation text
               }
             }
             

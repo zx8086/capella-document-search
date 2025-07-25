@@ -46,7 +46,7 @@
     
     <div class="thinking-content {expanded ? 'expanded' : 'collapsed'}">
       <div class="px-3 pb-3">
-        <div class="text-sm text-blue-700 dark:text-blue-300 whitespace-pre-wrap bg-white dark:bg-gray-800 p-3 rounded border border-blue-200 dark:border-blue-700">
+        <div class="text-sm text-blue-700 dark:text-blue-300 whitespace-pre-wrap bg-white dark:bg-gray-800 p-3 rounded border border-blue-200 dark:border-blue-700 overflow-y-auto max-h-96">
           {thinkingText}
         </div>
       </div>
@@ -72,7 +72,7 @@
   }
   
   .thinking-content.expanded {
-    max-height: 500px; /* Adjust based on expected content height */
+    max-height: none; /* Allow full expansion with scrolling handled by inner div */
     opacity: 1;
   }
 </style>
