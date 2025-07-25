@@ -554,7 +554,7 @@ async function checkBedrockChatEndpoint(fetch: typeof global.fetch): Promise<Che
     
     try {
         const region = Bun.env.AWS_REGION;
-        const chatModel = Bun.env.BEDROCK_CHAT_MODEL || "eu.amazon.nova-pro-v1:0";
+        const chatModel = Bun.env.BEDROCK_CHAT_MODEL || "anthropic.claude-3-5-sonnet-20241022-v2:0";
         
         if (!region) {
             return {

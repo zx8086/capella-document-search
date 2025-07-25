@@ -105,7 +105,7 @@ const defaultConfig: Config = {
     AWS_SECRET_ACCESS_KEY: 'DUMMY',
     AWS_BEARER_TOKEN_BEDROCK: 'ABSKQmVkcm9ja0FQSUtleS16ZWF1LWF0LTM1Mjg5Njg3NzI4MTpERHVXOFovZHVQTG5FWDlvM0VKUDcvQkEvZVhnOTMyZWpXRk1iQzlodlhBOFBkc0hrYlJBaTFXV3FpMD0=',
     BEDROCK_EMBEDDING_MODEL: 'amazon.titan-embed-text-v1',
-    BEDROCK_CHAT_MODEL: 'anthropic.claude-3-5-sonnet-20240620-v1:0',
+    BEDROCK_CHAT_MODEL: 'anthropic.claude-3-5-sonnet-20241022-v2:0',
   },
 };
 

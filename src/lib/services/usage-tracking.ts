@@ -281,13 +281,25 @@ export class UsageTrackingService {
     outputTokens: number,
     model: string
   ): number {
-    // Default to Nova Pro pricing
+    // Model-specific pricing
     const pricing = {
       "eu.amazon.nova-pro-v1:0": {
         inputTokensPerThousand: 0.0008,
         outputTokensPerThousand: 0.0032,
       },
-      // Add other model pricing as needed
+      "anthropic.claude-3-5-sonnet-20241022-v2:0": {
+        inputTokensPerThousand: 0.003,
+        outputTokensPerThousand: 0.015,
+      },
+      "eu.anthropic.claude-3-7-sonnet-20250219-v1:0": {
+        inputTokensPerThousand: 0.003,
+        outputTokensPerThousand: 0.015,
+      },
+      "anthropic.claude-3-5-sonnet-20240620-v1:0": {
+        inputTokensPerThousand: 0.003,
+        outputTokensPerThousand: 0.015,
+      },
+      // Default fallback
       default: {
         inputTokensPerThousand: 0.0008,
         outputTokensPerThousand: 0.0032,

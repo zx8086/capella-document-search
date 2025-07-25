@@ -194,6 +194,7 @@
   let currentLoadingMessageId = $state<string | null>(null);
   // Track thinking content per message
   let messageThinking = $state<Map<string, string>>(new Map());
+  let enableExtendedThinking = $state(false);
   
   // Use derived with safe access to avoid initialization issues
   let messages = $derived(formatMessagesForDisplay(conversation));
@@ -404,7 +405,8 @@
                     clientTimestamp: new Date().toISOString(),
                     pathname: $page?.url?.pathname,
                     conversationId: conversation?.id
-                } : null
+                } : null,
+                enableExtendedThinking: enableExtendedThinking
             })
         });
 
@@ -618,7 +620,9 @@
         abortController = null;
         currentLoadingMessageId = null;
         isLoading = false;
-        console.log('🧹 Cleaned up: timeout cleared, controllers reset');
+        // Reset extended thinking after each response
+        enableExtendedThinking = false;
+        console.log('🧹 Cleaned up: timeout cleared, controllers reset, extended thinking disabled');
     }
   }
 
@@ -787,7 +791,7 @@
             <div class="flex items-center gap-2">
               <h2 class="font-bold text-white">Chat Assistant</h2>
             </div>
-            <div class="flex items-center gap-2">
+            <div class="flex items-center gap-4">
               {#if conversationSummary?.hasContext}
                 <Button 
                   variant="ghost" 
@@ -920,6 +924,13 @@
             {/each}
           </div>
 
+          <!-- Disclaimer -->
+          <div class="px-4 py-2 text-center">
+            <p class="text-xs text-gray-500 dark:text-gray-400">
+              This Chat Assistant can make mistakes. Please double-check responses.
+            </p>
+          </div>
+
           <!-- Input -->
           <form 
             onsubmit={(e) => {
@@ -944,6 +955,23 @@
                 class="flex-1 rounded-md border border-gray-300 px-3 py-2 sm:py-3 text-sm focus:outline-none focus:ring focus:ring-tommy-red/50 dark:border-gray-700 bg-white text-black dark:bg-white dark:text-black disabled:opacity-50 touch-manipulation"
                 aria-label="Message input"
               />
+              <!-- Extended Thinking Toggle Button -->
+              <button
+                type="button"
+                onclick={() => enableExtendedThinking = !enableExtendedThinking}
+                class="p-2 rounded-md border transition-all duration-300 touch-manipulation hover:ring-2 hover:ring-red-500 hover:ring-offset-2 {
+                  enableExtendedThinking 
+                    ? 'bg-blue-600 text-white border-blue-600 hover:bg-blue-700' 
+                    : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-400 dark:border-gray-600 dark:hover:bg-gray-700'
+                }"
+                title={enableExtendedThinking ? "Extended thinking enabled" : "Enable extended thinking for complex problem solving"}
+                aria-label="Toggle extended thinking"
+                disabled={isLoading}
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904 9 18.75l-.813-2.846a4.5 4.5 0 0 0-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 0 0 3.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 0 0 3.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 0 0-3.09 3.09ZM18.259 8.715 18 9.75l-.259-1.035a3.375 3.375 0 0 0-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 0 0 2.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 0 0 2.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 0 0-2.456 2.456ZM16.894 20.567 16.5 21.75l-.394-1.183a2.25 2.25 0 0 0-1.423-1.423L13.5 18.75l1.183-.394a2.25 2.25 0 0 0 1.423-1.423l.394-1.183.394 1.183a2.25 2.25 0 0 0 1.423 1.423l1.183.394-1.183.394a2.25 2.25 0 0 0-1.423 1.423Z" />
+                </svg>
+              </button>
               <Button 
                 type="submit" 
                 class={isLoading 

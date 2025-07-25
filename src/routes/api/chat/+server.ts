@@ -128,7 +128,7 @@ export const POST: RequestHandler = async ({ fetch, request }) => {
     }
 
     const requestBody = await request.json();
-    const { message, messages, user } = requestBody;
+    const { message, messages, user, enableExtendedThinking } = requestBody;
     
     // Check if aborted after parsing request
     if (request.signal?.aborted) {
@@ -138,7 +138,77 @@ export const POST: RequestHandler = async ({ fetch, request }) => {
     
     // Handle both old single message format and new messages array format
     const conversationMessages = prepareConversationMessages(messages, message);
-    const currentMessage = conversationMessages[conversationMessages.length - 1]?.content || message || '';
+    let currentMessage = conversationMessages[conversationMessages.length - 1]?.content || message || '';
+    
+    // Modify message for extended thinking if enabled
+    if (enableExtendedThinking) {
+      // For very short responses (like "Yes", "No", "Show me"), preserve context
+      const originalMessage = currentMessage;
+      const isShortResponse = currentMessage.trim().split(' ').length <= 5;
+      
+      if (isShortResponse && conversationMessages.length > 1) {
+        log("🔍 [Extended Thinking] Detected short response, preserving context:", {
+          originalMessage,
+          messageLength: currentMessage.trim().split(' ').length,
+          conversationLength: conversationMessages.length
+        });
+        
+        // Find the last assistant message to provide context
+        let lastAssistantMessage = null;
+        for (let i = conversationMessages.length - 2; i >= 0; i--) {
+          if (conversationMessages[i].role === 'assistant') {
+            lastAssistantMessage = conversationMessages[i].content;
+            break;
+          }
+        }
+        
+        if (lastAssistantMessage) {
+          // Extract the last question or suggestion from the assistant's message
+          // Look for questions ending with ? or suggestive phrases
+          const questionPatterns = [
+            /[^.!?]*\?/g,  // Any question ending with ?
+            /(would you like|should I|do you want|shall I|can I|may I|I can also|I should|want me to)[^.!?]*/gi,  // Suggestive phrases
+            /(In this case|If you want|Alternatively)[^.!?]*[.!?]/gi  // Contextual suggestions
+          ];
+          
+          let questionMatch = null;
+          for (const pattern of questionPatterns) {
+            const matches = lastAssistantMessage.match(pattern);
+            if (matches && matches.length > 0) {
+              questionMatch = matches;
+              break;
+            }
+          }
+          const contextHint = questionMatch ? `The assistant previously asked: "${questionMatch[questionMatch.length - 1]}"` : 'This appears to be a response to the previous conversation.';
+          
+          log("🔍 [Extended Thinking] Context extracted:", {
+            foundQuestion: !!questionMatch,
+            contextHint
+          });
+          
+          currentMessage = `Please think through this step-by-step before answering, using <thinking> tags to show your reasoning process.
+
+${contextHint}
+
+User's response: ${originalMessage}`;
+        } else {
+          // No previous assistant message found, use standard format
+          currentMessage = `Please think through this step-by-step before answering, using <thinking> tags to show your reasoning process.
+
+User's response: ${originalMessage}`;
+        }
+      } else {
+        // For longer messages, use the standard format
+        currentMessage = `Please think through this step-by-step before answering, using <thinking> tags to show your reasoning process.
+
+User's question: ${currentMessage}`;
+      }
+      
+      // Also update the last message in conversationMessages
+      if (conversationMessages.length > 0) {
+        conversationMessages[conversationMessages.length - 1].content = currentMessage;
+      }
+    }
 
     // Initialize chat service using global connection approach
     if (!chatService) {
@@ -197,6 +267,9 @@ export const POST: RequestHandler = async ({ fetch, request }) => {
       // Message Details
       messageLength: currentMessage.length,
       conversationLength: conversationMessages.length,
+      
+      // Features
+      enableExtendedThinking: enableExtendedThinking || false,
     };
 
     // Check if aborted before RAG query
@@ -304,27 +377,50 @@ export const POST: RequestHandler = async ({ fetch, request }) => {
               totalContextLength: contextContent.length
             });
             
-            const systemMessage = `You are a helpful assistant for Couchbase. Use the following context to answer questions accurately and comprehensively.
+            let systemMessage = `You are Claude, an AI assistant with expertise in Couchbase and Capella database technologies. Your role is to provide accurate, comprehensive, and helpful information based on the available context and tools.
 
-Context: ${contextContent}
+<context>
+<relevance>High relevance - context directly related to user query</relevance>
+<content>
+${contextContent}
+</content>
+</context>
 
-IMPORTANT TERMINOLOGY:
-- Couchbase and Capella are interchangeable terms - Capella is Couchbase's cloud database platform
-- When users ask about "Couchbase", this includes information about "Capella" and vice versa
-- Couchbase Server is the core database technology, Capella is the cloud-based platform built on Couchbase
+<guidelines>
+- Base your responses on the provided context when available
+- Structure your answers clearly with appropriate formatting
+- For tool execution results, provide analysis and insights rather than repeating the raw data
+- Use markdown formatting to enhance readability (bullet points, code blocks, bold for emphasis)
+- When context is insufficient, clearly state what information is missing
+- Prioritize accuracy and completeness in your responses
+${metadata.enableExtendedThinking ? `- When asked to think step-by-step, use <thinking> tags to show your reasoning
+- In your thinking section:
+  * Analyze what the user is asking for
+  * Determine if you need to use tools or if context provides the answer
+  * Consider relevant best practices, performance implications, and common pitfalls
+  * Plan how to structure your response clearly
+- Your thinking should be natural and conversational, not templated
+- After </thinking>, provide your main response without mentioning the thinking process` : ''}
+</guidelines>
 
-IMPORTANT INSTRUCTIONS:
-- Provide a clear response based ONLY on the context provided
-- DO NOT show your thinking process or reasoning steps
-- DO NOT include phrases like "The context mentions..." or "I will..."
-- DO NOT repeat the same information in different ways
-- DO NOT repeat or re-display tool results that were already shown to the user
-- When tools have been executed, provide analysis and insights about the results, not a duplicate display
-- Start your response directly with the answer, not with explanatory text
-- Structure your response clearly without repetitive statements
-- Treat questions about Couchbase and Capella as referring to the same technology platform
-- NEVER include URLs, links, or references in your response - references will be added automatically
-- DO NOT add a "References:" section or any source citations to your answer`;
+<terminology>
+- Couchbase and Capella refer to the same technology platform
+- Capella is Couchbase's cloud database offering  
+- Couchbase Server is the core database technology
+- These terms can be used interchangeably in responses
+</terminology>
+
+<response_format>
+- Begin directly with the answer without preamble
+- Use clear sections and formatting for complex responses
+- Include code examples in markdown code blocks when relevant
+- References to sources will be automatically appended - do not include them
+</response_format>`;
+            
+            // Log that extended thinking is enabled
+            if (metadata.enableExtendedThinking) {
+              log("🧠 [Server] Extended thinking mode enabled for this request");
+            }
 
             // Use the RAG provider stream (contains proper trace headers and tool execution)
             log("🌊 [Server] Starting to read stream with conversation context");
@@ -370,8 +466,7 @@ IMPORTANT INSTRUCTIONS:
                     content.includes("get_detailed_indexes") ||
                     content.includes("get_detailed_prepared_statements") ||
                     content.includes("get_schema_for_collection") ||
-                    content.includes("run_sql_plus_plus_query") ||
-                    content.includes("<thinking>")) {
+                    content.includes("run_sql_plus_plus_query")) {
                   toolsWereExecuted = true;
                   log("🔧 [Server] Tools execution detected in stream");
                 }

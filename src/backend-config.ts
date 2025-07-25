@@ -114,7 +114,7 @@ const defaultConfig: BackendConfig = {
     AWS_SECRET_ACCESS_KEY: "",
     AWS_BEARER_TOKEN_BEDROCK: "",
     BEDROCK_EMBEDDING_MODEL: "amazon.titan-embed-text-v1",
-    BEDROCK_CHAT_MODEL: "eu.amazon.nova-pro-v1:0",
+    BEDROCK_CHAT_MODEL: "anthropic.claude-3-5-sonnet-20241022-v2:0",
     KNOWLEDGE_BASE_ID: "OSYN5HVWI2",
   },
 };
