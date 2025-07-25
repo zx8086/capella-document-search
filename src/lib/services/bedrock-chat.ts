@@ -414,6 +414,23 @@ const runSqlPlusPlusQueryTool: Tool = {
 export class BedrockChatService {
   private client: BedrockRuntimeClient;
   private modelId: string;
+  
+  // Helper to get normalized model name for Langsmith
+  private getNormalizedModelName(): string {
+    // Map AWS Bedrock model IDs to Langsmith-recognized model names
+    const modelMappings: { [key: string]: string } = {
+      // Claude 3.7 Sonnet - use the format Langsmith expects
+      "eu.anthropic.claude-3-7-sonnet-20250219-v1:0": "claude-3-7-sonnet",
+      // Claude 3.5 Sonnet mappings
+      "anthropic.claude-3-5-sonnet-20241022-v2:0": "claude-3-5-sonnet",
+      "anthropic.claude-3-5-sonnet-20240620-v1:0": "claude-3-5-sonnet",
+      // Amazon Nova Pro
+      "eu.amazon.nova-pro-v1:0": "amazon.nova-pro-v1",
+    };
+    
+    return modelMappings[this.modelId] || this.modelId;
+  }
+  
   private tools: Tool[] = [
     getSystemVitalsTool,
     getSystemNodesTool,
@@ -1948,28 +1965,36 @@ export class BedrockChatService {
             usageSource,
           });
           
-          // Add token usage to trace using LangSmith metadata
+          // Add token usage to trace using LangSmith metadata format
           if (parentRunTree) {
-            // Set usage_metadata in the extra.metadata field
+            // Set token counts at root level of metadata as per LangSmith docs
             parentRunTree.extra = {
               ...parentRunTree.extra,
               metadata: {
                 ...parentRunTree.extra?.metadata,
-                usage_metadata: {
-                  input_tokens: tokenUsage.inputTokens,
-                  output_tokens: tokenUsage.outputTokens,
-                  total_tokens: tokenUsage.totalTokens,
-                  total_cost: tokenUsage.estimatedCost,
-                  input_token_details: {
-                    cache_creation: 0,
-                    cache_read: 0
-                  }
+                // Token counts at root level for LangSmith cost calculation
+                input_tokens: tokenUsage.inputTokens,
+                output_tokens: tokenUsage.outputTokens,
+                total_tokens: tokenUsage.totalTokens,
+                // Optional token details
+                input_token_details: {
+                  cache_creation: usageData.cacheWriteInputTokens || 0,
+                  cache_read: usageData.cacheReadInputTokens || 0
                 },
+                output_token_details: {},
+                // Model information
                 ls_provider: 'amazon_bedrock',
-                ls_model_name: this.modelId,
+                ls_model_name: this.getNormalizedModelName(),
                 ls_model_type: 'llm',
+                // Additional cost information
+                total_cost: tokenUsage.estimatedCost,
+                // Keep cache metrics for debugging
+                cache_metrics: {
+                  cache_read_input_tokens: usageData.cacheReadInputTokens || 0,
+                  cache_write_input_tokens: usageData.cacheWriteInputTokens || 0,
+                }
               },
-              // Also keep legacy fields for debugging and cache metrics
+              // Also keep legacy fields for debugging
               tokenUsage,
               llmCost: tokenUsage.estimatedCost,
               model: this.modelId,
@@ -1983,21 +2008,26 @@ export class BedrockChatService {
               traceId: parentRunTree.id,
               tokenUsage: tokenUsage,
               sentToLangSmith: {
-                usage_metadata: {
-                  input_tokens: tokenUsage.inputTokens,
-                  output_tokens: tokenUsage.outputTokens,
-                  total_tokens: tokenUsage.totalTokens,
-                  total_cost: tokenUsage.estimatedCost,
-                  input_token_details: {
-                    cache_creation: 0,
-                    cache_read: 0
-                  }
+                input_tokens: tokenUsage.inputTokens,
+                output_tokens: tokenUsage.outputTokens,
+                total_tokens: tokenUsage.totalTokens,
+                total_cost: tokenUsage.estimatedCost,
+                input_token_details: {
+                  cache_creation: usageData.cacheWriteInputTokens || 0,
+                  cache_read: usageData.cacheReadInputTokens || 0
                 },
                 ls_provider: 'amazon_bedrock',
-                ls_model_name: this.modelId,
+                ls_model_name: this.getNormalizedModelName(),
                 ls_model_type: 'llm',
               },
-              fullExtraObject: JSON.stringify(parentRunTree.extra, null, 2),
+              metadataKeys: Object.keys(parentRunTree.extra?.metadata || {}),
+              validation: {
+                hasInputTokens: parentRunTree.extra?.metadata?.input_tokens > 0,
+                hasOutputTokens: parentRunTree.extra?.metadata?.output_tokens > 0,
+                hasModelName: !!parentRunTree.extra?.metadata?.ls_model_name,
+                hasProvider: !!parentRunTree.extra?.metadata?.ls_provider,
+                totalCostPresent: !!parentRunTree.extra?.metadata?.total_cost,
+              }
             });
           }
           
@@ -2047,14 +2077,27 @@ export class BedrockChatService {
 
         // Final verification: Log what will be sent to LangSmith
         if (parentRunTree) {
+          const metadata = parentRunTree.extra?.metadata || {};
           log("📤 [BedrockChat] Final RunTree state before LangSmith submission", {
             traceId: parentRunTree.id,
-            hasUsageMetadata: !!(parentRunTree.extra?.metadata?.usage_metadata),
-            usageMetadataContent: parentRunTree.extra?.metadata?.usage_metadata,
-            provider: parentRunTree.extra?.metadata?.ls_provider,
-            modelName: parentRunTree.extra?.metadata?.ls_model_name,
+            hasTokenData: !!(metadata.input_tokens),
+            tokenData: {
+              input_tokens: metadata.input_tokens,
+              output_tokens: metadata.output_tokens,
+              total_tokens: metadata.total_tokens,
+              total_cost: metadata.total_cost,
+            },
+            provider: metadata.ls_provider,
+            modelName: metadata.ls_model_name,
+            actualModelId: this.modelId,
             extraKeys: Object.keys(parentRunTree.extra || {}),
-            metadataKeys: Object.keys(parentRunTree.extra?.metadata || {}),
+            metadataKeys: Object.keys(metadata),
+            langsmithFormat: {
+              hasRequiredFields: !!(metadata.input_tokens && metadata.output_tokens && metadata.ls_model_name),
+              message: metadata.input_tokens && metadata.output_tokens 
+                ? "✅ Token data properly formatted for LangSmith cost calculation" 
+                : "⚠️ Missing required token fields for LangSmith - Langsmith should auto-calculate if model is recognized"
+            }
           });
         }
 
@@ -2187,26 +2230,32 @@ export class BedrockChatService {
                   totalCost: tokenUsage.estimatedCost,
                 });
                 
-                // Update trace with aggregated usage using LangSmith metadata
+                // Update trace with aggregated usage using LangSmith metadata format
                 if (parentRunTree) {
-                  // Set usage_metadata in the extra.metadata field
+                  // Set token counts at root level of metadata as per LangSmith docs
                   parentRunTree.extra = {
                     ...parentRunTree.extra,
                     metadata: {
                       ...parentRunTree.extra?.metadata,
-                      usage_metadata: {
-                        input_tokens: tokenUsage.inputTokens,
-                        output_tokens: tokenUsage.outputTokens,
-                        total_tokens: tokenUsage.totalTokens,
-                        total_cost: tokenUsage.estimatedCost,
-                        input_token_details: {
-                          cache_creation: 0,
-                          cache_read: 0
-                        }
+                      // Token counts at root level for LangSmith cost calculation
+                      input_tokens: tokenUsage.inputTokens,
+                      output_tokens: tokenUsage.outputTokens,
+                      total_tokens: tokenUsage.totalTokens,
+                      // Optional token details (aggregated from all tool calls)
+                      input_token_details: {
+                        cache_creation: 0,
+                        cache_read: 0
                       },
+                      output_token_details: {},
+                      // Model information
                       ls_provider: 'amazon_bedrock',
                       ls_model_name: this.modelId,
                       ls_model_type: 'llm',
+                      // Additional cost information
+                      total_cost: tokenUsage.estimatedCost,
+                      // Tool execution metadata
+                      tools_executed: toolsExecuted,
+                      tool_execution_time_ms: totalToolExecutionTime,
                     },
                     // Also keep legacy fields for debugging
                     tokenUsage,
