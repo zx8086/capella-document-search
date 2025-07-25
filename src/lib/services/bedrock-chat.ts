@@ -3,6 +3,7 @@
 import {
   BedrockRuntimeClient,
   ConverseStreamCommand,
+  ConverseCommand,
   type Tool,
   type ToolConfiguration,
   type Message,
@@ -32,6 +33,29 @@ import { backendConfig } from "../../backend-config";
 import { traceable } from "langsmith/traceable";
 import { getCurrentRunTree, withRunTree } from "langsmith/singletons/traceable";
 import { RunTree } from "langsmith/run_trees";
+import { usageTracker } from "./usage-tracking";
+
+// Token usage interface for type safety
+interface TokenUsage {
+  inputTokens: number;
+  outputTokens: number;
+  totalTokens: number;
+  model: string;
+  timestamp: string;
+  estimatedCost?: number;
+}
+
+// Cost calculation for Amazon Nova Pro model (eu-central-1 pricing)
+const NOVA_PRO_PRICING = {
+  inputTokensPerThousand: 0.0008, // $0.80 per 1M input tokens
+  outputTokensPerThousand: 0.0032, // $3.20 per 1M output tokens
+};
+
+function calculateCost(usage: TokenUsage): number {
+  const inputCost = (usage.inputTokens / 1000) * NOVA_PRO_PRICING.inputTokensPerThousand;
+  const outputCost = (usage.outputTokens / 1000) * NOVA_PRO_PRICING.outputTokensPerThousand;
+  return inputCost + outputCost;
+}
 
 const getSystemVitalsTool: Tool = {
   toolSpec: {
@@ -1551,6 +1575,9 @@ export class BedrockChatService {
       temperature?: number;
       max_tokens?: number;
       traceHeaders?: Record<string, string>;
+      userId?: string;
+      sessionId?: string;
+      conversationId?: string;
     } = {},
   ): AsyncGenerator<string, void, unknown> {
     try {
@@ -1666,11 +1693,21 @@ export class BedrockChatService {
         );
       }
 
+      // Debug: Log initial response structure
+      log("🔍 [BedrockChat] Initial response structure", {
+        responseKeys: Object.keys(response),
+        hasMetadata: !!response.metadata,
+        hasUsage: !!response.usage,
+        metadataKeys: response.metadata ? Object.keys(response.metadata) : [],
+        usageKeys: response.usage ? Object.keys(response.usage) : [],
+      });
+
       // AWS Documentation: Handle both text and tool responses
       let assistantMessage: Message = { role: "assistant", content: [] };
       let currentContentIndex = -1;
       let stopReason = "";
       let chunkCount = 0;
+      let tokenUsage: TokenUsage | null = null;
 
       try {
         for await (const event of response.stream) {
@@ -1767,11 +1804,33 @@ export class BedrockChatService {
               }
             } else if (event.messageStop) {
               stopReason = event.messageStop.stopReason || "";
+              
+              // Debug: Check if messageStop contains any usage info
+              log("🔍 [BedrockChat] MessageStop event details", {
+                stopReason,
+                eventKeys: Object.keys(event.messageStop || {}),
+                fullMessageStop: JSON.stringify(event.messageStop, null, 2).substring(0, 300),
+                hasAdditionalFields: !!event.messageStop.additionalModelResponseFields,
+                additionalFields: event.messageStop.additionalModelResponseFields ? 
+                  JSON.stringify(event.messageStop.additionalModelResponseFields, null, 2).substring(0, 300) : null,
+              });
+              
               log("✅ [BedrockChat] Converse stream completed", {
                 totalChunks: chunkCount,
                 stopReason,
+                tokenUsage,
               });
               break;
+            } else {
+              // Debug: Log any other event types we might be missing
+              const eventType = Object.keys(event)[0];
+              if (eventType && !['messageStart', 'contentBlockStart', 'contentBlockDelta', 'messageStop'].includes(eventType)) {
+                log("🔍 [BedrockChat] Unknown event type", {
+                  eventType,
+                  eventKeys: Object.keys(event),
+                  eventData: JSON.stringify(event, null, 2).substring(0, 200),
+                });
+              }
             }
           } catch (eventError) {
             // Log event processing errors but continue stream to prevent $unknown crashes
@@ -1781,6 +1840,279 @@ export class BedrockChatService {
             });
             continue;
           }
+        }
+
+        // Debug: Log response structure after stream consumption with full details
+        log("🔍 [BedrockChat] FULL Response after stream consumption", {
+          responseKeys: Object.keys(response),
+          hasMetadata: !!response.metadata,
+          hasUsage: !!response.usage,
+          metadataKeys: response.metadata ? Object.keys(response.metadata) : [],
+          usageKeys: response.usage ? Object.keys(response.usage) : [],
+          fullResponseStructure: JSON.stringify({
+            hasStream: !!response.stream,
+            hasMetadata: !!response.metadata,
+            hasUsage: !!response.usage,
+            dollarMetadata: !!response.$metadata,
+          }),
+          // Full response object inspection (limited for log size)
+          fullResponse: JSON.stringify(response, (key, value) => {
+            // Skip the stream object to avoid circular refs and large data
+            if (key === 'stream') return '[ReadableStream]';
+            return value;
+          }, 2).substring(0, 1000),
+          // Detailed $metadata inspection
+          dollarMetadata: response.$metadata ? JSON.stringify(response.$metadata, null, 2).substring(0, 500) : null,
+        });
+
+        // Try multiple locations for token usage
+        let usageSource = null;
+        let usageData = null;
+
+        if (response.metadata?.usage) {
+          usageSource = "response.metadata.usage";
+          usageData = response.metadata.usage;
+        } else if (response.usage) {
+          usageSource = "response.usage";
+          usageData = response.usage;
+        } else if (response.$metadata?.usage) {
+          usageSource = "response.$metadata.usage";
+          usageData = response.$metadata.usage;
+        }
+
+        // Extract token usage from wherever we found it
+        if (usageData) {
+          tokenUsage = {
+            inputTokens: usageData.inputTokens || 0,
+            outputTokens: usageData.outputTokens || 0,
+            totalTokens: usageData.totalTokens || (usageData.inputTokens || 0) + (usageData.outputTokens || 0),
+            model: this.modelId,
+            timestamp: new Date().toISOString(),
+          };
+          tokenUsage.estimatedCost = calculateCost(tokenUsage);
+          
+          log("📊 [BedrockChat] Token usage extracted from " + usageSource, {
+            inputTokens: tokenUsage.inputTokens,
+            outputTokens: tokenUsage.outputTokens,
+            totalTokens: tokenUsage.totalTokens,
+            estimatedCost: tokenUsage.estimatedCost,
+            model: tokenUsage.model,
+            cacheReadInputTokens: usageData.cacheReadInputTokens || 0,
+            cacheWriteInputTokens: usageData.cacheWriteInputTokens || 0,
+            usageSource,
+          });
+          
+          // Add token usage to trace using LangSmith metadata
+          if (parentRunTree) {
+            // Set usage_metadata in the extra.metadata field
+            parentRunTree.extra = {
+              ...parentRunTree.extra,
+              metadata: {
+                ...parentRunTree.extra?.metadata,
+                usage_metadata: {
+                  input_tokens: tokenUsage.inputTokens,
+                  output_tokens: tokenUsage.outputTokens,
+                  total_tokens: tokenUsage.totalTokens,
+                  total_cost: tokenUsage.estimatedCost,
+                  input_token_details: {
+                    cache_creation: 0,
+                    cache_read: 0
+                  }
+                },
+                ls_provider: 'amazon_bedrock',
+                ls_model_name: this.modelId,
+                ls_model_type: 'llm',
+              },
+              // Also keep legacy fields for debugging and cache metrics
+              tokenUsage,
+              llmCost: tokenUsage.estimatedCost,
+              model: this.modelId,
+              cacheMetrics: {
+                cacheReadInputTokens: usageData.cacheReadInputTokens || 0,
+                cacheWriteInputTokens: usageData.cacheWriteInputTokens || 0,
+              }
+            };
+            
+            log("🔗 [BedrockChat] Added token usage to trace", {
+              traceId: parentRunTree.id,
+              tokenUsage: tokenUsage,
+              sentToLangSmith: {
+                usage_metadata: {
+                  input_tokens: tokenUsage.inputTokens,
+                  output_tokens: tokenUsage.outputTokens,
+                  total_tokens: tokenUsage.totalTokens,
+                  total_cost: tokenUsage.estimatedCost,
+                  input_token_details: {
+                    cache_creation: 0,
+                    cache_read: 0
+                  }
+                },
+                ls_provider: 'amazon_bedrock',
+                ls_model_name: this.modelId,
+                ls_model_type: 'llm',
+              },
+              fullExtraObject: JSON.stringify(parentRunTree.extra, null, 2),
+            });
+          }
+          
+          // Record usage in tracking service
+          try {
+            await usageTracker.recordUsage({
+              userId: options.userId,
+              sessionId: options.sessionId,
+              conversationId: options.conversationId,
+              model: tokenUsage.model,
+              inputTokens: tokenUsage.inputTokens,
+              outputTokens: tokenUsage.outputTokens,
+              totalTokens: tokenUsage.totalTokens,
+              estimatedCost: tokenUsage.estimatedCost!,
+              metadata: {
+                stopReason,
+                chunkCount,
+                hasTools: this.tools.length > 0,
+                traceId: parentRunTree?.id,
+                cacheReadInputTokens: usageData.cacheReadInputTokens || 0,
+                cacheWriteInputTokens: usageData.cacheWriteInputTokens || 0,
+              }
+            });
+            
+            log("💾 [BedrockChat] Usage recorded in tracking service", {
+              userId: options.userId,
+              conversationId: options.conversationId,
+              totalTokens: tokenUsage.totalTokens,
+              cost: tokenUsage.estimatedCost,
+            });
+          } catch (trackingError) {
+            err("❌ [BedrockChat] Failed to record usage", {
+              error: trackingError.message,
+              tokenUsage,
+            });
+          }
+        } else {
+          // Token usage not available in streaming responses - estimate with non-streaming call
+          log("⚠️ [BedrockChat] Token usage not available in streaming response, estimating...", {
+            responseKeys: Object.keys(response),
+            hasStream: !!response.stream,
+            hasMetadata: !!response.metadata,
+            metadataKeys: response.metadata ? Object.keys(response.metadata) : [],
+          });
+          
+          try {
+            // Estimate token usage based on input/output text
+            const estimatedUsage = this.estimateTokenUsage(converseMessages, systemPrompt, assistantMessage);
+            
+            log("📊 [BedrockChat] Token usage estimated (streaming limitation)", {
+              inputTokens: estimatedUsage.inputTokens,
+              outputTokens: estimatedUsage.outputTokens,
+              totalTokens: estimatedUsage.totalTokens,
+              estimatedCost: estimatedUsage.estimatedCost,
+              model: estimatedUsage.model,
+              isEstimate: true,
+            });
+            
+            // Add estimated token usage to trace using LangSmith metadata
+            if (parentRunTree) {
+              // Set usage_metadata in the extra.metadata field
+              parentRunTree.extra = {
+                ...parentRunTree.extra,
+                metadata: {
+                  ...parentRunTree.extra?.metadata,
+                  usage_metadata: {
+                    input_tokens: estimatedUsage.inputTokens,
+                    output_tokens: estimatedUsage.outputTokens,
+                    total_tokens: estimatedUsage.totalTokens,
+                    total_cost: estimatedUsage.estimatedCost,
+                    input_token_details: {
+                      cache_creation: 0,
+                      cache_read: 0
+                    }
+                  },
+                  ls_provider: 'amazon_bedrock',
+                  ls_model_name: this.modelId,
+                  ls_model_type: 'llm',
+                },
+                // Also keep legacy fields for debugging
+                tokenUsage: estimatedUsage,
+                llmCost: estimatedUsage.estimatedCost,
+                model: this.modelId,
+                isTokenEstimate: true,
+              };
+              
+              log("🔗 [BedrockChat] Added estimated token usage to trace", {
+                traceId: parentRunTree.id,
+                tokenUsage: estimatedUsage,
+                sentToLangSmith: {
+                  usage_metadata: {
+                    input_tokens: estimatedUsage.inputTokens,
+                    output_tokens: estimatedUsage.outputTokens,
+                    total_tokens: estimatedUsage.totalTokens,
+                    total_cost: estimatedUsage.estimatedCost,
+                    input_token_details: {
+                      cache_creation: 0,
+                      cache_read: 0
+                    }
+                  },
+                  ls_provider: 'amazon_bedrock',
+                  ls_model_name: this.modelId,
+                  ls_model_type: 'llm',
+                },
+                fullExtraObject: JSON.stringify(parentRunTree.extra, null, 2),
+                isEstimate: true,
+              });
+            }
+            
+            // Record estimated usage in tracking service
+            try {
+              await usageTracker.recordUsage({
+                userId: options.userId,
+                sessionId: options.sessionId,
+                conversationId: options.conversationId,
+                model: estimatedUsage.model,
+                inputTokens: estimatedUsage.inputTokens,
+                outputTokens: estimatedUsage.outputTokens,
+                totalTokens: estimatedUsage.totalTokens,
+                estimatedCost: estimatedUsage.estimatedCost!,
+                metadata: {
+                  stopReason,
+                  chunkCount,
+                  hasTools: this.tools.length > 0,
+                  traceId: parentRunTree?.id,
+                  isEstimate: true,
+                  streamingResponse: true,
+                }
+              });
+              
+              log("💾 [BedrockChat] Estimated usage recorded in tracking service", {
+                userId: options.userId,
+                conversationId: options.conversationId,
+                totalTokens: estimatedUsage.totalTokens,
+                cost: estimatedUsage.estimatedCost,
+                isEstimate: true,
+              });
+            } catch (trackingError) {
+              err("❌ [BedrockChat] Failed to record estimated usage", {
+                error: trackingError.message,
+                estimatedUsage,
+              });
+            }
+          } catch (estimationError) {
+            log("⚠️ [BedrockChat] Token usage estimation failed", {
+              error: estimationError.message,
+            });
+          }
+        }
+
+        // Final verification: Log what will be sent to LangSmith
+        if (parentRunTree) {
+          log("📤 [BedrockChat] Final RunTree state before LangSmith submission", {
+            traceId: parentRunTree.id,
+            hasUsageMetadata: !!(parentRunTree.extra?.metadata?.usage_metadata),
+            usageMetadataContent: parentRunTree.extra?.metadata?.usage_metadata,
+            provider: parentRunTree.extra?.metadata?.ls_provider,
+            modelName: parentRunTree.extra?.metadata?.ls_model_name,
+            extraKeys: Object.keys(parentRunTree.extra || {}),
+            metadataKeys: Object.keys(parentRunTree.extra?.metadata || {}),
+          });
         }
 
         // AWS Documentation: Handle tool use
@@ -1886,6 +2218,99 @@ export class BedrockChatService {
                 yield event.contentBlockDelta.delta.text;
               }
             }
+            
+            // Extract token usage from continuation response metadata
+            if (continueResponse.metadata?.usage) {
+              const continueTokenUsage: TokenUsage = {
+                inputTokens: continueResponse.metadata.usage.inputTokens || 0,
+                outputTokens: continueResponse.metadata.usage.outputTokens || 0,
+                totalTokens: continueResponse.metadata.usage.totalTokens || (continueResponse.metadata.usage.inputTokens || 0) + (continueResponse.metadata.usage.outputTokens || 0),
+                model: this.modelId,
+                timestamp: new Date().toISOString(),
+              };
+              continueTokenUsage.estimatedCost = calculateCost(continueTokenUsage);
+              
+              // Aggregate token usage from both initial and continuation responses
+              if (tokenUsage) {
+                tokenUsage.inputTokens += continueTokenUsage.inputTokens;
+                tokenUsage.outputTokens += continueTokenUsage.outputTokens;
+                tokenUsage.totalTokens += continueTokenUsage.totalTokens;
+                tokenUsage.estimatedCost! += continueTokenUsage.estimatedCost!;
+                
+                log("📊 [BedrockChat] Aggregated token usage after tool execution", {
+                  totalInputTokens: tokenUsage.inputTokens,
+                  totalOutputTokens: tokenUsage.outputTokens,
+                  totalTokens: tokenUsage.totalTokens,
+                  totalCost: tokenUsage.estimatedCost,
+                });
+                
+                // Update trace with aggregated usage using LangSmith metadata
+                if (parentRunTree) {
+                  // Set usage_metadata in the extra.metadata field
+                  parentRunTree.extra = {
+                    ...parentRunTree.extra,
+                    metadata: {
+                      ...parentRunTree.extra?.metadata,
+                      usage_metadata: {
+                        input_tokens: tokenUsage.inputTokens,
+                        output_tokens: tokenUsage.outputTokens,
+                        total_tokens: tokenUsage.totalTokens,
+                        total_cost: tokenUsage.estimatedCost,
+                        input_token_details: {
+                          cache_creation: 0,
+                          cache_read: 0
+                        }
+                      },
+                      ls_provider: 'amazon_bedrock',
+                      ls_model_name: this.modelId,
+                      ls_model_type: 'llm',
+                    },
+                    // Also keep legacy fields for debugging
+                    tokenUsage,
+                    llmCost: tokenUsage.estimatedCost,
+                    model: this.modelId,
+                  };
+                }
+                
+                // Update usage record with final aggregated values
+                try {
+                  await usageTracker.recordUsage({
+                    userId: options.userId,
+                    sessionId: options.sessionId,
+                    conversationId: options.conversationId,
+                    model: tokenUsage.model,
+                    inputTokens: tokenUsage.inputTokens,
+                    outputTokens: tokenUsage.outputTokens,
+                    totalTokens: tokenUsage.totalTokens,
+                    estimatedCost: tokenUsage.estimatedCost!,
+                    toolUsage: {
+                      toolsExecuted,
+                      toolExecutionTime: totalToolExecutionTime,
+                    },
+                    metadata: {
+                      stopReason: "tool_use_completed",
+                      chunkCount,
+                      hasTools: true,
+                      traceId: parentRunTree?.id,
+                      finalAggregatedUsage: true,
+                    }
+                  });
+                  
+                  log("💾 [BedrockChat] Final aggregated usage recorded", {
+                    userId: options.userId,
+                    conversationId: options.conversationId,
+                    totalTokens: tokenUsage.totalTokens,
+                    totalCost: tokenUsage.estimatedCost,
+                    toolsExecuted,
+                  });
+                } catch (trackingError) {
+                  err("❌ [BedrockChat] Failed to record aggregated usage", {
+                    error: trackingError.message,
+                    tokenUsage,
+                  });
+                }
+              }
+            }
           }
         }
       } catch (streamError) {
@@ -1905,10 +2330,61 @@ export class BedrockChatService {
     }
   }
 
+  // Token estimation method for streaming responses (where actual usage isn't available)
+  private estimateTokenUsage(
+    messages: Message[], 
+    systemPrompt: string, 
+    assistantMessage: Message
+  ): TokenUsage {
+    // Simple token estimation: ~4 characters per token (average for most languages)
+    const CHARS_PER_TOKEN = 4;
+    
+    // Calculate input tokens (messages + system prompt)
+    let inputText = systemPrompt || '';
+    for (const msg of messages) {
+      for (const content of msg.content) {
+        if (content.text) {
+          inputText += content.text;
+        }
+      }
+    }
+    
+    // Calculate output tokens (assistant response)
+    let outputText = '';
+    for (const content of assistantMessage.content) {
+      if (content.text) {
+        outputText += content.text;
+      }
+    }
+    
+    const inputTokens = Math.ceil(inputText.length / CHARS_PER_TOKEN);
+    const outputTokens = Math.ceil(outputText.length / CHARS_PER_TOKEN);
+    const totalTokens = inputTokens + outputTokens;
+    
+    const tokenUsage: TokenUsage = {
+      inputTokens,
+      outputTokens,
+      totalTokens,
+      model: this.modelId,
+      timestamp: new Date().toISOString(),
+    };
+    
+    tokenUsage.estimatedCost = calculateCost(tokenUsage);
+    
+    return tokenUsage;
+  }
+
   // Public method - no traceable wrapper to allow inheritance from parent trace
   createChatCompletion = (
     messages: Array<{ role: string; content: string }>,
-    options: { temperature?: number; max_tokens?: number; traceHeaders?: Record<string, string> } = {},
+    options: { 
+      temperature?: number; 
+      max_tokens?: number; 
+      traceHeaders?: Record<string, string>;
+      userId?: string;
+      sessionId?: string;
+      conversationId?: string;
+    } = {},
   ) => {
     return this._createChatCompletion(messages, options);
   };
