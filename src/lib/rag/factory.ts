@@ -9,7 +9,7 @@ import { log, err } from '../../utils/unifiedLogger';
 
 export function createRAGProvider(fetch: typeof fetch): RAGProvider {
     // Add immediate environment check
-    log('🔎 [RAG Factory] Environment check', {
+    log('🔍 [RAG Factory] Environment check', {
         RAG_PIPELINE: Bun.env.RAG_PIPELINE,
         NODE_ENV: Bun.env.NODE_ENV,
         timestamp: new Date().toISOString()
@@ -17,7 +17,7 @@ export function createRAGProvider(fetch: typeof fetch): RAGProvider {
 
     const pipeline = Bun.env.RAG_PIPELINE?.toUpperCase() || 'PINECONE';
     
-    log('🏭 [RAG Factory] Creating provider', {
+    log('🚀 [RAG Factory] Creating provider', {
         selectedPipeline: pipeline,
         rawEnvValue: Bun.env.RAG_PIPELINE,
         timestamp: new Date().toISOString()

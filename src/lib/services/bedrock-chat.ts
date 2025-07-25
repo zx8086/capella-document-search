@@ -605,7 +605,7 @@ export class BedrockChatService {
         );
       }
 
-      log("📝 [Tool] Executing query", {
+      log("🔄 [Tool] Executing query", {
         query: query.substring(0, 100) + "...",
       });
 
@@ -670,7 +670,7 @@ export class BedrockChatService {
         );
       }
 
-      log("📝 [Tool] Executing nodes query", {
+      log("🔄 [Tool] Executing nodes query", {
         query: query.substring(0, 100) + "...",
       });
 
@@ -773,7 +773,7 @@ export class BedrockChatService {
         `ORDER BY requestTime DESC LIMIT ${effectiveLimit};`,
       );
 
-      log("📝 [Tool] Executing fatal requests query", {
+      log("🔄 [Tool] Executing fatal requests query", {
         query: query.substring(0, 100) + "...",
       });
 
@@ -1401,7 +1401,7 @@ export class BedrockChatService {
       const fieldCount = Object.keys(rows[0]).length;
       const docSize = JSON.stringify(rows[0]).length;
 
-      log("📋 [Tool] Schema inference complete", {
+      log("📊 [Tool] Schema inference complete", {
         scope_name,
         collection_name,
         fieldCount,
@@ -1411,7 +1411,7 @@ export class BedrockChatService {
 
       // Format schema
       const formatSchema = (doc: any): string => {
-        let formattedText = "📋 Collection Schema:\n\n";
+        let formattedText = "📊 Collection Schema:\n\n";
         const formatField = (
           key: string,
           value: unknown,

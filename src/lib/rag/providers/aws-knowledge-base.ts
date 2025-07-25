@@ -19,7 +19,7 @@ export class AWSKnowledgeBaseRAGProvider implements RAGProvider {
   private ragPipeline: any;
 
   constructor() {
-    log("🎯 [AWSKnowledgeBaseProvider] Constructor called");
+    log("🚀 [AWSKnowledgeBaseProvider] Constructor called");
     this.chatService = new BedrockChatService(backendConfig.rag.AWS_REGION);
 
     const credentials: any = {
@@ -148,7 +148,7 @@ export class AWSKnowledgeBaseRAGProvider implements RAGProvider {
     };
 
   private contextProcessing = async (response: any) => {
-      log("📝 [AWSKnowledgeBase] Starting context processing", {
+      log("🔄 [AWSKnowledgeBase] Starting context processing", {
         resultCount: response.retrievalResults?.length || 0,
       });
 
@@ -268,7 +268,7 @@ export class AWSKnowledgeBaseRAGProvider implements RAGProvider {
         const contextText = context?.map((c) => c.text).join("\n\n---\n\n");
         const totalContextLength = contextText.length;
 
-        log("📝 [AWSKnowledgeBase] Prepared context for LLM", {
+        log("🔄 [AWSKnowledgeBase] Prepared context for LLM", {
           contextItems: context.length,
           totalContextLength,
           messageLength: message.length,
@@ -545,7 +545,7 @@ RESPONSE GUIDELINES:
   }
 
   async query(message: string, metadata: RAGMetadata): Promise<RAGResponse> {
-    log("📝 [AWSKnowledgeBaseProvider] Query received", {
+    log("📥 [AWSKnowledgeBaseProvider] Query received", {
       messageLength: message.length,
       userId: metadata.userId,
       timestamp: new Date().toISOString(),

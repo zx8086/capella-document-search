@@ -100,9 +100,9 @@ export const POST: RequestHandler = async ({ fetch, request }) => {
   try {
     // Initialize provider with fetch
     if (!ragProvider) {
-      log("🌟 [Server] Starting RAG system initialization");
+      log("🚀 [Server] Starting RAG system initialization");
       ragProvider = createRAGProvider(fetch);
-      log("⚙️ [Server] Provider instance created:", {
+      log("🔧 [Server] Provider instance created:", {
         type: ragProvider.constructor.name,
       });
 
@@ -122,14 +122,14 @@ export const POST: RequestHandler = async ({ fetch, request }) => {
 
     // Initialize chat service using global connection approach
     if (!chatService) {
-      log("🌟 [Server] Creating chat service with global connection approach");
+      log("🚀 [Server] Creating chat service with global connection approach");
       chatService = new BedrockChatService("eu-central-1");
       log("✅ [Server] Chat service created (will use global connection for tools)");
     } else {
-      log("♻️ [Server] Using existing chat service instance");
+      log("🔄 [Server] Using existing chat service instance");
     }
 
-    log("📨 [Server] Processing chat request:", {
+    log("📥 [Server] Processing chat request:", {
       messageLength: currentMessage.length,
       conversationLength: conversationMessages.length,
       conversationId: user?.conversationId,
@@ -413,7 +413,7 @@ IMPORTANT INSTRUCTIONS:
 
             const doneMessage = JSON.stringify({ done: true, runId: runId }) + "\n";
             controller.enqueue(new TextEncoder().encode(doneMessage));
-            log("🏁 [Server] Sent done signal:", {
+            log("🛑 [Server] Sent done signal:", {
               doneMessage: doneMessage.trim(),
               finalResponseLength: fullResponse.length,
               runId: runId,

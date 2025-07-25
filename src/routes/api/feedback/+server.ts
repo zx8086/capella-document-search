@@ -29,7 +29,7 @@ export const POST: RequestHandler = async ({ request }) => {
       return json({ error: "Score must be -1 (thumbs down), 0 (neutral), or 1 (thumbs up)" }, { status: 400 });
     }
 
-    log("📝 [Feedback] Submitting feedback to Langsmith", {
+    log("📤 [Feedback] Submitting feedback to Langsmith", {
       runId,
       score,
       hasComment: !!comment,
