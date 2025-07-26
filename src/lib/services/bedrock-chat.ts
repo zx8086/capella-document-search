@@ -33,7 +33,7 @@ import { backendConfig } from "../../backend-config";
 import { traceable } from "langsmith/traceable";
 import { getCurrentRunTree, withRunTree } from "langsmith/singletons/traceable";
 import { RunTree } from "langsmith/run_trees";
-import { usageTracker } from "./usage-tracking";
+// import { usageTracker } from "./usage-tracking"; // Removed - using LangSmith only
 
 // Token usage interface for type safety
 interface TokenUsage {
@@ -1713,9 +1713,9 @@ export class BedrockChatService {
           },
           extra: {
             metadata: {
-              ls_provider: 'amazon_bedrock',
+              ls_provider: 'anthropic',
               ls_model_name: this.getNormalizedModelName(),
-              ls_model_type: 'llm',
+              ls_model_type: 'chat',
             }
           }
         });
@@ -1887,8 +1887,11 @@ export class BedrockChatService {
                 totalChunks: chunkCount,
                 stopReason,
                 tokenUsage,
+                responseLength: fullResponseText.length,
               });
-              break;
+              
+              // Don't break here - wait for metadata event that comes after messageStop
+              // break;
             } else if (event.metadata) {
               // Handle Claude's metadata event which contains usage information
               log("🔍 [BedrockChat] Metadata event received", {
@@ -2017,11 +2020,9 @@ export class BedrockChatService {
             // We have actual token usage - send it to Langsmith
             await llmRunTree.end({
               outputs: {
-                generations: [[{ text: fullResponseText }]]
-              },
-              extra: {
-                metadata: {
-                  // Token counts at root level for LangSmith cost calculation
+                generations: [[{ text: fullResponseText }]],
+                // usage_metadata at the outputs level per LangSmith docs
+                usage_metadata: {
                   input_tokens: tokenUsage.inputTokens,
                   output_tokens: tokenUsage.outputTokens,
                   total_tokens: tokenUsage.totalTokens,
@@ -2032,11 +2033,17 @@ export class BedrockChatService {
                   } : {},
                   output_token_details: {},
                   // Model information
-                  ls_provider: 'amazon_bedrock',
+                  ls_provider: 'anthropic',
                   ls_model_name: this.getNormalizedModelName(),
-                  ls_model_type: 'llm',
-                  // Additional cost information
-                  total_cost: tokenUsage.estimatedCost,
+                  ls_model_type: 'chat',
+                  // Additional cost information (removed per user request)
+                }
+              },
+              extra: {
+                metadata: {
+                  ls_provider: 'anthropic',
+                  ls_model_name: this.getNormalizedModelName(),
+                  ls_model_type: 'chat',
                 }
               }
             });
@@ -2049,11 +2056,11 @@ export class BedrockChatService {
                 input_tokens: tokenUsage.inputTokens,
                 output_tokens: tokenUsage.outputTokens,
                 total_tokens: tokenUsage.totalTokens,
-                total_cost: tokenUsage.estimatedCost,
-                ls_provider: 'amazon_bedrock',
+                ls_provider: 'anthropic',
                 ls_model_name: this.getNormalizedModelName(),
-                ls_model_type: 'llm',
-              }
+                ls_model_type: 'chat',
+              },
+              runTreeOutputs: llmRunTree.outputs ? Object.keys(llmRunTree.outputs) : 'undefined'
             });
           } else {
             // No token usage from AWS - provide estimates for Langsmith
@@ -2073,20 +2080,25 @@ export class BedrockChatService {
             
             await llmRunTree.end({
               outputs: {
-                generations: [[{ text: fullResponseText }]]
-              },
-              extra: {
-                metadata: {
-                  // Provide estimated token counts for Langsmith cost calculation
+                generations: [[{ text: fullResponseText }]],
+                // usage_metadata at the outputs level per LangSmith docs
+                usage_metadata: {
                   input_tokens: estimatedInputTokens,
                   output_tokens: estimatedOutputTokens,
                   total_tokens: estimatedTotalTokens,
                   // Model information
-                  ls_provider: 'amazon_bedrock',
+                  ls_provider: 'anthropic',
                   ls_model_name: this.getNormalizedModelName(),
-                  ls_model_type: 'llm',
+                  ls_model_type: 'chat',
                   // Flag that these are estimates
                   token_source: 'estimated',
+                }
+              },
+              extra: {
+                metadata: {
+                  ls_provider: 'anthropic',
+                  ls_model_name: this.getNormalizedModelName(),
+                  ls_model_type: 'chat',
                 }
               }
             });
@@ -2105,70 +2117,7 @@ export class BedrockChatService {
           }
         }
           
-        // Record usage in tracking service if we have it
-        if (tokenUsage) {
-          try {
-            await usageTracker.recordUsage({
-              userId: options.userId,
-              sessionId: options.sessionId,
-              conversationId: options.conversationId,
-              model: tokenUsage.model,
-              inputTokens: tokenUsage.inputTokens,
-              outputTokens: tokenUsage.outputTokens,
-              totalTokens: tokenUsage.totalTokens,
-              estimatedCost: tokenUsage.estimatedCost!,
-              metadata: {
-                stopReason,
-                chunkCount,
-                hasTools: this.tools.length > 0,
-                traceId: parentRunTree?.id,
-                cacheReadInputTokens: usageData?.cacheReadInputTokens || 0,
-                cacheWriteInputTokens: usageData?.cacheWriteInputTokens || 0,
-              }
-            });
-            
-            log("💾 [BedrockChat] Usage recorded in tracking service", {
-              userId: options.userId,
-              conversationId: options.conversationId,
-              totalTokens: tokenUsage.totalTokens,
-              cost: tokenUsage.estimatedCost,
-            });
-          } catch (trackingError) {
-            err("❌ [BedrockChat] Failed to record usage", {
-              error: trackingError.message,
-              tokenUsage,
-            });
-          }
-        }
-
-        // Final verification: Log what will be sent to LangSmith
-        if (llmRunTree) {
-          const metadata = llmRunTree.extra?.metadata || {};
-          log("📤 [BedrockChat] Final LLM RunTree state before LangSmith submission", {
-            traceId: llmRunTree.id,
-            hasTokenData: !!(metadata.input_tokens),
-            tokenData: metadata.input_tokens ? {
-              input_tokens: metadata.input_tokens,
-              output_tokens: metadata.output_tokens,
-              total_tokens: metadata.total_tokens,
-              total_cost: metadata.total_cost,
-              token_source: metadata.token_source || 'aws',
-            } : "No token data provided",
-            provider: metadata.ls_provider,
-            modelName: metadata.ls_model_name,
-            actualModelId: this.modelId,
-            extraKeys: Object.keys(llmRunTree.extra || {}),
-            metadataKeys: Object.keys(metadata),
-            langsmithFormat: {
-              hasRequiredFields: !!(metadata.ls_model_name && metadata.ls_provider && metadata.input_tokens),
-              message: metadata.token_source === 'estimated' 
-                ? "✅ Estimated token data provided for LangSmith cost calculation" 
-                : metadata.input_tokens && metadata.output_tokens 
-                  ? "✅ Actual token data provided for LangSmith cost calculation" 
-                  : "⚠️ No token data - cost calculation may not work"
-            }
-          });
-        }
+        // Usage tracking removed - data is sent to LangSmith only
 
         // AWS Documentation: Handle tool use
         if (stopReason === "tool_use") {
@@ -2318,9 +2267,9 @@ export class BedrockChatService {
                       },
                       output_token_details: {},
                       // Model information
-                      ls_provider: 'amazon_bedrock',
+                      ls_provider: 'anthropic',
                       ls_model_name: this.modelId,
-                      ls_model_type: 'llm',
+                      ls_model_type: 'chat',
                       // Additional cost information
                       total_cost: tokenUsage.estimatedCost,
                       // Tool execution metadata
@@ -2334,43 +2283,7 @@ export class BedrockChatService {
                   };
                 }
                 
-                // Update usage record with final aggregated values
-                try {
-                  await usageTracker.recordUsage({
-                    userId: options.userId,
-                    sessionId: options.sessionId,
-                    conversationId: options.conversationId,
-                    model: tokenUsage.model,
-                    inputTokens: tokenUsage.inputTokens,
-                    outputTokens: tokenUsage.outputTokens,
-                    totalTokens: tokenUsage.totalTokens,
-                    estimatedCost: tokenUsage.estimatedCost!,
-                    toolUsage: {
-                      toolsExecuted,
-                      toolExecutionTime: totalToolExecutionTime,
-                    },
-                    metadata: {
-                      stopReason: "tool_use_completed",
-                      chunkCount,
-                      hasTools: true,
-                      traceId: parentRunTree?.id,
-                      finalAggregatedUsage: true,
-                    }
-                  });
-                  
-                  log("💾 [BedrockChat] Final aggregated usage recorded", {
-                    userId: options.userId,
-                    conversationId: options.conversationId,
-                    totalTokens: tokenUsage.totalTokens,
-                    totalCost: tokenUsage.estimatedCost,
-                    toolsExecuted,
-                  });
-                } catch (trackingError) {
-                  err("❌ [BedrockChat] Failed to record aggregated usage", {
-                    error: trackingError.message,
-                    tokenUsage,
-                  });
-                }
+                // Usage tracking removed - data is sent to LangSmith only
               }
             }
           }
