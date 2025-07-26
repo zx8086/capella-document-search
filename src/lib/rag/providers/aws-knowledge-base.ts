@@ -4,7 +4,7 @@ import {
   BedrockAgentRuntimeClient,
   RetrieveCommand,
 } from "@aws-sdk/client-bedrock-agent-runtime";
-import type { RAGProvider, RAGResponse, RAGMetadata } from "../types";
+import type { RAGProvider, RAGResponse, RAGMetadata, ConversationMessage } from "../types";
 import { traceable } from "langsmith/traceable";
 import { getCurrentRunTree } from "langsmith/singletons/traceable";
 import { BedrockChatService } from "../../services/bedrock-chat";
@@ -246,10 +246,12 @@ export class AWSKnowledgeBaseRAGProvider implements RAGProvider {
       }
     };
 
-  private llmCompletion = async (message: string, context: any[]) => {
+  private llmCompletion = async (message: string, context: any[], messages?: ConversationMessage[]) => {
       log("🤖 [AWSKnowledgeBase] Starting LLM completion", {
         messageLength: message.length,
         contextItems: context.length,
+        hasConversationHistory: !!(messages && messages.length > 0),
+        conversationLength: messages?.length || 0,
       });
 
       try {
@@ -298,7 +300,7 @@ export class AWSKnowledgeBaseRAGProvider implements RAGProvider {
         // Build options object with explicit traceHeaders check
         const chatOptions: any = {
           temperature: 0.7,
-          max_tokens: 2000,
+          max_tokens: 4096,  // Increased from 2000 to allow for longer responses with tool results
         };
 
         // Only add traceHeaders if they exist to avoid undefined values
@@ -312,12 +314,10 @@ export class AWSKnowledgeBaseRAGProvider implements RAGProvider {
           log("⚠️ [AWSKnowledgeBase] No trace headers to include in chat options");
         }
 
-        // Call chat service directly with trace headers (no traceable wrapper to avoid header blocking)
-        const stream = await this.chatService.createChatCompletion(
-          [
-            {
-              role: "system",
-              content: `You are a helpful assistant for Couchbase with access to both documentation context and live database tools.
+        // Build conversation messages with system prompt and context
+        const systemMessage = {
+          role: "system",
+          content: `You are a helpful assistant for Couchbase with access to both documentation context and live database tools.
 
 🔴 TOOL USAGE GUIDELINES 🔴
 
@@ -358,13 +358,45 @@ NEVER use context to answer questions about current system state, running querie
 RESPONSE GUIDELINES:
 - Do not include references in your response as they will be added automatically
 - When showing live data from tools, display ALL items - do not summarize
-- If you cannot answer based on context or tools, say so clearly`,
-            },
+- If you cannot answer based on context or tools, say so clearly
+
+CONTEXT FOR CURRENT QUERY:
+${contextText}`,
+        };
+
+        // Build conversation messages
+        let conversationMessages = [];
+        
+        // If we have conversation history, use it
+        if (messages && messages.length > 0) {
+          // Add system message first
+          conversationMessages.push(systemMessage);
+          
+          // Add all conversation messages
+          conversationMessages.push(...messages);
+          
+          // If the last message doesn't match our current message, add it
+          const lastMessage = messages[messages.length - 1];
+          if (!lastMessage || lastMessage.content !== message) {
+            conversationMessages.push({
+              role: "user",
+              content: message,
+            });
+          }
+        } else {
+          // No conversation history, use the traditional format
+          conversationMessages = [
+            systemMessage,
             {
               role: "user",
-              content: `Context: ${contextText}\n\nQuestion: ${message}`,
+              content: message,
             },
-          ],
+          ];
+        }
+
+        // Call chat service with full conversation history
+        const stream = await this.chatService.createChatCompletion(
+          conversationMessages,
           chatOptions, // Pass the explicitly built options object
         );
 
@@ -492,9 +524,11 @@ RESPONSE GUIDELINES:
       }
     );
 
-    this.ragPipeline = async (message: string) => {
+    this.ragPipeline = async (message: string, messages?: ConversationMessage[]) => {
       log("🔄 [TRACE DEBUG] Starting RAG pipeline within conversation trace", {
         messageLength: message.length,
+        hasConversationHistory: !!(messages && messages.length > 0),
+        conversationLength: messages?.length || 0,
       });
 
       // Debug: Check current run context
@@ -516,7 +550,7 @@ RESPONSE GUIDELINES:
       const { context, processingTime, totalChars, avgScore } = await tracedContextProcessing(response);
 
       // Step 3: LLM Completion (child trace)
-      const { stream, llmTime } = await tracedLLMCompletion(message, context);
+      const { stream, llmTime } = await tracedLLMCompletion(message, context, messages);
 
       // Create a simple stream wrapper to capture the final response
       const wrappedStream = this.createStreamWrapper(stream, {
@@ -544,11 +578,13 @@ RESPONSE GUIDELINES:
     log("✅ [AWSKnowledgeBase] Initialization complete with enhanced tracing");
   }
 
-  async query(message: string, metadata: RAGMetadata): Promise<RAGResponse> {
+  async query(message: string, metadata: RAGMetadata, messages?: ConversationMessage[]): Promise<RAGResponse> {
     log("📥 [AWSKnowledgeBaseProvider] Query received", {
       messageLength: message.length,
       userId: metadata.userId,
       timestamp: new Date().toISOString(),
+      hasConversationHistory: !!(messages && messages.length > 0),
+      conversationLength: messages?.length || 0,
     });
 
     try {
@@ -558,7 +594,7 @@ RESPONSE GUIDELINES:
       const threadId =
         metadata.sessionId || `session-${metadata.userId}-${Date.now()}`;
 
-      const result = await this.ragPipeline(message);
+      const result = await this.ragPipeline(message, messages);
 
       const queryEnd = Date.now();
       const totalQueryTime = queryEnd - queryStart;

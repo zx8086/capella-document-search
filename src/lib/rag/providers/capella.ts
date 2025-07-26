@@ -1,6 +1,6 @@
 /* src/lib/rag/providers/capella.ts */
 
-import type { RAGProvider, RAGResponse, RAGMetadata } from '../types';
+import type { RAGProvider, RAGResponse, RAGMetadata, ConversationMessage } from '../types';
 import { Worker } from 'worker_threads';
 import { log, err } from '$utils/unifiedLogger';
 import { traceable } from "langsmith/traceable";
@@ -31,9 +31,13 @@ export class CapellaRAGProvider implements RAGProvider {
         log('📊 [Capella] Creating traceable pipeline');
         
         // Create traced pipeline
-        this.traceablePipeline = traceable(async (message: string) => {
+        this.traceablePipeline = traceable(async (message: string, messages?: ConversationMessage[]) => {
             try {
-                log('🔄 [Capella] Processing query:', { messageLength: message.length });
+                log('🔄 [Capella] Processing query:', { 
+                    messageLength: message.length,
+                    hasConversationHistory: !!(messages && messages.length > 0),
+                    conversationLength: messages?.length || 0
+                });
                 
                 // Enhanced embedding logging
                 log('🔤 [Capella] Generating embedding with Bedrock');
@@ -87,19 +91,44 @@ export class CapellaRAGProvider implements RAGProvider {
                     metadata: match.metadata
                 })).filter(item => item.text) : [];
 
-                // Generate completion using Bedrock
-                const stream = await this.chatService.createChatCompletion([
-                    {
-                        role: "system",
-                        content: "You are a helpful assistant. Use the following context to answer the user's question. Do not include references in your response as they will be added automatically. If you cannot answer the question based on the context, say so."
-                    },
-                    {
-                        role: "user",
-                        content: `Context: ${context?.map(c => c.text).join('\n\n---\n\n')}\n\nQuestion: ${message}`
+                // Build conversation messages with context
+                const systemMessage = {
+                    role: "system",
+                    content: "You are a helpful assistant. Use the following context to answer the user's question. Do not include references in your response as they will be added automatically. If you cannot answer the question based on the context, say so."
+                };
+
+                let conversationMessages = [];
+                
+                if (messages && messages.length > 0) {
+                    // Add system message first
+                    conversationMessages.push(systemMessage);
+                    
+                    // Add all conversation messages
+                    conversationMessages.push(...messages);
+                    
+                    // If the last message doesn't match our current message, add it with context
+                    const lastMessage = messages[messages.length - 1];
+                    if (!lastMessage || lastMessage.content !== message) {
+                        conversationMessages.push({
+                            role: "user",
+                            content: `Context: ${context?.map(c => c.text).join('\n\n---\n\n')}\n\nQuestion: ${message}`
+                        });
                     }
-                ], {
+                } else {
+                    // No conversation history, use the traditional format
+                    conversationMessages = [
+                        systemMessage,
+                        {
+                            role: "user",
+                            content: `Context: ${context?.map(c => c.text).join('\n\n---\n\n')}\n\nQuestion: ${message}`
+                        }
+                    ];
+                }
+
+                // Generate completion using Bedrock with full conversation
+                const stream = await this.chatService.createChatCompletion(conversationMessages, {
                     temperature: 0.7,
-                    max_tokens: 2000
+                    max_tokens: 4096  // Increased to allow for longer responses
                 });
 
                 return { stream, context };
@@ -120,14 +149,16 @@ export class CapellaRAGProvider implements RAGProvider {
         log('✅ [Capella] Initialization complete');
     }
 
-    async query(message: string, metadata: RAGMetadata): Promise<RAGResponse> {
+    async query(message: string, metadata: RAGMetadata, messages?: ConversationMessage[]): Promise<RAGResponse> {
         log('📝 [CapellaProvider] Query received:', {
             messageLength: message.length,
-            userId: metadata.userId
+            userId: metadata.userId,
+            hasConversationHistory: !!(messages && messages.length > 0),
+            conversationLength: messages?.length || 0
         });
         
         try {
-            const result = await this.traceablePipeline(message, {
+            const result = await this.traceablePipeline(message, messages, {
                 metadata,
                 tags: [
                     "rag-query",

@@ -46,7 +46,12 @@ export interface RAGMetadata {
     [key: string]: any;
 }
 
+export interface ConversationMessage {
+    role: 'user' | 'assistant' | 'system';
+    content: string;
+}
+
 export interface RAGProvider {
-    query: (message: string, metadata: RAGMetadata) => Promise<RAGResponse>;
+    query: (message: string, metadata: RAGMetadata, messages?: ConversationMessage[]) => Promise<RAGResponse>;
     initialize: () => Promise<void>;
 } 

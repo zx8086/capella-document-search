@@ -75,7 +75,7 @@ const processConversation = traceable(
 
     try {
       // Execute RAG query within conversation trace context
-      const { stream, context } = await ragProvider.query(currentMessage, metadata);
+      const { stream, context } = await ragProvider.query(currentMessage, metadata, conversationMessages);
 
       log("✅ [TRACE DEBUG] RAG query completed within conversation trace", {
         contextSize: context?.length || 0,

@@ -57,6 +57,7 @@ const RagConfigSchema = z.object({
   BEDROCK_EMBEDDING_MODEL: z.string(),
   BEDROCK_CHAT_MODEL: z.string(),
   KNOWLEDGE_BASE_ID: z.string(),
+  BEDROCK_MAX_TOOL_RECURSION_DEPTH: z.number().min(0).max(10).default(3),
 });
 
 const BackendConfigSchema = z.object({
@@ -116,6 +117,7 @@ const defaultConfig: BackendConfig = {
     BEDROCK_EMBEDDING_MODEL: "amazon.titan-embed-text-v1",
     BEDROCK_CHAT_MODEL: "anthropic.claude-3-5-sonnet-20241022-v2:0",
     KNOWLEDGE_BASE_ID: "OSYN5HVWI2",
+    BEDROCK_MAX_TOOL_RECURSION_DEPTH: 1,
   },
 };
 
@@ -167,6 +169,7 @@ const envVarMapping = {
     BEDROCK_EMBEDDING_MODEL: "BEDROCK_EMBEDDING_MODEL",
     BEDROCK_CHAT_MODEL: "BEDROCK_CHAT_MODEL",
     KNOWLEDGE_BASE_ID: "KNOWLEDGE_BASE_ID",
+    BEDROCK_MAX_TOOL_RECURSION_DEPTH: "BEDROCK_MAX_TOOL_RECURSION_DEPTH",
   },
 };
 
@@ -191,12 +194,12 @@ function parseEnvVar(
   type: "string" | "number" | "boolean",
 ): unknown {
   if (value === undefined) return undefined;
-  
+
   // Clean up quoted values
   if (typeof value === "string") {
     value = value.replace(/^['"]|['"]$/g, "").trim();
   }
-  
+
   if (type === "number") return Number(value);
   if (type === "boolean") return value.toLowerCase() === "true";
   return value;
@@ -416,6 +419,11 @@ function loadConfigFromEnv(): Partial<BackendConfig> {
         getEnvVar(envVarMapping.rag.KNOWLEDGE_BASE_ID),
         "string",
       ) as string) || defaultConfig.rag.KNOWLEDGE_BASE_ID,
+    BEDROCK_MAX_TOOL_RECURSION_DEPTH:
+      (parseEnvVar(
+        getEnvVar(envVarMapping.rag.BEDROCK_MAX_TOOL_RECURSION_DEPTH),
+        "number",
+      ) as number) || defaultConfig.rag.BEDROCK_MAX_TOOL_RECURSION_DEPTH,
   };
 
   return config;

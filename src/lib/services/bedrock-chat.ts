@@ -2134,14 +2134,14 @@ export class BedrockChatService {
           // This allows the LLM to execute tools once, then execute follow-up tools once more
           // Example: get_system_nodes -> get_system_vitals (depth 0 -> depth 1)
           const recursionDepth = (options as any).recursionDepth || 0;
-          const maxRecursionDepth = 1; // Allow one level of tool recursion
+          const maxRecursionDepth = backendConfig.rag.BEDROCK_MAX_TOOL_RECURSION_DEPTH || 1; // Use configurable value
           
           if (recursionDepth >= maxRecursionDepth) {
             log("🚫 [BedrockChat] Maximum recursion depth reached, skipping tool execution", {
               recursionDepth,
               maxRecursionDepth,
             });
-            yield "\n\n[Tool execution skipped - maximum recursion depth reached]\n";
+            yield `\n\n[Additional tools were requested but execution limit reached (${recursionDepth}/${maxRecursionDepth} rounds). To allow more tool rounds, increase BEDROCK_MAX_TOOL_RECURSION_DEPTH.]\n`;
             return;
           }
 
