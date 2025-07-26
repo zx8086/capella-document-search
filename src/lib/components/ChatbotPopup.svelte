@@ -194,6 +194,8 @@
   let currentLoadingMessageId = $state<string | null>(null);
   // Track thinking content per message
   let messageThinking = $state<Map<string, string>>(new Map());
+  // Track which messages used extended thinking
+  let extendedThinkingMessages = $state<Set<string>>(new Set());
   let enableExtendedThinking = $state(false);
   
   // Use derived with safe access to avoid initialization issues
@@ -381,6 +383,11 @@
         const loadingMessageId = chatStore.addMessage('assistant', '', true);
         currentLoadingMessageId = loadingMessageId;
         console.log('💬 Created loading message with ID:', loadingMessageId);
+        
+        // Track if this message uses extended thinking
+        if (enableExtendedThinking) {
+            extendedThinkingMessages.add(loadingMessageId);
+        }
 
         const sessionStartTime = new Date().toISOString();
         const response = await fetch('/api/chat', {
@@ -709,6 +716,7 @@
     isThinking = false;
     currentThinking = '';
     messageThinking.clear();
+    extendedThinkingMessages.clear();
   }
 
   $effect(() => {
@@ -844,7 +852,9 @@
                     <!-- Simple thinking spinner -->
                     <div class="flex items-center gap-2 mb-2 text-blue-600 dark:text-blue-400">
                       <div class="animate-spin rounded-full h-4 w-4 border-2 border-blue-500 border-t-transparent flex-shrink-0"></div>
-                      <span class="text-sm font-medium">Thinking...</span>
+                      <span class="text-sm font-medium">
+                        {extendedThinkingMessages.has(message.id) ? 'Extended Thinking...' : 'Thinking...'}
+                      </span>
                     </div>
                   {/if}
                   

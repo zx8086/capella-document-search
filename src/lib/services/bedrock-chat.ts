@@ -2129,10 +2129,26 @@ export class BedrockChatService {
           });
           
           yield "\n\n[Executing tools...]\n";
+          
+          // Track recursion depth to prevent infinite loops
+          // This allows the LLM to execute tools once, then execute follow-up tools once more
+          // Example: get_system_nodes -> get_system_vitals (depth 0 -> depth 1)
+          const recursionDepth = (options as any).recursionDepth || 0;
+          const maxRecursionDepth = 1; // Allow one level of tool recursion
+          
+          if (recursionDepth >= maxRecursionDepth) {
+            log("🚫 [BedrockChat] Maximum recursion depth reached, skipping tool execution", {
+              recursionDepth,
+              maxRecursionDepth,
+            });
+            yield "\n\n[Tool execution skipped - maximum recursion depth reached]\n";
+            return;
+          }
 
           const toolResults: ContentBlock[] = [];
           const toolExecutionStart = Date.now();
           let toolsExecuted = 0;
+          const toolResultsForDisplay: string[] = []; // Store formatted results for display
 
           for (const content of assistantMessage.content) {
             if (content.toolUse) {
@@ -2183,6 +2199,9 @@ export class BedrockChatService {
                   status: result.success ? "success" : "error",
                 },
               });
+              
+              // Store formatted result for display
+              toolResultsForDisplay.push(`\n### Tool: ${name}\n${result.content || JSON.stringify(result.data, null, 2)}`);
             }
           }
 
@@ -2195,6 +2214,11 @@ export class BedrockChatService {
               totalToolExecutionTime / toolsExecuted,
             ),
           });
+          
+          // Display tool results to user
+          if (toolResultsForDisplay.length > 0) {
+            yield "\n" + toolResultsForDisplay.join("\n") + "\n";
+          }
 
           // Continue conversation with tool results
           converseMessages.push(assistantMessage);
@@ -2217,11 +2241,92 @@ export class BedrockChatService {
           const continueResponse = await this.client.send(continueCommand);
 
           if (continueResponse.stream) {
+            let continuationStopReason = "";
+            let continuationAssistantMessage: Message = { role: "assistant", content: [] };
+            let continuationContentIndex = -1;
+            
             for await (const event of continueResponse.stream) {
-              if (event.contentBlockDelta?.delta?.text) {
-                yield event.contentBlockDelta.delta.text;
-                fullResponseText += event.contentBlockDelta.delta.text; // Track continuation text
+              if (event.contentBlockStart) {
+                continuationContentIndex++;
+                if (event.contentBlockStart.start?.toolUse) {
+                  continuationAssistantMessage.content.push({
+                    toolUse: {
+                      toolUseId: event.contentBlockStart.start.toolUse.toolUseId || "",
+                      name: event.contentBlockStart.start.toolUse.name || "",
+                      input: {},
+                    },
+                  });
+                } else {
+                  continuationAssistantMessage.content.push({ text: "" });
+                }
+              } else if (event.contentBlockDelta?.delta) {
+                if (event.contentBlockDelta.delta.text !== undefined) {
+                  yield event.contentBlockDelta.delta.text;
+                  fullResponseText += event.contentBlockDelta.delta.text;
+                  
+                  // Update text content
+                  const content = continuationAssistantMessage.content[continuationContentIndex];
+                  if (content && 'text' in content) {
+                    content.text = (content.text || "") + event.contentBlockDelta.delta.text;
+                  }
+                } else if (event.contentBlockDelta.delta.toolUse?.input) {
+                  // Accumulate tool input
+                  const content = continuationAssistantMessage.content[continuationContentIndex];
+                  if (content && content.toolUse) {
+                    const inputChunk = event.contentBlockDelta.delta.toolUse.input;
+                    if (typeof inputChunk === 'string') {
+                      content.toolUse.input = JSON.parse(inputChunk);
+                    } else {
+                      content.toolUse.input = { ...content.toolUse.input, ...inputChunk };
+                    }
+                  }
+                }
+              } else if (event.messageStop) {
+                continuationStopReason = event.messageStop.stopReason || "";
+                log("🔍 [BedrockChat] Continuation stop reason", {
+                  stopReason: continuationStopReason,
+                });
+              } else if (event.metadata?.usage) {
+                // Capture token usage from continuation
+                tokenUsage = {
+                  inputTokens: (tokenUsage?.inputTokens || 0) + (event.metadata.usage.inputTokens || 0),
+                  outputTokens: (tokenUsage?.outputTokens || 0) + (event.metadata.usage.outputTokens || 0),
+                  totalTokens: (tokenUsage?.totalTokens || 0) + (event.metadata.usage.totalTokens || 0),
+                  timestamp: new Date().toISOString(),
+                  model: this.modelId,
+                  estimatedCost: 0, // Will calculate after
+                };
               }
+            }
+            
+            // Handle recursive tool use if continuation also requests tools
+            if (continuationStopReason === "tool_use" && recursionDepth < maxRecursionDepth) {
+              const additionalToolCalls = continuationAssistantMessage.content.filter(c => c.toolUse);
+              log("🔄 [BedrockChat] Continuation requested additional tools, executing recursively", {
+                toolCount: additionalToolCalls.length,
+                recursionDepth,
+                maxRecursionDepth,
+              });
+              
+              // Recursively execute the additional tools
+              yield "\n";
+              const recursiveOptions = { 
+                ...options, 
+                recursionDepth: recursionDepth + 1,
+                traceHeaders: options.traceHeaders // Preserve trace headers
+              };
+              
+              // Execute the recursive tool call
+              const recursiveMessages = [...converseMessages, continuationAssistantMessage];
+              for await (const chunk of this.converseStream(recursiveMessages, systemPrompt, tools, recursiveOptions)) {
+                yield chunk;
+              }
+            } else if (continuationStopReason === "tool_use") {
+              log("🚫 [BedrockChat] Recursion depth exceeded, preventing infinite loop", {
+                recursionDepth,
+                maxRecursionDepth,
+              });
+              yield "\n\n[Additional tools were requested but execution was limited to prevent excessive recursion]\n";
             }
             
             // Extract token usage from continuation response metadata
