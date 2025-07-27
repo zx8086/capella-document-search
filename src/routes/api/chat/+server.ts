@@ -393,6 +393,9 @@ ${contextContent}
 - Use markdown formatting to enhance readability (bullet points, code blocks, bold for emphasis)
 - When context is insufficient, clearly state what information is missing
 - Prioritize accuracy and completeness in your responses
+- IMPORTANT: When you offer to execute a tool (e.g., "Would you like me to...?") and the user responds with confirmation ("Yes", "OK", "Sure", "Please", "Go ahead"), immediately execute that tool
+- IMPORTANT: If the user provides a very short response like "Yes" without clear context, ask for clarification rather than assuming what they mean
+- Keep responses concise and focused - avoid overly long explanations unless specifically requested
 ${metadata.enableExtendedThinking ? `- When asked to think step-by-step, use <thinking> tags to show your reasoning
 - In your thinking section:
   * Analyze what the user is asking for
@@ -448,25 +451,8 @@ ${metadata.enableExtendedThinking ? `- When asked to think step-by-step, use <th
               if (content) {
                 fullResponse += content;
                 
-                // Check if tools are being executed - comprehensive tool detection
-                if (content.includes("[Executing tools...]") || 
-                    content.includes("get_system_vitals") ||
-                    content.includes("get_system_nodes") ||
-                    content.includes("get_fatal_requests") ||
-                    content.includes("get_most_expensive_queries") ||
-                    content.includes("get_longest_running_queries") ||
-                    content.includes("get_most_frequent_queries") ||
-                    content.includes("get_largest_result_size_queries") ||
-                    content.includes("get_largest_result_count_queries") ||
-                    content.includes("get_primary_index_queries") ||
-                    content.includes("get_system_indexes") ||
-                    content.includes("get_completed_requests") ||
-                    content.includes("get_prepared_statements") ||
-                    content.includes("get_indexes_to_drop") ||
-                    content.includes("get_detailed_indexes") ||
-                    content.includes("get_detailed_prepared_statements") ||
-                    content.includes("get_schema_for_collection") ||
-                    content.includes("run_sql_plus_plus_query")) {
+                // Check if tools are being executed
+                if (content.includes("[Executing tools...]")) {
                   toolsWereExecuted = true;
                   log("🔧 [Server] Tools execution detected in stream");
                 }
@@ -582,29 +568,27 @@ ${metadata.enableExtendedThinking ? `- When asked to think step-by-step, use <th
               request.signal.removeEventListener('abort', abortHandler);
             }
             
-            // Send user-friendly error message to client (unless it was aborted)
-            if (errorMessage !== 'Request was aborted') {
-              const userFriendlyError = getUserFriendlyErrorMessage(errorMessage);
-              const errorJsonLine = JSON.stringify({ 
-                content: userFriendlyError,
-                error: true 
-              }) + "\n";
-              
-              try {
+            // Always try to send a done signal to ensure client doesn't get stuck
+            try {
+              if (errorMessage !== 'Request was aborted') {
+                const userFriendlyError = getUserFriendlyErrorMessage(errorMessage);
+                const errorJsonLine = JSON.stringify({ 
+                  content: userFriendlyError,
+                  error: true 
+                }) + "\n";
                 controller.enqueue(new TextEncoder().encode(errorJsonLine));
-                const doneMessage = JSON.stringify({ done: true, runId: runId }) + "\n";
-                controller.enqueue(new TextEncoder().encode(doneMessage));
-                controller.close();
-              } catch (controllerError) {
-                log("❌ Failed to send error message to client:", { error: controllerError });
-                controller.error(error);
               }
-            } else {
-              // For aborted requests, just close the stream
+              
+              // IMPORTANT: Always send done signal even on errors
+              const doneMessage = JSON.stringify({ done: true, error: true, runId: runId }) + "\n";
+              controller.enqueue(new TextEncoder().encode(doneMessage));
+              controller.close();
+            } catch (controllerError) {
+              log("❌ Failed to send error/done message to client:", { error: controllerError });
               try {
-                controller.close();
+                controller.error(error);
               } catch {
-                // Stream might already be closed
+                // Controller might already be errored/closed
               }
             }
           }

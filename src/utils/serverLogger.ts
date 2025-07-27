@@ -67,17 +67,21 @@ function getLogger(config: BackendConfig): winston.Logger {
     return coloredMessage;
   });
 
-  const transports: winston.transport[] = [
-    new winston.transports.Console({
-      level: config.application.LOG_LEVEL || "info",
-      format: winston.format.combine(
-        customColorize,
-        ecsFormat()
-      ),
-    }),
-  ];
+  const transports: winston.transport[] = [];
 
   if (config.application.ENABLE_FILE_LOGGING) {
+    // Add console transport
+    transports.push(
+      new winston.transports.Console({
+        level: config.application.LOG_LEVEL || "info",
+        format: winston.format.combine(
+          customColorize,
+          ecsFormat()
+        ),
+      })
+    );
+
+    // Add file transport
     transports.push(
       new DailyRotateFile({
         filename: "logs/application-%DATE%.log",

@@ -55,6 +55,7 @@ export default defineConfig(({ mode }): UserConfig => {
           '$app/navigation': './.svelte-kit/runtime/app/navigation',
           '$app/stores': './.svelte-kit/runtime/app/stores',
           'node:events': 'events',
+          'node:http': 'stream-http',
           events: 'events-browserify',
           'sdp': 'sdp/sdp.js',
           // Add zen-observable alias to handle default export
@@ -82,7 +83,9 @@ export default defineConfig(({ mode }): UserConfig => {
           credentials: false
         },
         hmr: {
-          timeout: 5000
+          timeout: 5000,
+          protocol: 'ws',
+          host: 'localhost'
         },
         proxy: {
           '/openreplay': {

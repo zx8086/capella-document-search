@@ -1,8 +1,6 @@
 /* src/instrumentation.ts */
 
-import { debug, log, warn, err } from "./utils/browserLogger";
-
-log("Starting Application - Couchbase Capella Document Search Application");
+console.log("Starting Application - Couchbase Capella Document Search Application");
 
 import { diag, DiagConsoleLogger, DiagLogLevel } from "@opentelemetry/api";
 import { NodeSDK } from "@opentelemetry/sdk-node";
@@ -21,13 +19,13 @@ import { WinstonInstrumentation } from "@opentelemetry/instrumentation-winston";
 import { GraphQLInstrumentation } from "@opentelemetry/instrumentation-graphql";
 import { backendConfig } from "./backend-config";
 
-log("Starting OpenTelemetry instrumentation...");
+console.log("Starting OpenTelemetry instrumentation...");
 
 const INSTRUMENTATION_ENABLED =
   (Bun.env["ENABLE_OPENTELEMETRY"] as string) === "true" &&
   Bun.env["DISABLE_OPENTELEMETRY"] !== "true";
 
-log("OpenTelemetry enabled:", { INSTRUMENTATION_ENABLED });
+console.log("OpenTelemetry enabled:", { INSTRUMENTATION_ENABLED });
 
 let sdk: NodeSDK | undefined;
 
@@ -45,7 +43,7 @@ const exporterTimeout = 300000; // 5 minutes
 async function initializeOpenTelemetry() {
   if (INSTRUMENTATION_ENABLED) {
     try {
-      log("Initializing OpenTelemetry SDK...");
+      console.log("Initializing OpenTelemetry SDK...");
       // Reduce OpenTelemetry diagnostic verbosity to prevent duplicate console logs
       diag.setLogger(new DiagConsoleLogger(), DiagLogLevel.WARN);
 
@@ -57,7 +55,7 @@ async function initializeOpenTelemetry() {
         timeoutMillis: exporterTimeout,
       });
 
-      log("Traces exporter created with config:", {
+      console.log("Traces exporter created with config:", {
         url: backendConfig.openTelemetry.TRACES_ENDPOINT,
         timeout: exporterTimeout,
       });
@@ -68,7 +66,7 @@ async function initializeOpenTelemetry() {
         timeoutMillis: exporterTimeout,
       });
 
-      log("Logs exporter created with config:", {
+      console.log("Logs exporter created with config:", {
         url: backendConfig.openTelemetry.LOGS_ENDPOINT,
         timeout: exporterTimeout,
       });
@@ -109,11 +107,11 @@ async function initializeOpenTelemetry() {
       });
 
       sdk.start();
-      log("OpenTelemetry SDK started");
+      console.log("OpenTelemetry SDK started");
 
       process.on("SIGTERM", () => {
         const shutdownTimeout = setTimeout(() => {
-          err("SDK shutdown timed out, forcing exit");
+          console.error("SDK shutdown timed out, forcing exit");
           process.exit(1);
         }, 5000);
 
@@ -121,20 +119,20 @@ async function initializeOpenTelemetry() {
           ?.shutdown()
           .then(() => {
             clearTimeout(shutdownTimeout);
-            log("SDK shut down successfully");
+            console.log("SDK shut down successfully");
             setTimeout(() => process.exit(0), 1000);
           })
           .catch((error) => {
             clearTimeout(shutdownTimeout);
-            err("Error shutting down SDK", error);
+            console.error("Error shutting down SDK", error);
             process.exit(1);
           });
       });
     } catch (error) {
-      err("Error initializing OpenTelemetry SDK:", error);
+      console.error("Error initializing OpenTelemetry SDK:", error);
     }
   } else {
-    log("OpenTelemetry instrumentation is disabled");
+    console.log("OpenTelemetry instrumentation is disabled");
   }
 }
 

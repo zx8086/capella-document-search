@@ -192,6 +192,7 @@
   let isThinking = $state(false);
   let abortController = $state<AbortController | null>(null);
   let currentLoadingMessageId = $state<string | null>(null);
+  
   // Track thinking content per message
   let messageThinking = $state<Map<string, string>>(new Map());
   // Track which messages used extended thinking
@@ -209,6 +210,9 @@
     (conversation && conversation.messages.filter(msg => !msg.isLoading).length > MAX_CONTEXT_THRESHOLD) ? "Approaching context limit - consider clearing conversation..." :
     "Type your Couchbase Capella related question here..."
   );
+  
+  // Derive button disabled state for better reactivity
+  let isButtonDisabled = $derived(isLoading ? false : !newMessage.trim());
   
   // Get first name from full name
   function getFirstName(fullName: string = ''): string {
@@ -283,6 +287,34 @@
 
       // Initialize chat store
       chatStore.initialize($userAccount?.name);
+      
+      // Set up periodic check for stuck loading states
+      const stuckCheckInterval = setInterval(() => {
+        if (messages.length > 0) {
+          const stuckMessages = messages.filter(m => m.isLoading && m.timestamp && 
+            (Date.now() - new Date(m.timestamp).getTime()) > 40000); // 40 seconds
+          
+          if (stuckMessages.length > 0) {
+            console.warn('⚠️ Detected stuck loading messages:', stuckMessages.length);
+            stuckMessages.forEach(msg => {
+              console.log('🔧 Force-clearing stuck message:', msg.id);
+              chatStore.updateMessage(msg.id, 
+                msg.content || 'Request timed out. Please refresh and try again.', false);
+            });
+            
+            // Force clear thinking state
+            if (isThinking || currentLoadingMessageId) {
+              isThinking = false;
+              currentThinking = '';
+              isLoading = false;
+              currentLoadingMessageId = null;
+            }
+          }
+        }
+      }, 5000); // Check every 5 seconds
+      
+      // Store interval ID for cleanup
+      window.__stuckCheckInterval = stuckCheckInterval;
 
       // Fetch user photo if authenticated
       if ($isAuthenticated && $userAccount) {
@@ -356,7 +388,11 @@
   }
 
   async function handleSubmit() {
-    if (!newMessage.trim()) return;
+    // Prevent submission if already loading or no message
+    if (isLoading || !newMessage.trim()) {
+      console.log('⚠️ Prevented submission:', { isLoading, hasMessage: !!newMessage.trim() });
+      return;
+    }
     
     const userMessage = newMessage.trim();
     newMessage = '';
@@ -374,6 +410,18 @@
         abortController.abort('timeout');
       }
     }, 30000);
+    
+    // Set up failsafe timeout to ensure thinking state is cleared (35 seconds)
+    const failsafeTimeoutId = setTimeout(() => {
+      console.log('⏰ Failsafe timeout triggered - clearing thinking state');
+      if (isThinking && currentLoadingMessageId) {
+        // Force clear the loading state
+        chatStore.updateMessage(currentLoadingMessageId, 'Request timed out. Please try again.', false);
+        isThinking = false;
+        currentThinking = '';
+        isLoading = false;
+      }
+    }, 35000);
     
     try {
         // Add user message to conversation
@@ -449,6 +497,8 @@
 
         try {
             let streamComplete = false;
+            let readAttempts = 0;
+            const maxReadAttempts = 3;
             
             while (!streamComplete) {
                 // Check if aborted before reading next chunk
@@ -459,7 +509,24 @@
                 }
                 
                 console.log('📥 Reading next chunk...');
-                const result = await reader.read();
+                let result;
+                
+                try {
+                    result = await reader.read();
+                    readAttempts = 0; // Reset attempts on successful read
+                } catch (readError) {
+                    readAttempts++;
+                    console.error(`❌ Read error (attempt ${readAttempts}/${maxReadAttempts}):`, readError);
+                    
+                    if (readAttempts >= maxReadAttempts) {
+                        throw new Error('Failed to read stream after multiple attempts');
+                    }
+                    
+                    // Wait briefly before retry
+                    await new Promise(resolve => setTimeout(resolve, 1000));
+                    continue;
+                }
+                
                 console.log('📦 Read result:', { done: result.done, hasValue: !!result.value });
                 
                 // Check for stream completion before processing value
@@ -487,12 +554,15 @@
                             console.log('🔍 Parsed data:', data);
                             
                             if (data.done) {
-                                console.log('🏁 Received done signal');
+                                console.log('🏁 Received done signal', { hasError: data.error });
                                 // Capture runId if provided in done message
-                                if (data.runId) {
+                                if (data.runId && !data.error) {
                                     console.log('📝 Captured runId for feedback:', data.runId);
                                     // Update the message with runId for feedback functionality
                                     chatStore.updateMessage(loadingMessageId, cleanedText || accumulatedResponse, false, data.runId);
+                                } else {
+                                    // Ensure loading state is cleared even on error
+                                    chatStore.updateMessage(loadingMessageId, cleanedText || accumulatedResponse, false);
                                 }
                                 streamComplete = true;
                                 break;
@@ -568,13 +638,14 @@
                 currentThinking = fallbackThinking;
             }
             
-            // Ensure final message state is set with cleaned response (runId will be added when done signal is received)
-            if (!cleanedText.trim()) {
-                // If no cleaned text, use the final response
-                chatStore.updateMessage(loadingMessageId, accumulatedResponse, false);
-            } else {
-                chatStore.updateMessage(loadingMessageId, cleanedText, false);
-            }
+            // CRITICAL: Always ensure final message state is not loading
+            const finalContent = cleanedText.trim() || accumulatedResponse || 'Response completed.';
+            console.log('🏁 Setting final message state:', { 
+                messageId: loadingMessageId, 
+                contentLength: finalContent.length,
+                isLoading: false 
+            });
+            chatStore.updateMessage(loadingMessageId, finalContent, false);
             
             // Stop thinking when response is complete - add small delay for smoother transition
             setTimeout(() => {
@@ -622,14 +693,15 @@
             isThinking = false;
         }, 300);
     } finally {
-        // Clear timeout and cleanup
+        // Clear timeouts and cleanup
         clearTimeout(timeoutId);
+        clearTimeout(failsafeTimeoutId);
         abortController = null;
         currentLoadingMessageId = null;
         isLoading = false;
         // Reset extended thinking after each response
         enableExtendedThinking = false;
-        console.log('🧹 Cleaned up: timeout cleared, controllers reset, extended thinking disabled');
+        console.log('🧹 Cleaned up: timeouts cleared, controllers reset, extended thinking disabled');
     }
   }
 
@@ -741,6 +813,20 @@
       document.documentElement.style.setProperty('--scrollbar-width', `${scrollbarWidth}px`);
       
       document.body.removeChild(scrollDiv);
+    }
+  });
+  
+  onDestroy(() => {
+    // Clean up stuck check interval
+    if (window.__stuckCheckInterval) {
+      clearInterval(window.__stuckCheckInterval);
+      delete window.__stuckCheckInterval;
+    }
+    
+    // Clean up any pending abort controllers
+    if (abortController) {
+      abortController.abort();
+      abortController = null;
     }
   });
 
@@ -858,6 +944,16 @@
                     </div>
                   {/if}
                   
+                  {#if message.type === 'bot' && message.content && message.content.includes('[Executing tools...]')}
+                    <!-- Tool execution indicator -->
+                    <div class="flex items-center gap-2 mb-2 text-amber-600 dark:text-amber-400">
+                      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4 animate-pulse">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M11.42 15.17 17.25 21A2.652 2.652 0 0 0 21 17.25l-5.877-5.877M11.42 15.17l2.496-3.03c.317-.384.74-.626 1.208-.766M11.42 15.17l-4.655 5.653a2.548 2.548 0 1 1-3.586-3.586l6.837-5.63m5.108-.233c.55-.164 1.163-.188 1.743-.14a4.5 4.5 0 0 0 4.486-6.336l-3.276 3.277a3.004 3.004 0 0 1-2.25-2.25l3.276-3.276a4.5 4.5 0 0 0-6.336 4.486c.091 1.076-.071 2.264-.904 3.096l-.102.104m-1.64 1.64-.196.196a5.661 5.661 0 0 1-4.013 1.664 5.662 5.662 0 0 1-5.664-5.664 5.661 5.661 0 0 1 1.664-4.013l4.014-4.014" />
+                      </svg>
+                      <span class="text-sm font-medium">Executing tools to get live data...</span>
+                    </div>
+                  {/if}
+                  
                   {#if message.type === 'bot' && messageThinking.has(message.id)}
                     <!-- AI Reasoning (collapsed by default) -->
                     <ThinkingSection 
@@ -945,13 +1041,15 @@
           <form 
             onsubmit={(e) => {
               e.preventDefault();
-              console.log('📋 Form submitted, isLoading:', isLoading, 'abortController:', !!abortController);
+              console.log('📋 Form submitted, isLoading:', isLoading, 'newMessage:', newMessage, 'abortController:', !!abortController);
               if (isLoading && abortController) {
                 console.log('🛑 Calling handleAbort from form submission');
                 handleAbort();
-              } else {
+              } else if (!isLoading && newMessage.trim()) {
                 console.log('📤 Calling handleSubmit from form submission');
                 handleSubmit();
+              } else {
+                console.log('⚠️ Form submitted but conditions not met');
               }
             }}
             class="border-t border-gray-200 p-4 dark:border-gray-800"
@@ -984,12 +1082,11 @@
               </button>
               <Button 
                 type="submit" 
-                class={isLoading 
-                  ? "bg-red-600 hover:bg-red-700 hover:ring-2 hover:ring-red-500 hover:ring-offset-2 transition-all duration-300 touch-manipulation sm:px-6 sm:py-3"
-                  : "bg-[#00174f] hover:bg-[#00174f]/90 hover:ring-2 hover:ring-red-500 hover:ring-offset-2 transition-all duration-300 disabled:opacity-50 touch-manipulation sm:px-6 sm:py-3"}
-                disabled={isLoading && !abortController}
+                variant={isLoading ? "destructive" : "default"}
+                disabled={isButtonDisabled}
                 aria-label={isLoading ? "Stop request" : "Send message"}
                 data-transaction-name={isLoading ? "Stop Chat Query" : "Send Chat Query"}
+                class="px-4 py-2 sm:px-6 sm:py-3 touch-manipulation {isLoading ? 'bg-red-600 hover:bg-red-700' : 'bg-[#00174f] hover:bg-[#00174f]/90'}"
               >
                 {#if isLoading}
                   Stop
