@@ -300,7 +300,7 @@ export class AWSKnowledgeBaseRAGProvider implements RAGProvider {
         // Build options object with explicit traceHeaders check
         const chatOptions: any = {
           temperature: 0.7,
-          max_tokens: 4096,  // Increased from 2000 to allow for longer responses with tool results
+          max_tokens: backendConfig.rag.BEDROCK_MAX_TOKENS,
         };
 
         // Only add traceHeaders if they exist to avoid undefined values
@@ -331,6 +331,8 @@ ONLY USE TOOLS FOR LIVE SYSTEM DATA REQUESTS:
 - "show me failed queries" → get_fatal_requests()
 - "show me expensive queries" → get_most_expensive_queries()
 - "show me system indexes" → get_system_indexes()
+- When you offer "Would you like me to provide more detailed system vitals?" and user says "Yes" → get_system_vitals()
+- When you offer any tool execution and user confirms → execute that tool immediately
 
 🚫 DO NOT USE TOOLS FOR:
 - General questions about "how to" or "what is"
@@ -341,11 +343,13 @@ ONLY USE TOOLS FOR LIVE SYSTEM DATA REQUESTS:
 🎯 DECISION LOGIC:
 - If user says "show me", "what are my", "do I have" → USE TOOLS
 - If user says "how to", "what is the query for", "how can I" → USE CONTEXT ONLY
+- If user responds "Yes", "OK", "Sure" after you offer to run a tool → EXECUTE THE OFFERED TOOL
 
 ✅ CORRECT BEHAVIOR:
 1. For live data requests → Call appropriate tool function
 2. For conceptual/syntax questions → Use documentation context only
 3. Never fabricate system data or query results
+4. When you offer to execute a tool (e.g., "Would you like me to provide more detailed system vitals?") and the user confirms, immediately execute that tool
 
 CONTEXT USAGE:
 Only use the provided context for:

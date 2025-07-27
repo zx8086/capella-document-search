@@ -1611,6 +1611,37 @@ export class BedrockChatService {
     }
   };
 
+  // Helper function to convert Bedrock Message format to simple format
+  private convertBedrockMessageToSimple(message: Message): { role: string; content: string } {
+    let content = "";
+    
+    if (message.content && Array.isArray(message.content)) {
+      for (const block of message.content) {
+        if (block.text) {
+          content += block.text;
+        } else if (block.toolResult) {
+          // Convert tool results to readable text
+          const toolResult = block.toolResult;
+          if (toolResult.content && Array.isArray(toolResult.content)) {
+            for (const resultBlock of toolResult.content) {
+              if (resultBlock.text) {
+                content += resultBlock.text + "\n";
+              }
+            }
+          }
+        } else if (block.toolUse) {
+          // Include tool use information in the content
+          content += `[Tool called: ${block.toolUse.name}]\n`;
+        }
+      }
+    }
+    
+    return {
+      role: message.role,
+      content: content.trim() || ""
+    };
+  }
+
   // Function to create a streaming chat completion using Converse API
   private async *_createChatCompletion(
     messages: Array<{ role: string; content: string }>,
@@ -1621,6 +1652,7 @@ export class BedrockChatService {
       userId?: string;
       sessionId?: string;
       conversationId?: string;
+      recursionDepth?: number;
     } = {},
   ): AsyncGenerator<string, void, unknown> {
     try {
@@ -1695,7 +1727,7 @@ export class BedrockChatService {
         system: systemPrompt ? [{ text: systemPrompt }] : undefined,
         toolConfig,
         inferenceConfig: {
-          maxTokens: options.max_tokens || 8000,
+          maxTokens: options.max_tokens || backendConfig.rag.BEDROCK_MAX_TOKENS,
           temperature: options.temperature || 0.7,
         },
       });
@@ -1917,10 +1949,13 @@ export class BedrockChatService {
                   estimatedCost: tokenUsage.estimatedCost,
                 });
               }
+            } else if (event.contentBlockStop) {
+              // Handle content block stop event - this signals the end of a content block
+              // No action needed, just acknowledge it to prevent "unknown event" logs
             } else {
               // Debug: Log any other event types we might be missing
               const eventType = Object.keys(event)[0];
-              if (eventType && !['messageStart', 'contentBlockStart', 'contentBlockDelta', 'messageStop', 'metadata'].includes(eventType)) {
+              if (eventType && !['messageStart', 'contentBlockStart', 'contentBlockDelta', 'contentBlockStop', 'messageStop', 'metadata'].includes(eventType)) {
                 log("🔍 [BedrockChat] Unknown event type", {
                   eventType,
                   eventKeys: Object.keys(event),
@@ -2119,6 +2154,15 @@ export class BedrockChatService {
           
         // Usage tracking removed - data is sent to LangSmith only
 
+        // Check if response was truncated due to max tokens
+        if (stopReason === "max_tokens") {
+          log("⚠️ [BedrockChat] Response truncated due to max tokens limit", {
+            responseLength: fullResponseText.length,
+            stopReason,
+          });
+          yield "\n\n[Response truncated due to length limit. Please ask me to continue or be more specific about what you'd like to know.]";
+        }
+
         // AWS Documentation: Handle tool use
         if (stopReason === "tool_use") {
           const toolCalls = assistantMessage.content.filter(c => c.toolUse);
@@ -2133,7 +2177,7 @@ export class BedrockChatService {
           // Track recursion depth to prevent infinite loops
           // This allows the LLM to execute tools once, then execute follow-up tools once more
           // Example: get_system_nodes -> get_system_vitals (depth 0 -> depth 1)
-          const recursionDepth = (options as any).recursionDepth || 0;
+          const recursionDepth = options.recursionDepth || 0;
           const maxRecursionDepth = backendConfig.rag.BEDROCK_MAX_TOOL_RECURSION_DEPTH || 1; // Use configurable value
           
           if (recursionDepth >= maxRecursionDepth) {
@@ -2233,7 +2277,7 @@ export class BedrockChatService {
             system: systemPrompt ? [{ text: systemPrompt }] : undefined,
             toolConfig,
             inferenceConfig: {
-              maxTokens: options.max_tokens || 8000,
+              maxTokens: options.max_tokens || backendConfig.rag.BEDROCK_MAX_TOKENS,
               temperature: options.temperature || 0.7,
             },
           });
@@ -2249,6 +2293,9 @@ export class BedrockChatService {
               if (event.contentBlockStart) {
                 continuationContentIndex++;
                 if (event.contentBlockStart.start?.toolUse) {
+                  if (!continuationAssistantMessage.content) {
+                    continuationAssistantMessage.content = [];
+                  }
                   continuationAssistantMessage.content.push({
                     toolUse: {
                       toolUseId: event.contentBlockStart.start.toolUse.toolUseId || "",
@@ -2257,6 +2304,9 @@ export class BedrockChatService {
                     },
                   });
                 } else {
+                  if (!continuationAssistantMessage.content) {
+                    continuationAssistantMessage.content = [];
+                  }
                   continuationAssistantMessage.content.push({ text: "" });
                 }
               } else if (event.contentBlockDelta?.delta) {
@@ -2274,10 +2324,25 @@ export class BedrockChatService {
                   const content = continuationAssistantMessage.content[continuationContentIndex];
                   if (content && content.toolUse) {
                     const inputChunk = event.contentBlockDelta.delta.toolUse.input;
-                    if (typeof inputChunk === 'string') {
-                      content.toolUse.input = JSON.parse(inputChunk);
-                    } else {
-                      content.toolUse.input = { ...content.toolUse.input, ...inputChunk };
+                    
+                    // Try to parse directly if it's a complete JSON
+                    try {
+                      const inputData = typeof inputChunk === 'string' ? JSON.parse(inputChunk) : inputChunk;
+                      content.toolUse.input = inputData;
+                    } catch (e) {
+                      // Accumulate input if it's being streamed in parts
+                      if (!(content.toolUse as any).inputBuffer) {
+                        (content.toolUse as any).inputBuffer = "";
+                      }
+                      (content.toolUse as any).inputBuffer += inputChunk;
+                      
+                      try {
+                        const parsedInput = JSON.parse((content.toolUse as any).inputBuffer);
+                        content.toolUse.input = parsedInput;
+                        delete (content.toolUse as any).inputBuffer;
+                      } catch (e) {
+                        // Still accumulating
+                      }
                     }
                   }
                 }
@@ -2316,10 +2381,46 @@ export class BedrockChatService {
                 traceHeaders: options.traceHeaders // Preserve trace headers
               };
               
-              // Execute the recursive tool call
-              const recursiveMessages = [...converseMessages, continuationAssistantMessage];
-              for await (const chunk of this.converseStream(recursiveMessages, systemPrompt, tools, recursiveOptions)) {
-                yield chunk;
+              // Convert all messages back to simple format for recursive call
+              const simpleMessages: Array<{ role: string; content: string }> = [];
+              
+              // Add original messages (they're already in simple format)
+              simpleMessages.push(...messages);
+              
+              // Add tool results message
+              const toolResultsContent = toolResults
+                .map(result => result.toolResult.content
+                  .map(c => c.text)
+                  .join("\n"))
+                .join("\n\n");
+              simpleMessages.push({
+                role: "user",
+                content: toolResultsContent
+              });
+              
+              // Add the continuation assistant message
+              simpleMessages.push(this.convertBedrockMessageToSimple(continuationAssistantMessage));
+              
+              log("🔄 [BedrockChat] Executing recursive tool call", {
+                recursionDepth: recursionDepth + 1,
+                messageCount: simpleMessages.length,
+                lastMessage: simpleMessages[simpleMessages.length - 1],
+                optionsKeys: Object.keys(recursiveOptions),
+                hasTraceHeaders: !!recursiveOptions.traceHeaders
+              });
+              
+              // Execute the recursive tool call with properly formatted messages
+              try {
+                for await (const chunk of this._createChatCompletion(simpleMessages, recursiveOptions)) {
+                  yield chunk;
+                }
+              } catch (recursiveError) {
+                err("❌ [BedrockChat] Recursive tool execution failed", {
+                  error: recursiveError instanceof Error ? recursiveError.message : String(recursiveError),
+                  recursionDepth: recursionDepth + 1,
+                  messageCount: simpleMessages.length
+                });
+                yield "\n\n[Error: Failed to execute additional tools. Please try again.]\n";
               }
             } else if (continuationStopReason === "tool_use") {
               log("🚫 [BedrockChat] Recursion depth exceeded, preventing infinite loop", {
@@ -2421,6 +2522,7 @@ export class BedrockChatService {
       userId?: string;
       sessionId?: string;
       conversationId?: string;
+      recursionDepth?: number;
     } = {},
   ) => {
     return this._createChatCompletion(messages, options);

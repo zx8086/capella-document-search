@@ -128,7 +128,7 @@ export class CapellaRAGProvider implements RAGProvider {
                 // Generate completion using Bedrock with full conversation
                 const stream = await this.chatService.createChatCompletion(conversationMessages, {
                     temperature: 0.7,
-                    max_tokens: 4096  // Increased to allow for longer responses
+                    max_tokens: backendConfig.rag.BEDROCK_MAX_TOKENS
                 });
 
                 return { stream, context };

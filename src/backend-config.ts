@@ -58,6 +58,9 @@ const RagConfigSchema = z.object({
   BEDROCK_CHAT_MODEL: z.string(),
   KNOWLEDGE_BASE_ID: z.string(),
   BEDROCK_MAX_TOOL_RECURSION_DEPTH: z.number().min(0).max(10).default(3),
+  // Maximum tokens for Bedrock chat responses (1000-200000, default: 8000)
+  // Controls response length to prevent truncation of large tool outputs
+  BEDROCK_MAX_TOKENS: z.number().min(1000).max(200000).default(8000),
 });
 
 const BackendConfigSchema = z.object({
@@ -118,6 +121,7 @@ const defaultConfig: BackendConfig = {
     BEDROCK_CHAT_MODEL: "anthropic.claude-3-5-sonnet-20241022-v2:0",
     KNOWLEDGE_BASE_ID: "OSYN5HVWI2",
     BEDROCK_MAX_TOOL_RECURSION_DEPTH: 1,
+    BEDROCK_MAX_TOKENS: 8000,
   },
 };
 
@@ -170,6 +174,7 @@ const envVarMapping = {
     BEDROCK_CHAT_MODEL: "BEDROCK_CHAT_MODEL",
     KNOWLEDGE_BASE_ID: "KNOWLEDGE_BASE_ID",
     BEDROCK_MAX_TOOL_RECURSION_DEPTH: "BEDROCK_MAX_TOOL_RECURSION_DEPTH",
+    BEDROCK_MAX_TOKENS: "BEDROCK_MAX_TOKENS",
   },
 };
 
