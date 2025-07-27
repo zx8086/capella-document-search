@@ -51,15 +51,29 @@ jobs:
           snyk test \
             --package-manager=yarn \
             --file=package.json \
+            --project-name="capella-document-search-dependencies" \
             --sarif-file-output=snyk-dependencies.sarif \
             --severity-threshold=high \
             --json > snyk-dependencies-report.json || echo "Dependency vulnerabilities found but continuing..."
 
+          # Ensure single run in dependencies SARIF
+          if [ -f "snyk-dependencies.sarif" ]; then
+            jq '.runs = [.runs[0]]' snyk-dependencies.sarif > snyk-dependencies-single.sarif
+            mv snyk-dependencies-single.sarif snyk-dependencies.sarif
+          fi
+
           # Run code analysis scan
           snyk code test \
+            --project-name="capella-document-search-code" \
             --sarif-file-output=snyk-code-analysis.sarif \
             --severity-threshold=high \
             --json > snyk-code-analysis-report.json || echo "Code analysis vulnerabilities found but continuing..."
+
+          # Ensure single run in code analysis SARIF
+          if [ -f "snyk-code-analysis.sarif" ]; then
+            jq '.runs = [.runs[0]]' snyk-code-analysis.sarif > snyk-code-analysis-single.sarif
+            mv snyk-code-analysis-single.sarif snyk-code-analysis.sarif
+          fi
 
           # Monitor on master branch
           if [[ "${{ github.ref }}" == "refs/heads/master" ]]; then
@@ -127,17 +141,26 @@ jobs:
           # Authenticate Snyk
           snyk auth ${{ secrets.SNYK_TOKEN }}
           
-          # Run container scan
+          # Run container scan with explicit project name to ensure single run
           snyk container test ${{ env.DOCKER_IMAGE }} \
             --file=Dockerfile \
             --severity-threshold=high \
+            --project-name="capella-document-search-container" \
             --sarif-file-output=snyk-container.sarif \
             --json > snyk-container-report.json || echo "Container vulnerabilities found but continuing..."
+
+          # Validate SARIF file has single run - if multiple, extract first run only
+          if [ -f "snyk-container.sarif" ]; then
+            # Use jq to ensure only one run exists in the SARIF file
+            jq '.runs = [.runs[0]]' snyk-container.sarif > snyk-container-single.sarif
+            mv snyk-container-single.sarif snyk-container.sarif
+          fi
 
           # Monitor on master branch
           if [[ "${{ github.ref }}" == "refs/heads/master" ]]; then
             snyk container monitor ${{ env.DOCKER_IMAGE }} \
-              --file=Dockerfile || echo "Container monitor command failed but continuing..."
+              --file=Dockerfile \
+              --project-name="capella-document-search-container" || echo "Container monitor command failed but continuing..."
           fi
 
       - name: Upload Snyk container scan results
