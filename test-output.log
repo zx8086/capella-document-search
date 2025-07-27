@@ -1,47 +1,0 @@
-  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
-                                 Dload  Upload   Total   Spent    Left  Speed
-  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0100   207    0     0  100   207      0    171  0:00:01  0:00:01 --:--:--   171100   207    0     0  100   207      0     93  0:00:02  0:00:02 --:--:--    93100   207    0     0  100   207      0     64  0:00:03  0:00:03 --:--:--    64{"content":"I"}
-{"content":"'ll check the health status"}
-{"content":" of your nodes by retrieving the"}
-{"content":" current system information. Let me get"}
-{"content":" that data for you."}
-100   400    0   193  100   207     48     52  0:00:03  0:00:03 --:--:--   101{"content":"\n\n[Executing tools...]\n"}
-{"content":"\n\n### Tool: get_system_nodes\n# Couchbase Cluster Nodes (12 results)\n\n```json\n[\n  {\n    \"nodes\": {\n      \"name\": \"svc-s-node-099.mn1uxqblvorb0cle.cloud.couchbase.com:8091\",\n      \"ports\": {\n        \"fts\": 8094,\n        \"ftsGRPC\": 9130,\n        \"ftsGRPCSSL\": 19130,\n        \"ftsSSL\": 18094\n      },\n      \"services\": [\n        \"fts\"\n      ],\n      \"status\": \"healthy\",\n      \"uuid\": \"a3f7f85860dfae3a53a8fad34701345e\"\n    }\n  },\n  {\n    \"nodes\": {\n      \"name\": \"svc-d-node-091.mn1uxqblvorb0cle.cloud.couchbase.com:8091\",\n      \"ports\": {\n        \"kv\": 11210,\n        \"kvSSL\": 11207\n      },\n      \"services\": [\n        \"kv\"\n      ],\n      \"status\": \"healthy\",\n      \"uuid\": \"7f7cfe6180b3b01e26e96a08deaadbcc\"\n    }\n  },\n  {\n    \"nodes\": {\n      \"name\": \"svc-d-node-093.mn1uxqblvorb0cle.cloud.couchbase.com:8091\",\n      \"ports\": {\n        \"kv\": 11210,\n        \"kvSSL\": 11207\n      },\n      \"services\": [\n        \"kv\"\n      ],\n      \"status\": \"healthy\",\n      \"uuid\": \"a60edcff822ed4a192c55685d741797f\"\n    }\n  },\n  {\n    \"nodes\": {\n      \"name\": \"svc-d-node-094.mn1uxqblvorb0cle.cloud.couchbase.com:8091\",\n      \"ports\": {\n        \"kv\": 11210,\n        \"kvSSL\": 11207\n      },\n      \"services\": [\n        \"kv\"\n      ],\n      \"status\": \"healthy\",\n      \"uuid\": \"a8b21771ab0f0427fb3efa2fbb310e31\"\n    }\n  },\n  {\n    \"nodes\": {\n      \"name\": \"svc-d-node-095.mn1uxqblvorb0cle.cloud.couchbase.com:8091\",\n      \"ports\": {\n        \"kv\": 11210,\n        \"kvSSL\": 11207\n      },\n      \"services\": [\n        \"kv\"\n      ],\n      \"status\": \"healthy\",\n      \"uuid\": \"469ba6800eb5b79fff39b598bc842528\"\n    }\n  },\n  {\n    \"nodes\": {\n      \"name\": \"svc-e-node-102.mn1uxqblvorb0cle.cloud.couchbase.com:8091\",\n      \"ports\": {\n        \"eventingAdminPort\": 8096,\n        \"eventingDebug\": 9140,\n        \"eventingSSL\": 18096\n      },\n      \"services\": [\n        \"eventing\"\n      ],\n      \"status\": \"healthy\",\n      \"uuid\": \"9d0a7dfd71371f28a8dd631f20b2236a\"\n    }\n  },\n  {\n    \"nodes\": {\n      \"name\": \"svc-s-node-098.mn1uxqblvorb0cle.cloud.couchbase.com:8091\",\n      \"ports\": {\n        \"fts\": 8094,\n        \"ftsGRPC\": 9130,\n        \"ftsGRPCSSL\": 19130,\n        \"ftsSSL\": 18094\n      },\n      \"services\": [\n        \"fts\"\n      ],\n      \"status\": \"healthy\",\n      \"uuid\": \"8a0d0a946e33c7b9e1faf2a5d6789e6a\"\n    }\n  },\n  {\n    \"nodes\": {\n      \"name\": \"svc-d-node-092.mn1uxqblvorb0cle.cloud.couchbase.com:8091\",\n      \"ports\": {\n        \"kv\": 11210,\n        \"kvSSL\": 11207\n      },\n      \"services\": [\n        \"kv\"\n      ],\n      \"status\": \"healthy\",\n      \"uuid\": \"1d16b41f1ef9339fd87c69071f0fb8dc\"\n    }\n  },\n  {\n    \"nodes\": {\n      \"name\": \"svc-d-node-096.mn1uxqblvorb0cle.cloud.couchbase.com:8091\",\n      \"ports\": {\n        \"kv\": 11210,\n        \"kvSSL\": 11207\n      },\n      \"services\": [\n        \"kv\"\n      ],\n      \"status\": \"healthy\",\n      \"uuid\": \"642b6c80370e91a0fdf8a3422269bf7a\"\n    }\n  },\n  {\n    \"nodes\": {\n      \"name\": \"svc-e-node-097.mn1uxqblvorb0cle.cloud.couchbase.com:8091\",\n      \"ports\": {\n        \"eventingAdminPort\": 8096,\n        \"eventingDebug\": 9140,\n        \"eventingSSL\": 18096\n      },\n      \"services\": [\n        \"eventing\"\n      ],\n      \"status\": \"healthy\",\n      \"uuid\": \"aaec27a7e749688762609fae8fcd8745\"\n    }\n  },\n  {\n    \"nodes\": {\n      \"name\": \"svc-qi-node-100.mn1uxqblvorb0cle.cloud.couchbase.com:8091\",\n      \"ports\": {\n        \"indexAdmin\": 9100,\n        \"indexHttp\": 9102,\n        \"indexHttps\": 19102,\n        \"indexScan\": 9101,\n        \"indexStreamCatchup\": 9104,\n        \"indexStreamInit\": 9103,\n        \"indexStreamMaint\": 9105,\n        \"n1ql\": 8093,\n        \"n1qlSSL\": 18093\n      },\n      \"services\": [\n        \"index\",\n        \"n1ql\"\n      ],\n      \"status\": \"healthy\",\n      \"uuid\": \"2d0e4c8555d505a5d262b3959b73e22b\"\n    }\n  },\n  {\n    \"nodes\": {\n      \"name\": \"svc-qi-node-101.mn1uxqblvorb0cle.cloud.couchbase.com:8091\",\n      \"ports\": {\n        \"indexAdmin\": 9100,\n        \"indexHttp\": 9102,\n        \"indexHttps\": 19102,\n        \"indexScan\": 9101,\n        \"indexStreamCatchup\": 9104,\n        \"indexStreamInit\": 9103,\n        \"indexStreamMaint\": 9105,\n        \"n1ql\": 8093,\n        \"n1qlSSL\": 18093\n      },\n      \"services\": [\n        \"index\",\n        \"n1ql\"\n      ],\n      \"status\": \"healthy\",\n      \"uuid\": \"d9024523842aacffda7f373bc3845e84\"\n    }\n  }\n]\n```\n"}
-100  5275    0  5068  100   207   1027     41  0:00:05  0:00:04  0:00:01  1069100  5275    0  5068  100   207    854     34  0:00:06  0:00:05  0:00:01  1072{"content":"Goo"}
-{"content":"d news! All of your"}
-{"content":" nodes are healthy. Your"}
-100  5366    0  5159  100   207    722     29  0:00:07  0:00:07 --:--:--  1047{"content":" Couchbase cluster consists"}
-{"content":" of 12 nodes,"}
-{"content":" each running specific services:\n\n- "}
-{"content":"6 Data (KV) nodes:"}
-100  5522    0  5315  100   207    663     25  0:00:08  0:00:08 --:--:--  1107{"content":" These handle your data storage and retrieval"}
-{"content":" operations\n- 2 "}
-{"content":"Index and Query (n"}
-{"content":"1ql) nodes: These handle"}
-{"content":" indexing and query processing"}
-100  5731    0  5524  100   207    626     23  0:00:09  0:00:08  0:00:01  1098{"content":"\n- 2 Search"}
-{"content":" (FTS) nodes:"}
-{"content":" These provide full-text search"}
-{"content":" capabilities\n- 2"}
-{"content":" Eventing nodes: These handle"}
-{"content":" event-based processing"}
-{"content":"\n\nEach node is"}
-{"content":" reporting a \"healthy"}
-{"content":"\" status, which"}
-{"content":" means they're operating"}
-100  6085    0  5878  100   207    573     20  0:00:10  0:00:10 --:--:--   152{"content":" normally without any issues. The"}
-{"content":" cluster appears to be well-"}
-{"content":"distributed with dedicated nodes for different"}
-{"content":" services, following Couchbase"}
-100  6282    0  6075  100   207    552     18  0:00:11  0:00:10  0:00:01   199{"content":"'s Multi-"}
-{"content":"Dimensional Scaling (M"}
-{"content":"DS) architecture,"}
-{"content":" which allows for independent scaling of services"}
-{"content":".\n\nWould you like me"}
-{"content":" to provide more detaile"}
-{"content":"d system vit"}
-{"content":"als for these"}
-{"content":" nodes to see"}
-100  6598    0  6391  100   207    532     17  0:00:12  0:00:12 --:--:--   252{"content":" specific performance metrics?"}
-{"done":true,"runId":"d1478824-cc7b-4467-a677-ae552c073890"}
-100  6704    0  6497  100   207    538     17  0:00:12  0:00:12 --:--:--   291

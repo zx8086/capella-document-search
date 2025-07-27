@@ -47,13 +47,19 @@ jobs:
           # Authenticate Snyk
           snyk auth ${{ secrets.SNYK_TOKEN }}
           
-          # Run code scan with proper package manager detection
+          # Run dependency scan (separate from container scan)
           snyk test \
             --package-manager=yarn \
             --file=package.json \
-            --sarif-file-output=snyk-code.sarif \
+            --sarif-file-output=snyk-dependencies.sarif \
             --severity-threshold=high \
-            --json > snyk-code-report.json || echo "Code vulnerabilities found but continuing..."
+            --json > snyk-dependencies-report.json || echo "Dependency vulnerabilities found but continuing..."
+
+          # Run code analysis scan
+          snyk code test \
+            --sarif-file-output=snyk-code-analysis.sarif \
+            --severity-threshold=high \
+            --json > snyk-code-analysis-report.json || echo "Code analysis vulnerabilities found but continuing..."
 
           # Monitor on master branch
           if [[ "${{ github.ref }}" == "refs/heads/master" ]]; then
@@ -62,12 +68,20 @@ jobs:
               --file=package.json || echo "Code monitor command failed but continuing..."
           fi
 
-      - name: Upload Snyk code scan results
-        if: hashFiles('snyk-code.sarif') != ''
+      - name: Upload Snyk dependency scan results
+        if: hashFiles('snyk-dependencies.sarif') != ''
         uses: github/codeql-action/upload-sarif@v3
         with:
-          sarif_file: snyk-code.sarif
-          category: snyk-code
+          sarif_file: snyk-dependencies.sarif
+          category: snyk-dependencies
+          wait-for-processing: true
+
+      - name: Upload Snyk code analysis results
+        if: hashFiles('snyk-code-analysis.sarif') != ''
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: snyk-code-analysis.sarif
+          category: snyk-code-analysis
           wait-for-processing: true
 
   container-scan:
