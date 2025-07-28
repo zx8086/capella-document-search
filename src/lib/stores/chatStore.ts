@@ -185,6 +185,13 @@ function createChatStore() {
       // Count only user messages as they represent actual conversation turns
       const userMessages = conversation.messages.filter(msg => !msg.isLoading && msg.role === 'user');
       const messageCount = userMessages.length;
+      
+      // Calculate conversation age
+      const conversationAge = Date.now() - new Date(conversation.createdAt).getTime();
+      const ageInHours = conversationAge / (1000 * 60 * 60);
+      const remainingHours = Math.max(0, MAX_CONVERSATION_AGE_HOURS - ageInHours);
+      const isNearExpiry = remainingHours <= 2;
+      const isExpired = remainingHours <= 0;
 
       return {
         messageCount,
@@ -193,7 +200,11 @@ function createChatStore() {
         contextLimit: MAX_CONTEXT_MESSAGES,
         contextPercentage: Math.round((messageCount / MAX_CONTEXT_MESSAGES) * 100),
         isNearLimit: messageCount >= MAX_CONTEXT_MESSAGES * 0.8,
-        isAtLimit: messageCount >= MAX_CONTEXT_MESSAGES * 0.9
+        isAtLimit: messageCount >= MAX_CONTEXT_MESSAGES * 0.9,
+        ageInHours,
+        remainingHours,
+        isNearExpiry,
+        isExpired
       };
     },
 

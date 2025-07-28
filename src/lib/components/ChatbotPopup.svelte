@@ -13,8 +13,15 @@
   import { getMsalInstance } from '$lib/config/authConfig';
   import { marked } from 'marked';
   import ThinkingSection from './ThinkingSection.svelte';
+  import ChatProgressIndicator from './ChatProgressIndicator.svelte';
   import hljs from 'highlight.js/lib/core';
   import 'highlight.js/styles/github-dark.css';
+  
+  // Timeout configurations (with defaults matching backend)
+  const CHAT_REQUEST_TIMEOUT = import.meta.env.CHAT_REQUEST_TIMEOUT ? parseInt(import.meta.env.CHAT_REQUEST_TIMEOUT) : 300000; // 5 minutes
+  const CHAT_FAILSAFE_TIMEOUT = import.meta.env.CHAT_FAILSAFE_TIMEOUT ? parseInt(import.meta.env.CHAT_FAILSAFE_TIMEOUT) : 270000; // 4.5 minutes
+  const CHAT_STUCK_CHECK_TIMEOUT = import.meta.env.CHAT_STUCK_CHECK_TIMEOUT ? parseInt(import.meta.env.CHAT_STUCK_CHECK_TIMEOUT) : 240000; // 4 minutes
+  const STUCK_CHECK_INTERVAL = 5000; // Check every 5 seconds
   
   // Import specific language support for highlight.js
   import sql from 'highlight.js/lib/languages/sql';
@@ -182,16 +189,35 @@
   }
   
   const { isOpen = false } = $props<Props>();
-  let isLoading = $state(false);
+  
+  // Request state machine
+  type RequestState = 'idle' | 'initializing' | 'thinking' | 'streaming' | 'aborting' | 'error';
+  let requestState = $state<RequestState>('idle');
+  let requestId = $state<string | null>(null);
+  
+  // Derived loading state from request state
+  let isLoading = $derived(requestState !== 'idle');
+  let canSubmit = $derived(requestState === 'idle');
+  let canAbort = $derived(requestState === 'initializing' || requestState === 'thinking' || requestState === 'streaming');
+  
   let newMessage = $state('');
   let userPhoto = $state($userPhotoUrl);
   let trackerReady = $state(false);
   let isInitialized = $state(false);
   let conversation = $state<Conversation | null>(null);
   let currentThinking = $state('');
-  let isThinking = $state(false);
+  let isThinking = $derived(requestState === 'thinking' || requestState === 'initializing');
   let abortController = $state<AbortController | null>(null);
   let currentLoadingMessageId = $state<string | null>(null);
+  
+  // Progress tracking
+  let progressMessage = $state('');
+  let progressDetails = $state('');
+  let requestStartTime = $state<number | null>(null);
+  let showProgress = $state(false);
+  let requestElapsedTime = $state(0);
+  let currentTokenUsage = $state<{ input: number; output: number; total: number } | null>(null);
+  let currentEstimatedCost = $state<number | null>(null);
   
   // Track thinking content per message
   let messageThinking = $state<Map<string, string>>(new Map());
@@ -212,7 +238,7 @@
   );
   
   // Derive button disabled state for better reactivity
-  let isButtonDisabled = $derived(isLoading ? false : !newMessage.trim());
+  let isButtonDisabled = $derived(canAbort ? false : !newMessage.trim());
   
   // Get first name from full name
   function getFirstName(fullName: string = ''): string {
@@ -292,26 +318,26 @@
       const stuckCheckInterval = setInterval(() => {
         if (messages.length > 0) {
           const stuckMessages = messages.filter(m => m.isLoading && m.timestamp && 
-            (Date.now() - new Date(m.timestamp).getTime()) > 40000); // 40 seconds
+            (Date.now() - new Date(m.timestamp).getTime()) > CHAT_STUCK_CHECK_TIMEOUT);
           
           if (stuckMessages.length > 0) {
-            console.warn('⚠️ Detected stuck loading messages:', stuckMessages.length);
+            console.warn('⚠️ Detected stuck loading messages:', stuckMessages.length, 'after', CHAT_STUCK_CHECK_TIMEOUT / 1000, 'seconds');
             stuckMessages.forEach(msg => {
               console.log('🔧 Force-clearing stuck message:', msg.id);
               chatStore.updateMessage(msg.id, 
-                msg.content || 'Request timed out. Please refresh and try again.', false);
+                msg.content || 'Request timed out. The query took longer than expected. Please try a more specific query or break it into smaller parts.', false);
             });
             
             // Force clear thinking state
-            if (isThinking || currentLoadingMessageId) {
-              isThinking = false;
+            if ((requestState === 'thinking' || requestState === 'streaming') || currentLoadingMessageId) {
               currentThinking = '';
-              isLoading = false;
+              requestState = 'idle';
+              requestId = null;
               currentLoadingMessageId = null;
             }
           }
         }
-      }, 5000); // Check every 5 seconds
+      }, STUCK_CHECK_INTERVAL);
       
       // Store interval ID for cleanup
       window.__stuckCheckInterval = stuckCheckInterval;
@@ -366,13 +392,20 @@
   });
 
   function handleAbort() {
-    console.log('🛑 handleAbort called, abortController:', !!abortController, 'loadingMessageId:', currentLoadingMessageId);
+    console.log('🛑 handleAbort called, requestState:', requestState, 'abortController:', !!abortController, 'loadingMessageId:', currentLoadingMessageId);
+    
+    if (!canAbort) {
+      console.log('⚠️ Cannot abort in current state:', requestState);
+      return;
+    }
+    
+    // Update state to aborting
+    requestState = 'aborting';
+    
     if (abortController) {
       console.log('🛑 User requested to abort chat request');
       abortController.abort();
       abortController = null;
-      isLoading = false;
-      isThinking = false;
       
       // Use the stored loading message ID
       if (currentLoadingMessageId) {
@@ -382,46 +415,71 @@
       } else {
         console.log('⚠️ No loading message ID stored');
       }
+      
+      // Clear progress
+      progressMessage = '';
+      progressDetails = '';
+      requestStartTime = null;
+      showProgress = false;
+      requestElapsedTime = 0;
+      currentTokenUsage = null;
+      currentEstimatedCost = null;
     } else {
       console.log('⚠️ No abortController to abort');
     }
+    
+    // Reset to idle state
+    requestState = 'idle';
+    requestId = null;
   }
 
   async function handleSubmit() {
-    // Prevent submission if already loading or no message
-    if (isLoading || !newMessage.trim()) {
-      console.log('⚠️ Prevented submission:', { isLoading, hasMessage: !!newMessage.trim() });
+    // Prevent submission if not in idle state or no message
+    if (!canSubmit || !newMessage.trim()) {
+      console.log('⚠️ Prevented submission:', { requestState, canSubmit, hasMessage: !!newMessage.trim() });
       return;
     }
     
     const userMessage = newMessage.trim();
     newMessage = '';
-    isLoading = true;
-    isThinking = true;
+    
+    // Generate unique request ID
+    requestId = `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    console.log('🆔 Starting new request:', requestId);
+    
+    // Update state machine
+    requestState = 'initializing';
     currentThinking = `Analyzing your question: "${userMessage}"\n\nProcessing context and searching relevant information...`;
+    
+    // Initialize progress tracking
+    requestStartTime = Date.now();
+    requestElapsedTime = 0;
+    progressMessage = "Initializing request...";
+    progressDetails = "Connecting to AI services";
+    showProgress = true;
     
     // Create new AbortController for this request
     abortController = new AbortController();
     
-    // Set up timeout (30 seconds)
+    // Set up timeout matching backend timeout
     const timeoutId = setTimeout(() => {
       if (abortController) {
-        console.log('⏰ Chat request timed out after 30 seconds');
+        console.log(`⏰ Chat request timed out after ${CHAT_REQUEST_TIMEOUT / 1000} seconds`);
         abortController.abort('timeout');
       }
-    }, 30000);
+    }, CHAT_REQUEST_TIMEOUT);
     
-    // Set up failsafe timeout to ensure thinking state is cleared (35 seconds)
+    // Set up failsafe timeout to ensure thinking state is cleared (slightly before main timeout)
     const failsafeTimeoutId = setTimeout(() => {
-      console.log('⏰ Failsafe timeout triggered - clearing thinking state');
-      if (isThinking && currentLoadingMessageId) {
+      console.log(`⏰ Failsafe timeout triggered after ${CHAT_FAILSAFE_TIMEOUT / 1000} seconds - clearing thinking state`);
+      if ((requestState === 'thinking' || requestState === 'streaming') && currentLoadingMessageId) {
         // Force clear the loading state
-        chatStore.updateMessage(currentLoadingMessageId, 'Request timed out. Please try again.', false);
-        isThinking = false;
+        chatStore.updateMessage(currentLoadingMessageId, 'Request is taking longer than expected. The response may be truncated.', false);
         currentThinking = '';
-        isLoading = false;
+        requestState = 'idle';
+        requestId = null;
       }
-    }, 35000);
+    }, CHAT_FAILSAFE_TIMEOUT);
     
     try {
         // Add user message to conversation
@@ -437,6 +495,11 @@
             extendedThinkingMessages.add(loadingMessageId);
         }
 
+        // Transition to thinking state
+        requestState = 'thinking';
+        progressMessage = "AI is processing your request...";
+        progressDetails = "Analyzing context and formulating response";
+        
         const sessionStartTime = new Date().toISOString();
         const response = await fetch('/api/chat', {
             method: 'POST',
@@ -492,8 +555,14 @@
         let extractedThinking = '';
         let cleanedResponse = '';
         let cleanedText = '';
+        let firstContentReceived = false;
 
         console.log('🔄 Starting stream processing');
+        
+        // Transition to streaming state
+        requestState = 'streaming';
+        progressMessage = "Receiving response...";
+        progressDetails = "Streaming AI response";
 
         try {
             let streamComplete = false;
@@ -553,6 +622,19 @@
                             const data = JSON.parse(line);
                             console.log('🔍 Parsed data:', data);
                             
+                            // Handle token usage updates
+                            if (data.tokenUsage) {
+                                currentTokenUsage = data.tokenUsage;
+                                if (data.estimatedCost) {
+                                    currentEstimatedCost = data.estimatedCost;
+                                }
+                                console.log('📊 Token usage update:', { 
+                                    tokens: data.tokenUsage, 
+                                    cost: data.estimatedCost 
+                                });
+                                continue; // Don't treat token updates as content
+                            }
+                            
                             if (data.done) {
                                 console.log('🏁 Received done signal', { hasError: data.error });
                                 // Capture runId if provided in done message
@@ -564,6 +646,9 @@
                                     // Ensure loading state is cleared even on error
                                     chatStore.updateMessage(loadingMessageId, cleanedText || accumulatedResponse, false);
                                 }
+                                // Transition to idle state on completion
+                                requestState = 'idle';
+                                requestId = null;
                                 streamComplete = true;
                                 break;
                             }
@@ -576,9 +661,67 @@
                                 break;
                             }
                             
-                            if (data.content) {
+                            if (data.type === 'progress') {
+                                // Handle progress updates
+                                console.log('📈 Progress update:', data.message, data.details);
+                                
+                                // Update progress state for the indicator
+                                progressMessage = data.message || progressMessage;
+                                progressDetails = data.details || '';
+                                if (data.elapsedTime) {
+                                    requestElapsedTime = data.elapsedTime;
+                                }
+                                
+                                // Don't show inline progress anymore since we have the indicator
+                                // Just maintain the current content
+                                if (accumulatedResponse) {
+                                    chatStore.updateMessage(loadingMessageId, accumulatedResponse, true);
+                                } else if (cleanedText) {
+                                    chatStore.updateMessage(loadingMessageId, cleanedText, true);
+                                }
+                                // Force scroll to show progress
+                                forceScrollToBottom();
+                            } else if (data.content) {
                                 accumulatedResponse += data.content;
                                 console.log('💬 Updated response:', accumulatedResponse);
+                                
+                                // Extract thinking content and check if we have visible content
+                                const tempExtraction = extractThinkingContent(accumulatedResponse);
+                                const hasVisibleContent = tempExtraction.cleanedText.trim().length > 0;
+                                const isExecutingTools = accumulatedResponse.includes('[Executing tools...]') && 
+                                                       !accumulatedResponse.includes('### Tool:');
+                                
+                                // Only hide progress when we have actual visible content and not just tool execution
+                                if (!firstContentReceived && hasVisibleContent && !isExecutingTools) {
+                                    firstContentReceived = true;
+                                    console.log('✅ First visible content received, hiding progress indicator');
+                                    showProgress = false;
+                                } else if (isExecutingTools && showProgress) {
+                                    // Update progress message during tool execution
+                                    progressMessage = "Executing tools...";
+                                    progressDetails = "Retrieving live system data";
+                                } else if (showProgress && accumulatedResponse.includes('### Tool:')) {
+                                    // Tools have been executed, AI is analyzing results
+                                    progressMessage = "Analyzing results...";
+                                    progressDetails = "Processing tool execution results";
+                                }
+                                
+                                // Check for timeout or truncation warnings
+                                const isTimeoutWarning = data.content.includes('**RESPONSE TIMEOUT') || 
+                                                       data.content.includes('**Response timeout**') ||
+                                                       data.content.includes('Tool output was truncated');
+                                const isTruncationWarning = data.content.includes('**Response truncated**') ||
+                                                          data.content.includes('JSON output truncated');
+                                
+                                if (isTimeoutWarning || isTruncationWarning) {
+                                    console.warn('⚠️ Timeout/truncation warning detected:', data.content);
+                                    // Force immediate UI update for warnings
+                                    const extraction = extractThinkingContent(accumulatedResponse);
+                                    cleanedText = extraction.cleanedText;
+                                    chatStore.updateMessage(loadingMessageId, cleanedText, false);
+                                    forceScrollToBottom();
+                                    continue;
+                                }
                                 
                                 // Extract thinking content and clean response
                                 const extraction = extractThinkingContent(accumulatedResponse);
@@ -587,7 +730,7 @@
                                 // Store thinking but don't update the display yet (avoid jarring transition)
                                 if (extraction.thinking) {
                                     messageThinking.set(loadingMessageId, extraction.thinking);
-                                    // Keep isThinking = true to avoid jarring switch during streaming
+                                    // Keep thinking state active to avoid jarring switch during streaming
                                 }
                                 
                                 // Update message with cleaned response but keep loading state
@@ -647,9 +790,9 @@
             });
             chatStore.updateMessage(loadingMessageId, finalContent, false);
             
-            // Stop thinking when response is complete - add small delay for smoother transition
+            // Clear thinking when response is complete - add small delay for smoother transition
             setTimeout(() => {
-                isThinking = false;
+                currentThinking = '';
             }, 300);
             
             // Final scroll to ensure all content is visible
@@ -671,7 +814,7 @@
         if (error instanceof Error && error.name === 'AbortError') {
             // Check if it was a timeout or user-initiated abort
             if (abortController?.signal.reason === 'timeout') {
-                errorMessage = 'Request timed out after 30 seconds. Please try a shorter question or try again.';
+                errorMessage = `Request timed out after ${CHAT_REQUEST_TIMEOUT / 1000} seconds. This usually happens with very complex queries. Please try:\n• A more specific question\n• Breaking your query into smaller parts\n• Limiting the scope (e.g., "top 5" instead of "all")`;
                 console.log('⏰ Request timed out');
             } else {
                 errorMessage = 'Request was cancelled by user.';
@@ -685,23 +828,44 @@
         
         chatStore.updateMessage(loadingMessageId, errorMessage, false);
         
-        // Stop thinking on error - add small delay for smoother transition
+        // Clear thinking on error - add small delay for smoother transition
         const errorThinking = `Error processing: "${userMessage}"\n\nEncountered an issue while processing your request.`;
         messageThinking.set(loadingMessageId, errorThinking);
         currentThinking = errorThinking;
         setTimeout(() => {
-            isThinking = false;
+            currentThinking = '';
         }, 300);
+        
+        // Transition to error state
+        requestState = 'error';
+        setTimeout(() => {
+            requestState = 'idle';
+            requestId = null;
+        }, 1000);
     } finally {
         // Clear timeouts and cleanup
         clearTimeout(timeoutId);
         clearTimeout(failsafeTimeoutId);
         abortController = null;
         currentLoadingMessageId = null;
-        isLoading = false;
+        
+        // Ensure we're back to idle state
+        if (requestState !== 'idle') {
+            requestState = 'idle';
+            requestId = null;
+        }
+        
         // Reset extended thinking after each response
         enableExtendedThinking = false;
-        console.log('🧹 Cleaned up: timeouts cleared, controllers reset, extended thinking disabled');
+        // Clear progress tracking
+        requestStartTime = null;
+        requestElapsedTime = 0;
+        progressMessage = '';
+        progressDetails = '';
+        currentTokenUsage = null;
+        showProgress = false;
+        currentEstimatedCost = null;
+        console.log('🧹 Cleaned up: timeouts cleared, controllers reset, extended thinking disabled, progress cleared');
     }
   }
 
@@ -784,8 +948,9 @@
     
     chatStore.startNewConversation($userAccount?.name);
     
-    // Clear thinking state
-    isThinking = false;
+    // Clear thinking state and reset state machine
+    requestState = 'idle';
+    requestId = null;
     currentThinking = '';
     messageThinking.clear();
     extendedThinkingMessages.clear();
@@ -873,6 +1038,18 @@
         aria-label="Close chat overlay"
         data-transaction-name="Chat Assistant Close"
       ></button>
+      
+      <!-- Progress Indicator -->
+      <ChatProgressIndicator 
+        isActive={showProgress && isLoading && !isThinking} 
+        message={progressMessage || "Processing your request..."}
+        details={progressDetails}
+        elapsedTime={requestElapsedTime || (requestStartTime ? Date.now() - requestStartTime : 0)}
+        showElapsedTime={true}
+        tokenUsage={currentTokenUsage}
+        estimatedCost={currentEstimatedCost}
+      />
+      
       <div 
         class="fixed bottom-40 right-6 sm:right-4 sm:left-4 md:right-6 md:left-auto w-[800px] max-w-[calc(100vw-3rem)] xl:max-w-[calc(100vw-6rem)] sm:max-w-none md:max-w-[calc(100vw-3rem)] z-[46] rounded-lg border border-gray-200 bg-white shadow-xl dark:border-gray-800 dark:bg-gray-900"
         role="dialog"
@@ -915,6 +1092,44 @@
               </Button>
             </div>
           </div>
+
+          <!-- Context Usage Indicator -->
+          {#if conversationSummary}
+            <div class="px-4 py-2 bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
+              <div class="flex items-center justify-between text-xs">
+                <div class="flex items-center gap-2">
+                  <span class="text-gray-600 dark:text-gray-400">Context Usage:</span>
+                  <div class="flex items-center gap-1">
+                    <div class="w-32 h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+                      <div 
+                        class="h-full transition-all duration-300 {conversationSummary.contextPercentage >= 90 ? 'bg-red-500' : conversationSummary.contextPercentage >= 80 ? 'bg-amber-500' : 'bg-green-500'}"
+                        style="width: {conversationSummary.contextPercentage}%"
+                      ></div>
+                    </div>
+                    <span class="{conversationSummary.contextPercentage >= 90 ? 'text-red-600 dark:text-red-400 font-semibold' : conversationSummary.contextPercentage >= 80 ? 'text-amber-600 dark:text-amber-400' : 'text-gray-600 dark:text-gray-400'}">
+                      {conversationSummary.messageCount}/{conversationSummary.contextLimit} messages
+                    </span>
+                  </div>
+                </div>
+                <div class="flex items-center gap-3">
+                  {#if conversationSummary.contextPercentage >= 80}
+                    <span class="text-amber-600 dark:text-amber-400">
+                      {conversationSummary.contextPercentage >= 90 ? '⚠️ Near limit' : '⚠️ Approaching limit'}
+                    </span>
+                  {/if}
+                  {#if conversationSummary.isNearExpiry}
+                    <span class="text-red-600 dark:text-red-400 font-semibold">
+                      ⏰ Expires in {Math.floor(conversationSummary.remainingHours)}h {Math.floor((conversationSummary.remainingHours % 1) * 60)}m
+                    </span>
+                  {:else if conversationSummary.ageInHours > 12}
+                    <span class="text-gray-500 dark:text-gray-500">
+                      Expires in {Math.floor(conversationSummary.remainingHours)}h
+                    </span>
+                  {/if}
+                </div>
+              </div>
+            </div>
+          {/if}
 
           <!-- Messages -->
           <div 

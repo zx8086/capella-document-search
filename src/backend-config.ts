@@ -57,10 +57,10 @@ const RagConfigSchema = z.object({
   BEDROCK_EMBEDDING_MODEL: z.string(),
   BEDROCK_CHAT_MODEL: z.string(),
   KNOWLEDGE_BASE_ID: z.string(),
-  BEDROCK_MAX_TOOL_RECURSION_DEPTH: z.number().min(0).max(10).default(3),
+  BEDROCK_MAX_TOOL_RECURSION_DEPTH: z.number().min(0).max(10).default(4),
   // Maximum tokens for Bedrock chat responses (1000-200000, default: 8000)
   // Controls response length to prevent truncation of large tool outputs
-  BEDROCK_MAX_TOKENS: z.number().min(1000).max(200000).default(8000),
+  BEDROCK_MAX_TOKENS: z.number().min(1000).max(200000).default(20000),
 });
 
 const BackendConfigSchema = z.object({
@@ -120,8 +120,8 @@ const defaultConfig: BackendConfig = {
     BEDROCK_EMBEDDING_MODEL: "amazon.titan-embed-text-v1",
     BEDROCK_CHAT_MODEL: "anthropic.claude-3-5-sonnet-20241022-v2:0",
     KNOWLEDGE_BASE_ID: "OSYN5HVWI2",
-    BEDROCK_MAX_TOOL_RECURSION_DEPTH: 1,
-    BEDROCK_MAX_TOKENS: 8000,
+    BEDROCK_MAX_TOOL_RECURSION_DEPTH: 4,
+    BEDROCK_MAX_TOKENS: 20000,
   },
 };
 
@@ -429,6 +429,11 @@ function loadConfigFromEnv(): Partial<BackendConfig> {
         getEnvVar(envVarMapping.rag.BEDROCK_MAX_TOOL_RECURSION_DEPTH),
         "number",
       ) as number) || defaultConfig.rag.BEDROCK_MAX_TOOL_RECURSION_DEPTH,
+    BEDROCK_MAX_TOKENS:
+      (parseEnvVar(
+        getEnvVar(envVarMapping.rag.BEDROCK_MAX_TOKENS),
+        "number",
+      ) as number) || defaultConfig.rag.BEDROCK_MAX_TOKENS,
   };
 
   return config;
@@ -484,6 +489,7 @@ try {
           AWS_REGION: backendConfig.rag.AWS_REGION,
           BEDROCK_EMBEDDING_MODEL: backendConfig.rag.BEDROCK_EMBEDDING_MODEL,
           BEDROCK_CHAT_MODEL: backendConfig.rag.BEDROCK_CHAT_MODEL,
+          BEDROCK_MAX_TOKENS: backendConfig.rag.BEDROCK_MAX_TOKENS,
         },
       },
       null,

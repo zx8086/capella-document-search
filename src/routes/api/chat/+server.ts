@@ -353,10 +353,17 @@ User's question: ${currentMessage}`;
         async start(controller) {
           try {
             let fullResponse = "";
+            let startTime = Date.now();
+            let lastProgressUpdate = Date.now();
+            let tokenCount = 0;
+            const PROGRESS_UPDATE_INTERVAL = 3000; // Send progress update every 3 seconds (more frequent)
+            const MAX_RESPONSE_TIME = 300000; // Maximum 5 minutes for response (increased from 60s)
+            let currentTokenUsage = { input: 0, output: 0, total: 0 }; // Track token usage
 
             log("🌊 [Server] Starting to read stream with conversation context");
             let chunkCount = 0;
             let toolsWereExecuted = false; // Track if any tools were executed
+            let wasTimedOut = false; // Track if response was cut off due to timeout
             
             // Setup abort signal listener
             const abortHandler = () => {
@@ -428,16 +435,106 @@ ${metadata.enableExtendedThinking ? `- When asked to think step-by-step, use <th
             // Use the RAG provider stream (contains proper trace headers and tool execution)
             log("🌊 [Server] Starting to read stream with conversation context");
             
+            // Send initial progress indicator immediately
+            const initialProgress = {
+              type: "progress",
+              message: "🚀 Starting to process your request...",
+              details: "Connecting to AI services and preparing response",
+              elapsedTime: 0,
+              chunkCount: 0
+            };
+            controller.enqueue(new TextEncoder().encode(JSON.stringify(initialProgress) + "\n"));
+            
+            // Set up independent progress timer that runs even when no chunks are received
+            let progressTimerActive = true;
+            let firstContentReceived = false;
+            const progressTimer = setInterval(() => {
+              if (!progressTimerActive || firstContentReceived) return;
+              
+              const elapsedTime = Date.now() - startTime;
+              const elapsedSeconds = Math.floor(elapsedTime / 1000);
+              
+              // Different messages based on elapsed time
+              let progressMessage = "";
+              let progressDetails = "";
+              
+              if (elapsedSeconds < 10) {
+                progressMessage = `🚀 Initializing AI response... (${elapsedSeconds}s)`;
+                progressDetails = "Setting up conversation context and preparing response";
+              } else if (elapsedSeconds < 20) {
+                progressMessage = `🤖 AI is processing your request... (${elapsedSeconds}s)`;
+                progressDetails = "Analyzing context and formulating response";
+              } else if (elapsedSeconds < 30) {
+                progressMessage = `🔄 Still processing... (${elapsedSeconds}s)`;
+                progressDetails = "This is taking longer than usual - working on complex analysis";
+              } else if (elapsedSeconds < 45) {
+                progressMessage = `⚡ Continuing to process... (${elapsedSeconds}s)`;
+                progressDetails = "Processing complex data - please wait";
+              } else if (elapsedSeconds < 60) {
+                progressMessage = `🔍 Deep analysis in progress... (${elapsedSeconds}s)`;
+                progressDetails = "Almost there - finalizing comprehensive response";
+              } else {
+                progressMessage = `⏱️ Extended processing... (${elapsedSeconds}s)`;
+                progressDetails = `Processing for ${elapsedSeconds} seconds - complex query requiring detailed analysis`;
+              }
+              
+              const progress = {
+                type: "progress",
+                message: progressMessage,
+                details: progressDetails,
+                elapsedTime,
+                chunkCount,
+                isWaitingForAI: chunkCount === 0
+              };
+              
+              try {
+                controller.enqueue(new TextEncoder().encode(JSON.stringify(progress) + "\n"));
+              } catch (e) {
+                // Controller might be closed, stop the timer
+                clearInterval(progressTimer);
+                progressTimerActive = false;
+              }
+            }, PROGRESS_UPDATE_INTERVAL);
+            
             for await (const chunk of stream) {
               // Check if request was aborted
               if (request.signal?.aborted) {
                 log("🛑 [Server] Request aborted during stream iteration");
+                clearInterval(progressTimer);
+                progressTimerActive = false;
                 if (request.signal) {
                   request.signal.removeEventListener('abort', abortHandler);
                 }
                 controller.close();
                 return;
               }
+              
+              // This block is no longer needed since we track firstContentReceived
+              
+              // Check for timeout
+              const elapsedTime = Date.now() - startTime;
+              if (elapsedTime > MAX_RESPONSE_TIME) {
+                log("⏱️ [Server] Response timeout reached", {
+                  elapsedTime,
+                  responseLength: fullResponse.length,
+                  chunkCount
+                });
+                
+                wasTimedOut = true;
+                
+                // Add cleanup message if we're in the middle of content
+                const cleanupMessage = "\n\n[... Response truncated due to timeout ...]\n";
+                controller.enqueue(new TextEncoder().encode(JSON.stringify({ content: cleanupMessage }) + "\n"));
+                
+                // Add prominent timeout message
+                const timeoutMessage = "\n\n⚠️ **RESPONSE TIMEOUT (5 minutes reached)** ⚠️\n\nThe response was stopped after 5 minutes to prevent system overload. This typically happens when:\n\n• Processing extremely large amounts of data\n• Running multiple complex tool operations\n• Generating very detailed analysis across many items\n\n**What you can do:**\n• Try a more specific query (e.g., 'top 5' instead of 'all')\n• Break down your request into smaller parts\n• Request specific data points or time ranges\n• If you need the full data, try exporting it instead\n";
+                controller.enqueue(new TextEncoder().encode(JSON.stringify({ content: timeoutMessage }) + "\n"));
+                clearInterval(progressTimer);
+                progressTimerActive = false;
+                break;
+              }
+              
+              // The independent timer handles progress updates now, so we don't need this
               
               chunkCount++;
               let content = "";
@@ -449,7 +546,30 @@ ${metadata.enableExtendedThinking ? `- When asked to think step-by-step, use <th
               }
 
               if (content) {
+                // Mark that we've received the first content
+                if (!firstContentReceived) {
+                  firstContentReceived = true;
+                  log("✅ [Server] First content received, progress timer will stop");
+                  // Progress timer will stop on its next iteration
+                }
+                
                 fullResponse += content;
+                tokenCount += content.length / 4; // Rough token estimate
+                
+                // Check if chunk contains token usage information
+                if (chunk && typeof chunk === 'object' && chunk.tokenUsage) {
+                  currentTokenUsage = {
+                    input: chunk.tokenUsage.inputTokens || currentTokenUsage.input,
+                    output: chunk.tokenUsage.outputTokens || currentTokenUsage.output,
+                    total: chunk.tokenUsage.totalTokens || currentTokenUsage.total
+                  };
+                  
+                  // Send token usage update
+                  controller.enqueue(new TextEncoder().encode(JSON.stringify({ 
+                    tokenUsage: currentTokenUsage,
+                    estimatedCost: chunk.tokenUsage.estimatedCost 
+                  }) + "\n"));
+                }
                 
                 // Check if tools are being executed
                 if (content.includes("[Executing tools...]")) {
@@ -462,11 +582,22 @@ ${metadata.enableExtendedThinking ? `- When asked to think step-by-step, use <th
               }
             }
 
+            const totalElapsedTime = Date.now() - startTime;
             log("🛑 [Server] Stream iteration complete", {
               totalChunks: chunkCount,
               responseLength: fullResponse.length,
-              toolsWereExecuted
+              toolsWereExecuted,
+              totalElapsedTime,
+              estimatedTokens: Math.floor(tokenCount)
             });
+            
+            // No need to add incomplete data warning here - it's already handled in the timeout section
+            
+            // Add performance warning if response took too long
+            if (totalElapsedTime > 30000) { // More than 30 seconds
+              const performanceWarning = `\n\n⚠️ **Performance notice**: This response took ${Math.floor(totalElapsedTime / 1000)} seconds to generate. For better performance, consider more specific queries or limiting the scope of your request.\n`;
+              controller.enqueue(new TextEncoder().encode(JSON.stringify({ content: performanceWarning }) + "\n"));
+            }
 
             // Add references only if no tools were executed and we have context
             if (!toolsWereExecuted && context && context.length > 0) {
@@ -546,7 +677,9 @@ ${metadata.enableExtendedThinking ? `- When asked to think step-by-step, use <th
               finalResponseLength: fullResponse.length,
               runId: runId,
             });
-            // Cleanup abort handler
+            // Cleanup progress timer and abort handler
+            clearInterval(progressTimer);
+            progressTimerActive = false;
             if (request.signal) {
               request.signal.removeEventListener('abort', abortHandler);
             }
@@ -563,7 +696,9 @@ ${metadata.enableExtendedThinking ? `- When asked to think step-by-step, use <th
               log("❌ Stream processing error:", { errorMessage });
             }
             
-            // Cleanup abort handler
+            // Cleanup progress timer and abort handler
+            clearInterval(progressTimer);
+            progressTimerActive = false;
             if (request.signal) {
               request.signal.removeEventListener('abort', abortHandler);
             }

@@ -122,7 +122,7 @@ const getFatalRequestsTool: Tool = {
   toolSpec: {
     name: "get_fatal_requests",
     description:
-      "Get information about failed/fatal N1QL queries including error details and performance metrics",
+      "Find queries that have FAILED, TIMED OUT, or caused ERRORS. Critical for identifying stability issues, query failures, and operational problems. Use this to diagnose query errors and failures.",
     inputSchema: {
       json: {
         type: "object",
@@ -1704,8 +1704,41 @@ export class BedrockChatService {
       const systemMessages = messages.filter((m) => m.role === "system");
       const conversationMessages = messages.filter((m) => m.role !== "system");
 
-      // Combine system messages
-      const systemPrompt = systemMessages.map((m) => m.content).join("\n\n");
+      // Combine system messages with performance analysis guidance
+      const baseSystemPrompt = systemMessages.map((m) => m.content).join("\n\n");
+      
+      // Add tool selection guidance for performance analysis
+      const performanceToolGuidance = `
+## Tool Selection Guidelines for Performance Analysis
+
+When analyzing cluster performance issues:
+
+1. **ALWAYS START** with get_system_vitals to understand the current cluster state
+2. **FOR SLOW QUERIES**: Use get_most_expensive_queries as it provides comprehensive timing metrics:
+   - Detailed execution times (elapsed, service, run time)
+   - Phase-by-phase performance breakdown (index scan, project, stream)
+   - Resource usage metrics
+   - Both average and total time spent
+3. **AVOID REDUNDANCY**: Do not call get_longest_running_queries if you've already called get_most_expensive_queries
+4. **FOR ERRORS**: Use get_fatal_requests to identify failed or timed-out queries
+5. **FOR OPTIMIZATION**: Use get_most_frequent_queries to find high-volume queries that may benefit from optimization
+
+## Important: Announce tool usage accurately
+- Only announce tools you are actually about to execute
+- If you change your mind about which tool to use, explain why
+- Do not announce one tool and then execute a different one
+
+## CRITICAL REQUIREMENTS - YOU MUST FOLLOW THESE:
+- **COMPLETE YOUR ANALYSIS**: When analyzing performance issues, you MUST check:
+  1. System vitals (get_system_vitals) - DONE ✓
+  2. Failed queries (get_fatal_requests) - DONE ✓ 
+  3. Expensive/slow queries (get_most_expensive_queries) - REQUIRED
+  4. Provide a comprehensive analysis based on ALL data gathered
+- **NEVER ANNOUNCE WITHOUT EXECUTING**: If you say "Now let's examine..." or "Let me check...", you MUST execute the corresponding tool immediately
+- **FOLLOW THROUGH**: Once you start a performance analysis, complete it by executing all necessary tools
+- **NO PARTIAL RESPONSES**: Do not end your response after announcing a next step - always execute what you announce`;
+      
+      const systemPrompt = baseSystemPrompt ? baseSystemPrompt + performanceToolGuidance : performanceToolGuidance;
 
       // Convert conversation messages to Converse API format
       const converseMessages: Message[] = conversationMessages.map((msg) => ({
@@ -1921,6 +1954,7 @@ export class BedrockChatService {
                 tokenUsage,
                 responseLength: fullResponseText.length,
               });
+              
               
               // Don't break here - wait for metadata event that comes after messageStop
               // break;
@@ -2185,7 +2219,7 @@ export class BedrockChatService {
               recursionDepth,
               maxRecursionDepth,
             });
-            yield `\n\n[Additional tools were requested but execution limit reached (${recursionDepth}/${maxRecursionDepth} rounds). To allow more tool rounds, increase BEDROCK_MAX_TOOL_RECURSION_DEPTH.]\n`;
+            yield `\n\n[Error: Tool execution limit reached. ${recursionDepth + 1} rounds of tools were requested but the limit is ${maxRecursionDepth} rounds. To allow more tool execution rounds, increase BEDROCK_MAX_TOOL_RECURSION_DEPTH in your environment configuration.]\n`;
             return;
           }
 
@@ -2364,6 +2398,7 @@ export class BedrockChatService {
               }
             }
             
+            
             // Handle recursive tool use if continuation also requests tools
             if (continuationStopReason === "tool_use" && recursionDepth < maxRecursionDepth) {
               const additionalToolCalls = continuationAssistantMessage.content.filter(c => c.toolUse);
@@ -2381,53 +2416,111 @@ export class BedrockChatService {
                 traceHeaders: options.traceHeaders // Preserve trace headers
               };
               
-              // Convert all messages back to simple format for recursive call
-              const simpleMessages: Array<{ role: string; content: string }> = [];
+              // Convert messages to simple format for recursive call
+              // We need to build a proper conversation history
+              const recursiveMessages: Array<{ role: string; content: string }> = [];
               
-              // Add original messages (they're already in simple format)
-              simpleMessages.push(...messages);
+              // Preserve system messages from original conversation
+              const originalSystemMessages = messages.filter(m => m.role === "system");
+              recursiveMessages.push(...originalSystemMessages);
               
-              // Add tool results message
+              // Convert existing Bedrock messages to simple format
+              for (const msg of converseMessages) {
+                if (msg.role === "user" || msg.role === "assistant") {
+                  let content = "";
+                  for (const block of msg.content) {
+                    if (block.text) {
+                      content += block.text;
+                    } else if (block.toolResult) {
+                      // Include tool results as text
+                      const toolResult = block.toolResult;
+                      if (toolResult.content && Array.isArray(toolResult.content)) {
+                        for (const resultBlock of toolResult.content) {
+                          if (resultBlock.text) {
+                            content += resultBlock.text + "\n";
+                          }
+                        }
+                      }
+                    } else if (block.toolUse) {
+                      // Don't include tool use blocks in simple format
+                      // The content of the tool execution is what matters
+                    }
+                  }
+                  if (content.trim()) {
+                    recursiveMessages.push({
+                      role: msg.role,
+                      content: content.trim()
+                    });
+                  }
+                }
+              }
+              
+              // Add the assistant's response that included tool execution
+              let assistantResponse = "";
+              for (const block of assistantMessage.content) {
+                if (block.text) {
+                  assistantResponse += block.text;
+                }
+              }
+              if (assistantResponse.trim()) {
+                recursiveMessages.push({
+                  role: "assistant",
+                  content: assistantResponse.trim()
+                });
+              }
+              
+              // Add tool results as a user message
               const toolResultsContent = toolResults
                 .map(result => result.toolResult.content
                   .map(c => c.text)
                   .join("\n"))
                 .join("\n\n");
-              simpleMessages.push({
+              recursiveMessages.push({
                 role: "user",
                 content: toolResultsContent
               });
               
-              // Add the continuation assistant message
-              simpleMessages.push(this.convertBedrockMessageToSimple(continuationAssistantMessage));
+              // Add the continuation response if it has text content
+              let continuationText = "";
+              for (const block of continuationAssistantMessage.content) {
+                if (block.text) {
+                  continuationText += block.text;
+                }
+              }
+              if (continuationText.trim()) {
+                recursiveMessages.push({
+                  role: "assistant",
+                  content: continuationText.trim()
+                });
+              }
               
               log("🔄 [BedrockChat] Executing recursive tool call", {
                 recursionDepth: recursionDepth + 1,
-                messageCount: simpleMessages.length,
-                lastMessage: simpleMessages[simpleMessages.length - 1],
-                optionsKeys: Object.keys(recursiveOptions),
-                hasTraceHeaders: !!recursiveOptions.traceHeaders
+                messageCount: recursiveMessages.length,
+                lastMessage: recursiveMessages[recursiveMessages.length - 1],
+                toolResultCount: toolResults.length,
+                continuationToolCount: continuationAssistantMessage.content.filter(c => c.toolUse).length
               });
               
-              // Execute the recursive tool call with properly formatted messages
+              // Execute the recursive call using the main method
               try {
-                for await (const chunk of this._createChatCompletion(simpleMessages, recursiveOptions)) {
+                for await (const chunk of this._createChatCompletion(recursiveMessages, recursiveOptions)) {
                   yield chunk;
                 }
               } catch (recursiveError) {
                 err("❌ [BedrockChat] Recursive tool execution failed", {
                   error: recursiveError instanceof Error ? recursiveError.message : String(recursiveError),
                   recursionDepth: recursionDepth + 1,
-                  messageCount: simpleMessages.length
+                  messageCount: recursiveMessages.length
                 });
-                yield "\n\n[Error: Failed to execute additional tools. Please try again.]\n";
+                yield `\n\n[Error: Failed to execute additional tools. ${recursiveError instanceof Error ? recursiveError.message : 'Unknown error'}]\n`;
               }
             } else if (continuationStopReason === "tool_use") {
               log("🚫 [BedrockChat] Recursion depth exceeded, preventing infinite loop", {
                 recursionDepth,
                 maxRecursionDepth,
               });
-              yield "\n\n[Additional tools were requested but execution was limited to prevent excessive recursion]\n";
+              yield `\n\n[Error: Tool execution limit reached. Additional tools were requested but the limit is ${maxRecursionDepth} rounds. To allow more tool execution rounds, increase BEDROCK_MAX_TOOL_RECURSION_DEPTH in your environment configuration.]\n`;
             }
             
             // Extract token usage from continuation response metadata
