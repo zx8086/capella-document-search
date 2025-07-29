@@ -402,7 +402,12 @@ ${contextContent}
 - Prioritize accuracy and completeness in your responses
 - IMPORTANT: When you offer to execute a tool (e.g., "Would you like me to...?") and the user responds with confirmation ("Yes", "OK", "Sure", "Please", "Go ahead"), immediately execute that tool
 - IMPORTANT: If the user provides a very short response like "Yes" without clear context, ask for clarification rather than assuming what they mean
-- CRITICAL: If you announce that you will perform an action (e.g., "Let me check...", "I'll analyze...", "Let me also verify..."), you MUST execute that action immediately. Never announce an action without executing it
+- CRITICAL: After any announcement ("Let me check...", "I'll analyze..."), you MUST execute the corresponding tool immediately
+- NEVER end your response after announcing an action - always execute it
+- MANDATORY: After executing get_system_vitals, if you mention checking for expensive queries or failed queries, you MUST execute get_most_expensive_queries and get_fatal_requests in the SAME response
+- FORBIDDEN: Never say "as needed" without executing the tools. If you announce you'll check something, execute it immediately
+- FORBIDDEN: Never apologize with "You're absolutely right, I apologize" - just execute the tools
+- MANDATORY: If you say "Let me continue by checking..." you MUST execute the mentioned tool immediately
 - Keep responses concise and focused - avoid overly long explanations unless specifically requested
 ${metadata.enableExtendedThinking ? `- When asked to think step-by-step, use <thinking> tags to show your reasoning
 - In your thinking section:
@@ -433,6 +438,20 @@ ${metadata.enableExtendedThinking ? `- When asked to think step-by-step, use <th
               log("🧠 [Server] Extended thinking mode enabled for this request");
             }
 
+            // Helper function to get tool descriptions
+            const getToolDescription = (toolName: string): string => {
+              const descriptions: Record<string, string> = {
+                get_system_vitals: "Retrieving cluster health metrics and performance data",
+                get_fatal_requests: "Checking for failed queries and system errors",
+                get_most_expensive_queries: "Analyzing resource-intensive queries - this may take several seconds",
+                get_longest_running_queries: "Finding queries with high execution times",
+                get_most_frequent_queries: "Identifying frequently executed queries",
+                get_system_nodes: "Retrieving cluster node information",
+                get_completed_requests: "Analyzing completed query statistics"
+              };
+              return descriptions[toolName] || "Processing system data...";
+            };
+            
             // Use the RAG provider stream (contains proper trace headers and tool execution)
             log("🌊 [Server] Starting to read stream with conversation context");
             
@@ -450,8 +469,11 @@ ${metadata.enableExtendedThinking ? `- When asked to think step-by-step, use <th
             let progressTimerActive = true;
             let firstContentReceived = false;
             let toolsInProgress = false;
+            let streamComplete = false;
+            let lastChunkTime = Date.now();
+            let activeToolName = "";
             const progressTimer = setInterval(() => {
-              if (!progressTimerActive || (firstContentReceived && !toolsInProgress)) return;
+              if (!progressTimerActive || streamComplete) return;
               
               const elapsedTime = Date.now() - startTime;
               const elapsedSeconds = Math.floor(elapsedTime / 1000);
@@ -460,20 +482,47 @@ ${metadata.enableExtendedThinking ? `- When asked to think step-by-step, use <th
               let progressMessage = "";
               let progressDetails = "";
               
-              if (toolsInProgress) {
-                // Special messages during tool execution
+              // Check if we're in a gap (no chunks for more than 2 seconds)
+              const timeSinceLastChunk = Date.now() - lastChunkTime;
+              const isInGap = timeSinceLastChunk > 2000 && firstContentReceived;
+              
+              if (toolsInProgress && activeToolName) {
+                // Specific messages for active tool execution
+                progressMessage = `🔧 Executing ${activeToolName}... (${elapsedSeconds}s)`;
+                if (activeToolName.includes("expensive") || activeToolName.includes("longest")) {
+                  progressDetails = "Analyzing query performance metrics - this may take several seconds";
+                } else if (activeToolName.includes("fatal") || activeToolName.includes("error")) {
+                  progressDetails = "Checking for system errors and failed queries";
+                } else if (activeToolName.includes("vitals")) {
+                  progressDetails = "Retrieving live system vitals from your cluster";
+                } else {
+                  progressDetails = "Querying system data...";
+                }
+              } else if (toolsInProgress) {
+                // Generic tool execution messages
                 if (elapsedSeconds < 5) {
-                  progressMessage = `🔧 Executing tools... (${elapsedSeconds}s)`;
-                  progressDetails = "Retrieving live system data from your cluster";
+                  progressMessage = `🔧 Preparing tool execution... (${elapsedSeconds}s)`;
+                  progressDetails = "Setting up query parameters";
                 } else if (elapsedSeconds < 10) {
-                  progressMessage = `🔧 Tools still executing... (${elapsedSeconds}s)`;
+                  progressMessage = `🔧 Tools executing... (${elapsedSeconds}s)`;
                   progressDetails = "Analyzing system performance metrics";
                 } else if (elapsedSeconds < 20) {
-                  progressMessage = `⚙️ Processing tool results... (${elapsedSeconds}s)`;
-                  progressDetails = "Complex queries may take additional time";
+                  progressMessage = `⚙️ Processing complex queries... (${elapsedSeconds}s)`;
+                  progressDetails = "Large result sets may take additional time";
                 } else {
-                  progressMessage = `🔄 Extended tool execution... (${elapsedSeconds}s)`;
-                  progressDetails = "Large data analysis in progress - please wait";
+                  progressMessage = `🔄 Extended analysis running... (${elapsedSeconds}s)`;
+                  progressDetails = "Processing large amounts of data - please wait";
+                }
+              } else if (isInGap) {
+                // We're in a gap between tool executions or waiting for AI
+                progressMessage = `🤖 AI is analyzing results... (${elapsedSeconds}s)`;
+                progressDetails = "Preparing next analysis step based on findings";
+                if (timeSinceLastChunk > 10000) {
+                  progressMessage = `⏳ Waiting for AI response... (${elapsedSeconds}s)`;
+                  progressDetails = "Complex analysis in progress - the AI is determining next steps";
+                } else if (timeSinceLastChunk > 20000) {
+                  progressMessage = `🔍 Deep analysis continuing... (${elapsedSeconds}s)`;
+                  progressDetails = "Processing multiple data points - this is normal for complex queries";
                 }
               } else if (elapsedSeconds < 10) {
                 progressMessage = `🚀 Initializing AI response... (${elapsedSeconds}s)`;
@@ -554,6 +603,7 @@ ${metadata.enableExtendedThinking ? `- When asked to think step-by-step, use <th
               // The independent timer handles progress updates now, so we don't need this
               
               chunkCount++;
+              lastChunkTime = Date.now(); // Update last chunk time
               let content = "";
 
               if (typeof chunk === "string") {
@@ -566,8 +616,7 @@ ${metadata.enableExtendedThinking ? `- When asked to think step-by-step, use <th
                 // Mark that we've received the first content
                 if (!firstContentReceived) {
                   firstContentReceived = true;
-                  log("✅ [Server] First content received, progress timer will stop");
-                  // Progress timer will stop on its next iteration
+                  log("✅ [Server] First content received, progress timer continues");
                 }
                 
                 fullResponse += content;
@@ -597,8 +646,8 @@ ${metadata.enableExtendedThinking ? `- When asked to think step-by-step, use <th
                   // Send progress update to keep indicator visible during tool execution
                   const toolProgress = {
                     type: "progress",
-                    message: "🔧 Executing tools...",
-                    details: "Retrieving live system data",
+                    message: "🔧 Preparing to execute tools...",
+                    details: "Setting up system queries",
                     elapsedTime: Date.now() - startTime,
                     chunkCount,
                     isExecutingTools: true
@@ -606,10 +655,29 @@ ${metadata.enableExtendedThinking ? `- When asked to think step-by-step, use <th
                   controller.enqueue(new TextEncoder().encode(JSON.stringify(toolProgress) + "\n"));
                 }
                 
-                // Check if tool results are being displayed (tools finished)
-                if (content.includes("### Tool:") && toolsInProgress) {
-                  toolsInProgress = false;
-                  log("✅ [Server] Tool results detected, tools execution completed");
+                // Check for specific tool names
+                const toolMatch = content.match(/### Tool: (\w+)/);
+                if (toolMatch) {
+                  activeToolName = toolMatch[1];
+                  log(`🔧 [Server] Tool detected: ${activeToolName}`);
+                  
+                  // Send specific tool progress
+                  const toolProgress = {
+                    type: "progress",
+                    message: `🔧 Running ${activeToolName}...`,
+                    details: getToolDescription(activeToolName),
+                    elapsedTime: Date.now() - startTime,
+                    chunkCount,
+                    isExecutingTools: true,
+                    activeToolName
+                  };
+                  controller.enqueue(new TextEncoder().encode(JSON.stringify(toolProgress) + "\n"));
+                }
+                
+                // Check if tool results are complete (look for result count)
+                if (content.includes("results)") && toolsInProgress) {
+                  // Don't immediately set toolsInProgress to false - wait for next action
+                  log("✅ [Server] Tool results received, waiting for next action");
                 }
                 
                 const jsonLine = JSON.stringify({ content }) + "\n";
@@ -712,6 +780,9 @@ ${metadata.enableExtendedThinking ? `- When asked to think step-by-step, use <th
               finalResponseLength: fullResponse.length,
               runId: runId,
             });
+            // Mark stream as complete before cleanup
+            streamComplete = true;
+            toolsInProgress = false;
             // Cleanup progress timer and abort handler
             clearInterval(progressTimer);
             progressTimerActive = false;

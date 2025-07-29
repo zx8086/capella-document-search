@@ -1707,63 +1707,33 @@ export class BedrockChatService {
       // Combine system messages with performance analysis guidance
       const baseSystemPrompt = systemMessages.map((m) => m.content).join("\n\n");
       
-      // Add tool selection guidance for performance analysis
-      const performanceToolGuidance = `
-## Tool Selection Guidelines for Performance Analysis
+      // Add tool execution guidance
+      const toolExecutionGuidance = `
 
-When analyzing cluster performance issues:
+CRITICAL RULES FOR TOOL EXECUTION:
 
-1. **ALWAYS START** with get_system_vitals to understand the current cluster state
-2. **FOR SLOW QUERIES**: Use get_most_expensive_queries as it provides comprehensive timing metrics:
-   - Detailed execution times (elapsed, service, run time)
-   - Phase-by-phase performance breakdown (index scan, project, stream)
-   - Resource usage metrics
-   - Both average and total time spent
-3. **AVOID REDUNDANCY**: Do not call get_longest_running_queries if you've already called get_most_expensive_queries
-4. **FOR ERRORS**: Use get_fatal_requests to identify failed or timed-out queries
-5. **FOR OPTIMIZATION**: Use get_most_frequent_queries to find high-volume queries that may benefit from optimization
+1. IMMEDIATE EXECUTION: When you say you will check/analyze/examine something, you MUST execute the corresponding tool IMMEDIATELY in the SAME response.
 
-## Important: Announce tool usage accurately
-- Only announce tools you are actually about to execute
-- If you change your mind about which tool to use, explain why
-- Do not announce one tool and then execute a different one
+2. SPECIFIC PATTERNS THAT REQUIRE IMMEDIATE TOOL EXECUTION:
+   - "Let me check for the most expensive queries" → MUST execute get_most_expensive_queries
+   - "Let me check if there are any failed queries" → MUST execute get_fatal_requests
+   - "Let me analyze..." → MUST execute the relevant analysis tool
+   - "I'll examine..." → MUST execute the examination tool
+   - "additional checks" → MUST execute the additional tools
 
-## CRITICAL: Analyze Tool Results
-After executing ANY tool, you MUST:
-1. **ANALYZE THE DATA**: Don't just display raw results - provide meaningful insights
-2. **IDENTIFY KEY METRICS**: Highlight important findings (e.g., high CPU, memory issues, slow queries)
-3. **PROVIDE RECOMMENDATIONS**: Based on the data, suggest improvements or next steps
-4. **CONTINUE ANALYSIS**: If you announced additional checks, execute them after analyzing current results
+3. FORBIDDEN BEHAVIORS:
+   - NEVER end your response after announcing an action
+   - NEVER apologize for not completing analysis
+   - NEVER say "as needed" without executing
+   - NEVER leave announced actions unfulfilled
+   - NEVER say "You're absolutely right, I apologize" - just execute the tools
+   - NEVER say "Let me continue" without immediately executing the tool
 
-## CRITICAL REQUIREMENTS - YOU MUST FOLLOW THESE:
-- **COMPLETE YOUR ANALYSIS**: When analyzing performance issues, you MUST check:
-  1. System vitals (get_system_vitals)
-  2. Failed queries (get_fatal_requests)
-  3. Expensive/slow queries (get_most_expensive_queries)
-  4. Provide a comprehensive analysis based on ALL data gathered
-- **NEVER ANNOUNCE WITHOUT EXECUTING**: If you say "Let me check...", "Let me also...", "Now let's examine...", or ANY similar phrase, you MUST execute the corresponding tool immediately
-- **DO NOT END PREMATURELY**: If you announce an action, you MUST complete it before ending your response
-- **FOLLOW THROUGH**: Once you start a performance analysis, complete it by executing all necessary tools
-- **NO PARTIAL RESPONSES**: Never end your response after announcing a next step - always execute what you announce
+4. AFTER get_system_vitals: If you mention checking for expensive queries or failed queries, you MUST execute those tools in the SAME response.
 
-IMPORTANT: The system will mark your response as incomplete if you announce an action without executing it.
-
-## Response Control Rules:
-- **CONTINUE AFTER ANNOUNCEMENTS**: When you write phrases like "Let me check...", "Let me also verify...", etc., you are REQUIRED to continue your response and execute the announced action
-- **NO PREMATURE ENDINGS**: Do not use end_turn or stop generating after announcing an action
-- **COMPLETE ALL STEPS**: If you outline multiple steps, execute ALL of them before ending your response
-- **TOOL EXECUTION IS MANDATORY**: Once you announce a tool, its execution is not optional
-
-## Common Mistake to AVOID:
-DO NOT end your response after writing phrases like:
-- "Now, let me check if there are any failed queries..."
-- "Let me also verify..."
-- "I'll analyze..."
-- "Next, I'll examine..."
-
-These phrases REQUIRE immediate tool execution. Ending without executing is a critical error.`;
+5. Tool execution is MANDATORY, not optional. There is no "as needed" - if you announce it, you MUST do it.`;
       
-      const systemPrompt = baseSystemPrompt ? baseSystemPrompt + performanceToolGuidance : performanceToolGuidance;
+      const systemPrompt = baseSystemPrompt ? baseSystemPrompt + toolExecutionGuidance : toolExecutionGuidance;
 
       // Convert conversation messages to Converse API format
       const converseMessages: Message[] = conversationMessages.map((msg) => ({
@@ -1921,6 +1891,45 @@ These phrases REQUIRE immediate tool execution. Ending without executing is a cr
                 assistantMessage.content[currentContentIndex].text +=
                   delta.text;
                 fullResponseText += delta.text; // Track for LLM run
+                
+                // Real-time announcement detection
+                const recentText = fullResponseText.slice(-300); // Check last 300 chars
+                const announcementPatternsRealtime = [
+                  /let me (?:also )?(?:check|verify|analyze|examine|look|investigate|assess|see)/i,
+                  /let me check if/i,
+                  /now,? (?:let's|let me|I'll|I will)/i,
+                  /I(?:'ll| will) (?:also )?(?:check|verify|analyze|examine|look|see)/i,
+                  /let's (?:check|verify|see|look|examine)/i,
+                  /I need to (?:check|verify|analyze|examine)/i,
+                  /Let me (?:now )?(?:retrieve|gather|fetch|get)/i,
+                  // Add the exact pattern from screenshot
+                  /Let me check for (?:the )?most expensive queries/i,
+                  /to give you a more comprehensive view/i
+                ];
+                
+                // Also check for problematic patterns in real-time
+                const problematicPatternsRealtime = [
+                  /You're right/i,
+                  /Let me continue/i,
+                  /additional checks/i,
+                  /complete picture/i
+                ];
+                
+                const hasRecentAnnouncement = announcementPatternsRealtime.some(pattern => 
+                  pattern.test(recentText)
+                );
+                
+                const hasProblematicPatternRealtime = problematicPatternsRealtime.some(pattern => 
+                  pattern.test(recentText)
+                );
+                
+                if (hasRecentAnnouncement || hasProblematicPatternRealtime) {
+                  log("🚨 [BedrockChat] Real-time announcement/problematic pattern detected during streaming", {
+                    recentText: recentText.slice(-100),
+                    fullLength: fullResponseText.length,
+                    hasProblematic: hasProblematicPatternRealtime
+                  });
+                }
               } else if (
                 delta?.toolUse?.input &&
                 assistantMessage.content[currentContentIndex]?.toolUse
@@ -2300,10 +2309,8 @@ These phrases REQUIRE immediate tool execution. Ending without executing is a cr
                 toolIndex: toolsExecuted,
               });
 
-              // Add analysis instruction with the tool results
-              const analysisPrompt = toolsExecuted === 1 && name === "get_system_vitals" 
-                ? "\n\nBased on this system vitals data, analyze the cluster's performance and identify any issues or concerns. Then proceed with additional checks as needed."
-                : "";
+              // Add instruction to continue if more analysis is needed
+              const analysisPrompt = "";  // Let the model decide what to do next based on context
               
               toolResults.push({
                 toolResult: {
@@ -2342,10 +2349,14 @@ These phrases REQUIRE immediate tool execution. Ending without executing is a cr
           
           // Check if the response ends with an announcement pattern
           const announcementPatterns = [
-            /let me (?:also )?(?:check|verify|analyze|examine|look|investigate|assess)/i,
+            /let me (?:also )?(?:check|verify|analyze|examine|look|investigate|assess|see)/i,
+            /let me check if/i,
             /now,? (?:let's|let me|I'll|I will)/i,
-            /I(?:'ll| will) (?:also )?(?:check|verify|analyze|examine|look)/i,
-            /(?:Next|Additionally|Furthermore), (?:let me|I'll|I will)/i
+            /I(?:'ll| will) (?:also )?(?:check|verify|analyze|examine|look|see)/i,
+            /(?:Next|Additionally|Furthermore), (?:let me|I'll|I will)/i,
+            /let's (?:check|verify|see|look|examine)/i,
+            /I need to (?:check|verify|analyze|examine)/i,
+            /Let me (?:now )?(?:retrieve|gather|fetch|get)/i
           ];
           
           const endsWithAnnouncement = announcementPatterns.some(pattern => 
@@ -2458,27 +2469,131 @@ These phrases REQUIRE immediate tool execution. Ending without executing is a cr
                   .join("");
                   
                 const announcementPatterns = [
-                  /let me (?:also )?(?:check|verify|analyze|examine|look|investigate|assess)[^.]*[:.]?\s*$/i,
-                  /now,? (?:let's|let me|I'll|I will)[^.]*[:.]?\s*$/i,
-                  /I(?:'ll| will) (?:also )?(?:check|verify|analyze|examine|look)[^.]*[:.]?\s*$/i
+                  // Generic action announcements
+                  /(?:let me|I'll|I will|I'm going to|I need to|let's)\s+(?:also\s+)?\w+/i,
+                  // Continuation patterns
+                  /(?:next|then|additionally|furthermore),?\s+(?:let me|I'll|I will)/i,
+                  // Specific analysis patterns
+                  /(?:check|verify|analyze|examine|look|investigate|assess|see|get)\s+(?:if|whether|for|what|information|about)/i,
+                  // Future tense commitments
+                  /I (?:should|will|can) (?:also\s+)?(?:check|analyze|look|examine)/i,
+                  // Specific "Let me get" pattern
+                  /Let me get\s+\w+/i,
+                  // "provide a more complete picture" indicates more analysis needed
+                  /provide a (?:more )?complete picture/i,
+                  // Any sentence ending with future intention
+                  /(?:to|will|shall|going to)\s+\w+\.?$/i,
+                  // CRITICAL: Match the exact pattern from screenshot
+                  /Let me check for (?:the )?most expensive queries/i,
+                  // Pattern for performance analysis announcements
+                  /to give you a more comprehensive view of your system performance/i,
+                  // Match patterns that end conversations without action
+                  /as needed\.?$/i,
+                  // Specific continuation patterns that need execution
+                  /Let me continue by checking/i,
+                  /I should continue/i,
+                  /continue the analysis/i
+                ];
+                
+                // Also check if response contains problematic patterns that indicate incomplete execution
+                const problematicPatterns = [
+                  /I apologize/i,
+                  /Let me continue/i,
+                  /I should have/i,
+                  /I didn't complete/i,
+                  /You're right/i
                 ];
                 
                 const hasAnnouncement = announcementPatterns.some(pattern => 
                   pattern.test(responseText.trim())
                 );
                 
+                const hasProblematicPattern = problematicPatterns.some(pattern => 
+                  pattern.test(responseText)
+                );
+                
                 const hasTools = continuationAssistantMessage.content.some(c => c.toolUse);
                 
-                if (hasAnnouncement && !hasTools && continuationStopReason === "end_turn") {
-                  log("❌ [BedrockChat] CRITICAL ERROR: Response ended with announcement but no tool execution", {
+                // Log for debugging
+                if (continuationStopReason === "end_turn" && responseText.length > 100) {
+                  log("🔍 [BedrockChat] Checking end_turn response for announcements", {
+                    responseLength: responseText.length,
+                    lastChars: responseText.slice(-200),
+                    hasAnnouncement,
+                    hasProblematicPattern,
+                    hasTools
+                  });
+                }
+                
+                // Force continuation if we have problematic patterns OR announcements without tools
+                if ((hasAnnouncement || hasProblematicPattern) && !hasTools && continuationStopReason === "end_turn") {
+                  log("❌ [BedrockChat] CRITICAL ERROR: Response ended with announcement/problematic pattern but no tool execution", {
                     responsePreview: responseText.slice(-200),
                     stopReason: continuationStopReason,
                     hasAnnouncement,
+                    hasProblematicPattern,
                     hasTools
                   });
                   
-                  // Force an error message to the user
-                  yield "\n\n⚠️ **System Notice**: The response ended prematurely. The announced action was not executed. Please ask me to continue or try your question again.";
+                  // Automatically attempt to continue and execute the announced tool
+                  yield "\n\n[Executing announced action...]\n\n";
+                  
+                  // Determine which tool needs to be executed based on the announcement
+                  let requiredTool = "";
+                  const lastText = responseText.toLowerCase();
+                  
+                  if (lastText.includes("node status") || lastText.includes("checking the node")) {
+                    requiredTool = "get_system_nodes";
+                  } else if (lastText.includes("expensive queries")) {
+                    requiredTool = "get_most_expensive_queries";
+                  } else if (lastText.includes("failed queries") || lastText.includes("fatal requests")) {
+                    requiredTool = "get_fatal_requests";
+                  } else if (lastText.includes("check") || lastText.includes("analyze")) {
+                    // Generic - force continuation
+                    requiredTool = "the appropriate tool";
+                  }
+                  
+                  // Add explicit instruction to force tool execution
+                  const forcedContinuationMessages = [
+                    ...converseMessages,
+                    {
+                      role: "assistant" as const,
+                      content: continuationAssistantMessage.content
+                    },
+                    {
+                      role: "user" as const,
+                      content: [{
+                        text: requiredTool === "the appropriate tool" 
+                          ? "Execute the tool you just announced. No apologies, no explanations. Just execute it immediately."
+                          : `Execute ${requiredTool} immediately. You announced you would do this but didn't. No apologies - just execute the tool NOW.`
+                      }]
+                    }
+                  ];
+                  
+                  try {
+                    const forcedContinuationCommand = new ConverseStreamCommand({
+                      modelId: this.modelId,
+                      messages: forcedContinuationMessages,
+                      system: systemPrompt ? [{ text: systemPrompt }] : undefined,
+                      toolConfig,
+                      inferenceConfig: {
+                        maxTokens: options.max_tokens || backendConfig.rag.BEDROCK_MAX_TOKENS,
+                        temperature: options.temperature || 0.7,
+                      }
+                    });
+                    
+                    const forcedResponse = await this.bedrockClient.send(forcedContinuationCommand);
+                    if (forcedResponse.stream) {
+                      for await (const forcedEvent of forcedResponse.stream) {
+                        if (forcedEvent.contentBlockDelta?.delta?.text) {
+                          yield forcedEvent.contentBlockDelta.delta.text;
+                        }
+                      }
+                    }
+                  } catch (forcedError) {
+                    log("❌ [BedrockChat] Failed to force tool execution", { error: forcedError });
+                    yield "\n\n⚠️ **System Notice**: The response ended prematurely. The announced action was not executed. Please ask me to continue or try your question again.";
+                  }
                 }
                 
                 log("🛑 [BedrockChat] Continuation MessageStop - Recursive response completed", {

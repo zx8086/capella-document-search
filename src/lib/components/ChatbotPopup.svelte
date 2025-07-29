@@ -688,6 +688,10 @@
                                     isLoading,
                                     currentThinking: currentThinking ? 'has content' : 'empty'
                                 });
+                                // Hide progress indicator now that we're truly done
+                                showProgress = false;
+                                console.log('🔴 [Progress Indicator] DISABLED - Done signal received');
+                                
                                 // Capture runId if provided in done message
                                 if (data.runId && !data.error) {
                                     console.log('📝 Captured runId for feedback:', data.runId);
@@ -714,16 +718,28 @@
                             
                             if (data.type === 'progress') {
                                 // Handle progress updates
-                                console.log('📈 Progress update:', data.message, data.details);
+                                console.log('📈 Progress update:', data.message, data.details, { 
+                                    activeToolName: data.activeToolName,
+                                    isExecutingTools: data.isExecutingTools,
+                                    isWaitingForAI: data.isWaitingForAI
+                                });
                                 
                                 // Update progress state for the indicator
                                 progressMessage = data.message || progressMessage;
                                 progressDetails = data.details || '';
                                 
+                                // Always show progress when we receive progress updates
+                                showProgress = true;
+                                console.log('📊 [Progress Indicator] VISIBLE - Progress update received');
+                                
                                 // If tools are being executed, ensure progress stays visible
-                                if (data.isExecutingTools) {
-                                    showProgress = true;
-                                    console.log('🔧 [Progress Indicator] KEPT VISIBLE - Tools are executing');
+                                if (data.isExecutingTools || data.activeToolName) {
+                                    console.log(`🔧 [Progress Indicator] Tool execution: ${data.activeToolName || 'generic'}`);
+                                }
+                                
+                                // If we're waiting for AI (between tool calls), show that
+                                if (data.isWaitingForAI) {
+                                    console.log('⏳ [Progress Indicator] Waiting for AI response between operations');
                                 }
                                 
                                 // Don't show inline progress anymore since we have the indicator
@@ -746,31 +762,27 @@
                                 const hasToolResults = accumulatedResponse.includes('### Tool:');
                                 const toolsStillRunning = isExecutingTools && !hasToolResults;
                                 
-                                // Only hide progress when we have actual visible content and tools are NOT running
+                                // Mark first content received but don't hide progress yet
                                 if (!firstContentReceived && hasVisibleContent) {
                                     firstContentReceived = true;
-                                    if (!toolsStillRunning) {
-                                        console.log('✅ First visible content received, hiding progress indicator');
-                                        showProgress = false;
-                                        console.log('🔴 [Progress Indicator] DISABLED - First visible content received');
-                                    } else {
-                                        console.log('🔧 First content received but tools are executing, keeping progress visible');
-                                        showProgress = true;
+                                    console.log('✅ First visible content received, progress continues until done');
+                                    
+                                    // Keep progress visible even with content - it will be hidden when done:true is received
+                                    if (toolsStillRunning) {
+                                        console.log('🔧 Tools are executing, progress stays visible');
                                         progressMessage = "🔧 Executing tools...";
                                         progressDetails = "Retrieving live system data";
                                     }
+                                    // Don't hide progress here anymore - wait for done signal
                                 } else if (toolsStillRunning) {
                                     // Keep progress visible during tool execution
                                     showProgress = true;
                                     progressMessage = "🔧 Executing tools...";
                                     progressDetails = "Retrieving live system data";
                                     console.log('🔧 [Progress Indicator] KEPT VISIBLE - Tools still running');
-                                } else if (hasToolResults && showProgress) {
-                                    // Tools have finished, hide progress
-                                    showProgress = false;
-                                    console.log('✅ [Progress Indicator] HIDDEN - Tool results received');
                                 }
-                                }
+                                // Removed the logic that hides progress when tool results are received
+                                // Progress will only be hidden when done:true is received
                                 
                                 // Check for timeout or truncation warnings
                                 const isTimeoutWarning = data.content.includes('**RESPONSE TIMEOUT') || 
@@ -1104,22 +1116,22 @@
         data-transaction-name="Chat Assistant Close"
       ></button>
       
-      <!-- Progress Indicator -->
-      <ChatProgressIndicator 
-        isActive={progressIndicatorActive} 
-        message={progressMessage || "Processing your request..."}
-        details={progressDetails}
-        showElapsedTime={true}
-        tokenUsage={currentTokenUsage}
-        estimatedCost={currentEstimatedCost}
-      />
-      
       <div 
         class="fixed bottom-40 right-6 sm:right-4 sm:left-4 md:right-6 md:left-auto w-[800px] max-w-[calc(100vw-3rem)] xl:max-w-[calc(100vw-6rem)] sm:max-w-none md:max-w-[calc(100vw-3rem)] z-[46] rounded-lg border border-gray-200 bg-white shadow-xl dark:border-gray-800 dark:bg-gray-900"
         role="dialog"
         aria-modal="true"
         aria-label="Chat window"
       >
+        <!-- Progress Indicator -->
+        <ChatProgressIndicator 
+          isActive={progressIndicatorActive} 
+          message={progressMessage || "Processing your request..."}
+          details={progressDetails}
+          showElapsedTime={true}
+          tokenUsage={currentTokenUsage}
+          estimatedCost={currentEstimatedCost}
+        />
+        
         <div class="flex flex-col h-[80vh] max-h-[800px] min-h-[500px]">
           <!-- Header -->
           <div class="flex items-center justify-between border-b border-gray-200 bg-[#00174f] p-4 dark:border-gray-800">

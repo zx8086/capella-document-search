@@ -70,12 +70,18 @@
 </script>
 
 {#if isActive}
-  <div class="fixed bottom-48 right-8 z-[47] bg-white dark:bg-gray-900 shadow-lg rounded-lg border border-gray-200 dark:border-gray-700 p-4 max-w-sm animate-in slide-in-from-bottom-2 duration-300">
+  <!-- Progress indicator overlay -->
+  <div class="absolute inset-0 flex items-center justify-center z-50 pointer-events-none animate-in fade-in duration-300">
+    <!-- Semi-transparent backdrop -->
+    <div class="absolute inset-0 bg-black/10 dark:bg-black/20 rounded-lg pointer-events-auto"></div>
+    
+    <!-- Centered progress content -->
+    <div class="relative bg-white dark:bg-gray-900 shadow-2xl rounded-lg border border-gray-200 dark:border-gray-700 p-6 min-w-[320px] max-w-md pointer-events-auto">
     <div class="flex items-start gap-3">
       <!-- Animated spinner -->
       <div class="flex-shrink-0">
         <div class="relative">
-          <div class="w-8 h-8">
+          <div class="w-10 h-10">
             <svg class="animate-spin" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
               <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2" opacity="0.25"/>
               <path d="M12 2a10 10 0 0 1 0 20" stroke="currentColor" stroke-width="2" stroke-linecap="round" class="text-blue-600 dark:text-blue-400"/>
@@ -83,18 +89,18 @@
           </div>
           {#if elapsedTime > 30000}
             <!-- Warning indicator for long-running requests -->
-            <div class="absolute -top-1 -right-1 w-3 h-3 bg-amber-500 rounded-full animate-pulse"></div>
+            <div class="absolute -top-1 -right-1 w-4 h-4 bg-amber-500 rounded-full animate-pulse"></div>
           {/if}
         </div>
       </div>
       
       <!-- Progress content -->
       <div class="flex-1 min-w-0">
-        <p class="text-sm font-medium text-gray-900 dark:text-gray-100">
+        <p class="text-base font-medium text-gray-900 dark:text-gray-100">
           {message}
         </p>
-        {#if details}
-          <p class="text-xs text-gray-600 dark:text-gray-400 mt-1">
+        {#if details && !details.includes(formatElapsedTime(elapsedTime))}
+          <p class="text-sm text-gray-600 dark:text-gray-400 mt-1">
             {details}
           </p>
         {/if}
@@ -102,7 +108,7 @@
           <div class="mt-2 flex items-center gap-2 flex-wrap">
             {#if showElapsedTime}
               <span class="text-xs text-gray-500 dark:text-gray-500">
-                Elapsed: {formatElapsedTime(elapsedTime)}
+                {formatElapsedTime(elapsedTime)}
               </span>
             {/if}
             {#if tokenUsage}
@@ -136,6 +142,7 @@
         ⚠️ This request is taking longer than usual. It may timeout soon.
       </div>
     {/if}
+    </div>
   </div>
 {/if}
 
@@ -158,17 +165,21 @@
   
   /* Animate in/out */
   .animate-in {
-    animation: slideIn 0.3s ease-out;
+    animation: fadeIn 0.3s ease-out;
   }
   
-  @keyframes slideIn {
+  @keyframes fadeIn {
     from {
-      transform: translateY(100%);
       opacity: 0;
+      transform: scale(0.95);
     }
     to {
-      transform: translateY(0);
       opacity: 1;
+      transform: scale(1);
     }
+  }
+  
+  .fade-in {
+    animation: fadeIn 0.3s ease-out;
   }
 </style>
