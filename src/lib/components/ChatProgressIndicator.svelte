@@ -76,8 +76,8 @@
     <div class="absolute inset-0 bg-black/10 dark:bg-black/20 rounded-lg pointer-events-auto"></div>
     
     <!-- Centered progress content -->
-    <div class="relative bg-white dark:bg-gray-900 shadow-2xl rounded-lg border border-gray-200 dark:border-gray-700 p-6 min-w-[320px] max-w-md pointer-events-auto">
-    <div class="flex items-start gap-3">
+    <div class="relative bg-white dark:bg-gray-900 shadow-2xl rounded-lg border border-gray-200 dark:border-gray-700 p-6 w-[400px] h-[160px] pointer-events-auto">
+    <div class="flex items-center gap-3 h-full">
       <!-- Animated spinner -->
       <div class="flex-shrink-0">
         <div class="relative">
@@ -95,12 +95,12 @@
       </div>
       
       <!-- Progress content -->
-      <div class="flex-1 min-w-0">
-        <p class="text-base font-medium text-gray-900 dark:text-gray-100">
+      <div class="flex-1 min-w-0 overflow-hidden">
+        <p class="text-base font-medium text-gray-900 dark:text-gray-100 truncate">
           {message}
         </p>
         {#if details && !details.includes(formatElapsedTime(elapsedTime))}
-          <p class="text-sm text-gray-600 dark:text-gray-400 mt-1">
+          <p class="text-sm text-gray-600 dark:text-gray-400 mt-1 line-clamp-2">
             {details}
           </p>
         {/if}
@@ -121,9 +121,13 @@
                 </span>
               {/if}
             {/if}
-            {#if elapsedTime > 60000}
+            {#if elapsedTime > 60000 && elapsedTime <= 240000}
               <span class="text-xs text-amber-600 dark:text-amber-400">
                 • Complex query in progress
+              </span>
+            {:else if elapsedTime > 240000}
+              <span class="text-xs text-amber-600 dark:text-amber-400">
+                • May timeout soon
               </span>
             {/if}
           </div>
@@ -135,13 +139,6 @@
         </div>
       </div>
     </div>
-    
-    <!-- Timeout warning -->
-    {#if elapsedTime > 240000}
-      <div class="mt-3 p-2 bg-amber-50 dark:bg-amber-900/20 rounded text-xs text-amber-800 dark:text-amber-200">
-        ⚠️ This request is taking longer than usual. It may timeout soon.
-      </div>
-    {/if}
     </div>
   </div>
 {/if}
