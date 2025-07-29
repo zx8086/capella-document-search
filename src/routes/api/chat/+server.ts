@@ -488,7 +488,7 @@ ${metadata.enableExtendedThinking ? `- When asked to think step-by-step, use <th
               
               if (toolsInProgress && activeToolName) {
                 // Specific messages for active tool execution
-                progressMessage = `🔧 Executing ${activeToolName}... (${elapsedSeconds}s)`;
+                progressMessage = `🔧 Executing ${activeToolName}...`;
                 if (activeToolName.includes("expensive") || activeToolName.includes("longest")) {
                   progressDetails = "Analyzing query performance metrics - this may take several seconds";
                 } else if (activeToolName.includes("fatal") || activeToolName.includes("error")) {
@@ -501,46 +501,46 @@ ${metadata.enableExtendedThinking ? `- When asked to think step-by-step, use <th
               } else if (toolsInProgress) {
                 // Generic tool execution messages
                 if (elapsedSeconds < 5) {
-                  progressMessage = `🔧 Preparing tool execution... (${elapsedSeconds}s)`;
+                  progressMessage = `🔧 Preparing tool execution...`;
                   progressDetails = "Setting up query parameters";
                 } else if (elapsedSeconds < 10) {
-                  progressMessage = `🔧 Tools executing... (${elapsedSeconds}s)`;
+                  progressMessage = `🔧 Tools executing...`;
                   progressDetails = "Analyzing system performance metrics";
                 } else if (elapsedSeconds < 20) {
-                  progressMessage = `⚙️ Processing complex queries... (${elapsedSeconds}s)`;
+                  progressMessage = `⚙️ Processing complex queries...`;
                   progressDetails = "Large result sets may take additional time";
                 } else {
-                  progressMessage = `🔄 Extended analysis running... (${elapsedSeconds}s)`;
+                  progressMessage = `🔄 Extended analysis running...`;
                   progressDetails = "Processing large amounts of data - please wait";
                 }
               } else if (isInGap) {
                 // We're in a gap between tool executions or waiting for AI
-                progressMessage = `🤖 AI is analyzing results... (${elapsedSeconds}s)`;
+                progressMessage = `🤖 AI is analyzing results...`;
                 progressDetails = "Preparing next analysis step based on findings";
                 if (timeSinceLastChunk > 10000) {
-                  progressMessage = `⏳ Waiting for AI response... (${elapsedSeconds}s)`;
+                  progressMessage = `⏳ Waiting for AI response...`;
                   progressDetails = "Complex analysis in progress - the AI is determining next steps";
                 } else if (timeSinceLastChunk > 20000) {
-                  progressMessage = `🔍 Deep analysis continuing... (${elapsedSeconds}s)`;
+                  progressMessage = `🔍 Deep analysis continuing...`;
                   progressDetails = "Processing multiple data points - this is normal for complex queries";
                 }
               } else if (elapsedSeconds < 10) {
-                progressMessage = `🚀 Initializing AI response... (${elapsedSeconds}s)`;
+                progressMessage = `🚀 Initializing AI response...`;
                 progressDetails = "Setting up conversation context and preparing response";
               } else if (elapsedSeconds < 20) {
-                progressMessage = `🤖 AI is processing your request... (${elapsedSeconds}s)`;
+                progressMessage = `🤖 AI is processing your request...`;
                 progressDetails = "Analyzing context and formulating response";
               } else if (elapsedSeconds < 30) {
-                progressMessage = `🔄 Still processing... (${elapsedSeconds}s)`;
+                progressMessage = `🔄 Still processing...`;
                 progressDetails = "This is taking longer than usual - working on complex analysis";
               } else if (elapsedSeconds < 45) {
-                progressMessage = `⚡ Continuing to process... (${elapsedSeconds}s)`;
+                progressMessage = `⚡ Continuing to process...`;
                 progressDetails = "Processing complex data - please wait";
               } else if (elapsedSeconds < 60) {
-                progressMessage = `🔍 Deep analysis in progress... (${elapsedSeconds}s)`;
+                progressMessage = `🔍 Deep analysis in progress...`;
                 progressDetails = "Almost there - finalizing comprehensive response";
               } else {
-                progressMessage = `⏱️ Extended processing... (${elapsedSeconds}s)`;
+                progressMessage = `⏱️ Extended processing...`;
                 progressDetails = `Processing for ${elapsedSeconds} seconds - complex query requiring detailed analysis`;
               }
               

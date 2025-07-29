@@ -1726,6 +1726,12 @@ TOOL EXECUTION PROTOCOL:
 
 4. RESPONSE STYLE: Present results directly rather than narrating your process.
 
+5. POST-EXECUTION ANALYSIS: After executing any tool, always provide:
+   - Clear interpretation of the results
+   - Key findings and their implications
+   - Actionable recommendations when relevant
+   - Context about what the data means for the user
+
 REMEMBER: Tools are for execution, not announcement.`;
       
       const systemPrompt = baseSystemPrompt ? baseSystemPrompt + toolExecutionGuidance : toolExecutionGuidance;
