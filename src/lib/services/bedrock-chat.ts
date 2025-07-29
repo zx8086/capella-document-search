@@ -1728,15 +1728,40 @@ When analyzing cluster performance issues:
 - If you change your mind about which tool to use, explain why
 - Do not announce one tool and then execute a different one
 
+## CRITICAL: Analyze Tool Results
+After executing ANY tool, you MUST:
+1. **ANALYZE THE DATA**: Don't just display raw results - provide meaningful insights
+2. **IDENTIFY KEY METRICS**: Highlight important findings (e.g., high CPU, memory issues, slow queries)
+3. **PROVIDE RECOMMENDATIONS**: Based on the data, suggest improvements or next steps
+4. **CONTINUE ANALYSIS**: If you announced additional checks, execute them after analyzing current results
+
 ## CRITICAL REQUIREMENTS - YOU MUST FOLLOW THESE:
 - **COMPLETE YOUR ANALYSIS**: When analyzing performance issues, you MUST check:
-  1. System vitals (get_system_vitals) - DONE ✓
-  2. Failed queries (get_fatal_requests) - DONE ✓ 
-  3. Expensive/slow queries (get_most_expensive_queries) - REQUIRED
+  1. System vitals (get_system_vitals)
+  2. Failed queries (get_fatal_requests)
+  3. Expensive/slow queries (get_most_expensive_queries)
   4. Provide a comprehensive analysis based on ALL data gathered
-- **NEVER ANNOUNCE WITHOUT EXECUTING**: If you say "Now let's examine..." or "Let me check...", you MUST execute the corresponding tool immediately
+- **NEVER ANNOUNCE WITHOUT EXECUTING**: If you say "Let me check...", "Let me also...", "Now let's examine...", or ANY similar phrase, you MUST execute the corresponding tool immediately
+- **DO NOT END PREMATURELY**: If you announce an action, you MUST complete it before ending your response
 - **FOLLOW THROUGH**: Once you start a performance analysis, complete it by executing all necessary tools
-- **NO PARTIAL RESPONSES**: Do not end your response after announcing a next step - always execute what you announce`;
+- **NO PARTIAL RESPONSES**: Never end your response after announcing a next step - always execute what you announce
+
+IMPORTANT: The system will mark your response as incomplete if you announce an action without executing it.
+
+## Response Control Rules:
+- **CONTINUE AFTER ANNOUNCEMENTS**: When you write phrases like "Let me check...", "Let me also verify...", etc., you are REQUIRED to continue your response and execute the announced action
+- **NO PREMATURE ENDINGS**: Do not use end_turn or stop generating after announcing an action
+- **COMPLETE ALL STEPS**: If you outline multiple steps, execute ALL of them before ending your response
+- **TOOL EXECUTION IS MANDATORY**: Once you announce a tool, its execution is not optional
+
+## Common Mistake to AVOID:
+DO NOT end your response after writing phrases like:
+- "Now, let me check if there are any failed queries..."
+- "Let me also verify..."
+- "I'll analyze..."
+- "Next, I'll examine..."
+
+These phrases REQUIRE immediate tool execution. Ending without executing is a critical error.`;
       
       const systemPrompt = baseSystemPrompt ? baseSystemPrompt + performanceToolGuidance : performanceToolGuidance;
 
@@ -1762,6 +1787,8 @@ When analyzing cluster performance issues:
         inferenceConfig: {
           maxTokens: options.max_tokens || backendConfig.rag.BEDROCK_MAX_TOKENS,
           temperature: options.temperature || 0.7,
+          // Increase stop sequences to encourage completion of announced actions
+          stopSequences: [], // Empty to prevent premature stopping
         },
       });
 
@@ -1939,13 +1966,16 @@ When analyzing cluster performance issues:
               stopReason = event.messageStop.stopReason || "";
               
               // Debug: Check if messageStop contains any usage info
-              log("🔍 [BedrockChat] MessageStop event details", {
+              log("🛑 [BedrockChat] MessageStop event - Response completed", {
                 stopReason,
                 eventKeys: Object.keys(event.messageStop || {}),
                 fullMessageStop: JSON.stringify(event.messageStop, null, 2).substring(0, 300),
                 hasAdditionalFields: !!event.messageStop.additionalModelResponseFields,
                 additionalFields: event.messageStop.additionalModelResponseFields ? 
                   JSON.stringify(event.messageStop.additionalModelResponseFields, null, 2).substring(0, 300) : null,
+                isToolUse: stopReason === "tool_use",
+                isEndTurn: stopReason === "end_turn",
+                isMaxTokens: stopReason === "max_tokens"
               });
               
               log("✅ [BedrockChat] Converse stream completed", {
@@ -2270,10 +2300,15 @@ When analyzing cluster performance issues:
                 toolIndex: toolsExecuted,
               });
 
+              // Add analysis instruction with the tool results
+              const analysisPrompt = toolsExecuted === 1 && name === "get_system_vitals" 
+                ? "\n\nBased on this system vitals data, analyze the cluster's performance and identify any issues or concerns. Then proceed with additional checks as needed."
+                : "";
+              
               toolResults.push({
                 toolResult: {
                   toolUseId,
-                  content: [{ text: result.content || JSON.stringify(result) }],
+                  content: [{ text: (result.content || JSON.stringify(result)) + analysisPrompt }],
                   status: result.success ? "success" : "error",
                 },
               });
@@ -2300,9 +2335,40 @@ When analyzing cluster performance issues:
 
           // Continue conversation with tool results
           converseMessages.push(assistantMessage);
+          
+          // Add explicit instruction if the last response announced an action
+          let toolResultsWithInstruction = toolResults;
+          const lastAssistantText = fullResponseText || "";
+          
+          // Check if the response ends with an announcement pattern
+          const announcementPatterns = [
+            /let me (?:also )?(?:check|verify|analyze|examine|look|investigate|assess)/i,
+            /now,? (?:let's|let me|I'll|I will)/i,
+            /I(?:'ll| will) (?:also )?(?:check|verify|analyze|examine|look)/i,
+            /(?:Next|Additionally|Furthermore), (?:let me|I'll|I will)/i
+          ];
+          
+          const endsWithAnnouncement = announcementPatterns.some(pattern => 
+            pattern.test(lastAssistantText.trim().slice(-200)) // Check last 200 chars
+          );
+          
+          if (endsWithAnnouncement) {
+            // toolResults is an array of ContentBlock objects, not messages
+            // Add the instruction as an additional text block
+            toolResultsWithInstruction = [
+              ...toolResults,
+              { text: "\n\nIMPORTANT: Your previous response ended with an announcement of an action. You MUST now execute that announced action using the appropriate tool. Do not end your response without executing the tool you just announced." }
+            ];
+            
+            log("⚠️ [BedrockChat] Detected announcement pattern, adding execution instruction", {
+              lastText: lastAssistantText.slice(-200),
+              patternMatched: true
+            });
+          }
+          
           converseMessages.push({
             role: "user",
-            content: toolResults,
+            content: toolResultsWithInstruction,
           });
 
           const continueCommand = new ConverseStreamCommand({
@@ -2313,6 +2379,8 @@ When analyzing cluster performance issues:
             inferenceConfig: {
               maxTokens: options.max_tokens || backendConfig.rag.BEDROCK_MAX_TOKENS,
               temperature: options.temperature || 0.7,
+              // Increase stop sequences to encourage completion of announced actions
+              stopSequences: [], // Empty to prevent premature stopping
             },
           });
 
@@ -2382,8 +2450,45 @@ When analyzing cluster performance issues:
                 }
               } else if (event.messageStop) {
                 continuationStopReason = event.messageStop.stopReason || "";
-                log("🔍 [BedrockChat] Continuation stop reason", {
+                
+                // Check if response ended with an announcement but no tool execution
+                const responseText = continuationAssistantMessage.content
+                  .filter(c => c.text)
+                  .map(c => c.text)
+                  .join("");
+                  
+                const announcementPatterns = [
+                  /let me (?:also )?(?:check|verify|analyze|examine|look|investigate|assess)[^.]*[:.]?\s*$/i,
+                  /now,? (?:let's|let me|I'll|I will)[^.]*[:.]?\s*$/i,
+                  /I(?:'ll| will) (?:also )?(?:check|verify|analyze|examine|look)[^.]*[:.]?\s*$/i
+                ];
+                
+                const hasAnnouncement = announcementPatterns.some(pattern => 
+                  pattern.test(responseText.trim())
+                );
+                
+                const hasTools = continuationAssistantMessage.content.some(c => c.toolUse);
+                
+                if (hasAnnouncement && !hasTools && continuationStopReason === "end_turn") {
+                  log("❌ [BedrockChat] CRITICAL ERROR: Response ended with announcement but no tool execution", {
+                    responsePreview: responseText.slice(-200),
+                    stopReason: continuationStopReason,
+                    hasAnnouncement,
+                    hasTools
+                  });
+                  
+                  // Force an error message to the user
+                  yield "\n\n⚠️ **System Notice**: The response ended prematurely. The announced action was not executed. Please ask me to continue or try your question again.";
+                }
+                
+                log("🛑 [BedrockChat] Continuation MessageStop - Recursive response completed", {
                   stopReason: continuationStopReason,
+                  isToolUse: continuationStopReason === "tool_use",
+                  isEndTurn: continuationStopReason === "end_turn",
+                  isMaxTokens: continuationStopReason === "max_tokens",
+                  recursionDepth: options.recursionDepth || 0,
+                  responseEndsWithAnnouncement: hasAnnouncement,
+                  hasToolExecution: hasTools
                 });
               } else if (event.metadata?.usage) {
                 // Capture token usage from continuation
@@ -2417,81 +2522,24 @@ When analyzing cluster performance issues:
               };
               
               // Convert messages to simple format for recursive call
-              // We need to build a proper conversation history
               const recursiveMessages: Array<{ role: string; content: string }> = [];
               
               // Preserve system messages from original conversation
               const originalSystemMessages = messages.filter(m => m.role === "system");
               recursiveMessages.push(...originalSystemMessages);
               
-              // Convert existing Bedrock messages to simple format
-              for (const msg of converseMessages) {
-                if (msg.role === "user" || msg.role === "assistant") {
-                  let content = "";
-                  for (const block of msg.content) {
-                    if (block.text) {
-                      content += block.text;
-                    } else if (block.toolResult) {
-                      // Include tool results as text
-                      const toolResult = block.toolResult;
-                      if (toolResult.content && Array.isArray(toolResult.content)) {
-                        for (const resultBlock of toolResult.content) {
-                          if (resultBlock.text) {
-                            content += resultBlock.text + "\n";
-                          }
-                        }
-                      }
-                    } else if (block.toolUse) {
-                      // Don't include tool use blocks in simple format
-                      // The content of the tool execution is what matters
-                    }
-                  }
-                  if (content.trim()) {
-                    recursiveMessages.push({
-                      role: msg.role,
-                      content: content.trim()
-                    });
+              // Convert all Bedrock messages including the current conversation
+              const allBedrockMessages = [...converseMessages, assistantMessage, { role: "user", content: toolResults }, continuationAssistantMessage];
+              
+              for (const msg of allBedrockMessages) {
+                const simpleMsg = this.convertBedrockMessageToSimple(msg);
+                if (simpleMsg.content.trim()) {
+                  // Check if we already have this message to avoid duplicates
+                  const lastMsg = recursiveMessages[recursiveMessages.length - 1];
+                  if (!lastMsg || lastMsg.role !== simpleMsg.role || lastMsg.content !== simpleMsg.content) {
+                    recursiveMessages.push(simpleMsg);
                   }
                 }
-              }
-              
-              // Add the assistant's response that included tool execution
-              let assistantResponse = "";
-              for (const block of assistantMessage.content) {
-                if (block.text) {
-                  assistantResponse += block.text;
-                }
-              }
-              if (assistantResponse.trim()) {
-                recursiveMessages.push({
-                  role: "assistant",
-                  content: assistantResponse.trim()
-                });
-              }
-              
-              // Add tool results as a user message
-              const toolResultsContent = toolResults
-                .map(result => result.toolResult.content
-                  .map(c => c.text)
-                  .join("\n"))
-                .join("\n\n");
-              recursiveMessages.push({
-                role: "user",
-                content: toolResultsContent
-              });
-              
-              // Add the continuation response if it has text content
-              let continuationText = "";
-              for (const block of continuationAssistantMessage.content) {
-                if (block.text) {
-                  continuationText += block.text;
-                }
-              }
-              if (continuationText.trim()) {
-                recursiveMessages.push({
-                  role: "assistant",
-                  content: continuationText.trim()
-                });
               }
               
               log("🔄 [BedrockChat] Executing recursive tool call", {
@@ -2502,7 +2550,7 @@ When analyzing cluster performance issues:
                 continuationToolCount: continuationAssistantMessage.content.filter(c => c.toolUse).length
               });
               
-              // Execute the recursive call using the main method
+              // Execute the recursive call with simple format messages
               try {
                 for await (const chunk of this._createChatCompletion(recursiveMessages, recursiveOptions)) {
                   yield chunk;

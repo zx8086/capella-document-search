@@ -7,7 +7,6 @@
     isActive: boolean;
     message?: string;
     details?: string;
-    elapsedTime?: number;
     showElapsedTime?: boolean;
     tokenUsage?: {
       input: number;
@@ -21,13 +20,13 @@
     isActive = false,
     message = "Processing your request...",
     details = "",
-    elapsedTime = 0,
     showElapsedTime = true,
     tokenUsage = null,
     estimatedCost = null
   }: Props = $props();
   
-  let internalElapsedTime = $state(elapsedTime || 0);
+  let startTime = $state<number | null>(null);
+  let elapsedTime = $state(0);
   let interval: any;
   
   // Format elapsed time to human-readable format
@@ -45,27 +44,27 @@
   // Start/stop timer based on isActive
   $effect(() => {
     if (isActive) {
+      if (!startTime) {
+        startTime = Date.now();
+        console.log('🟢 [ChatProgressIndicator] Component activated - Starting timer');
+      }
       interval = setInterval(() => {
-        internalElapsedTime += 1000;
+        elapsedTime = Date.now() - startTime!;
       }, 1000);
     } else {
       if (interval) {
         clearInterval(interval);
+        console.log('🔴 [ChatProgressIndicator] Component deactivated - Timer stopped, elapsed time:', elapsedTime, 'ms');
       }
-      internalElapsedTime = 0;
-    }
-  });
-  
-  // Update internal timer when external elapsed time changes
-  $effect(() => {
-    if (elapsedTime !== undefined && elapsedTime > 0) {
-      internalElapsedTime = elapsedTime;
+      startTime = null;
+      elapsedTime = 0;
     }
   });
   
   onDestroy(() => {
     if (interval) {
       clearInterval(interval);
+      console.log('💀 [ChatProgressIndicator] Component destroyed - Cleanup complete');
     }
   });
 </script>
@@ -82,7 +81,7 @@
               <path d="M12 2a10 10 0 0 1 0 20" stroke="currentColor" stroke-width="2" stroke-linecap="round" class="text-blue-600 dark:text-blue-400"/>
             </svg>
           </div>
-          {#if internalElapsedTime > 30000}
+          {#if elapsedTime > 30000}
             <!-- Warning indicator for long-running requests -->
             <div class="absolute -top-1 -right-1 w-3 h-3 bg-amber-500 rounded-full animate-pulse"></div>
           {/if}
@@ -103,7 +102,7 @@
           <div class="mt-2 flex items-center gap-2 flex-wrap">
             {#if showElapsedTime}
               <span class="text-xs text-gray-500 dark:text-gray-500">
-                Elapsed: {formatElapsedTime(internalElapsedTime)}
+                Elapsed: {formatElapsedTime(elapsedTime)}
               </span>
             {/if}
             {#if tokenUsage}
@@ -116,7 +115,7 @@
                 </span>
               {/if}
             {/if}
-            {#if internalElapsedTime > 60000}
+            {#if elapsedTime > 60000}
               <span class="text-xs text-amber-600 dark:text-amber-400">
                 • Complex query in progress
               </span>
@@ -132,7 +131,7 @@
     </div>
     
     <!-- Timeout warning -->
-    {#if internalElapsedTime > 240000}
+    {#if elapsedTime > 240000}
       <div class="mt-3 p-2 bg-amber-50 dark:bg-amber-900/20 rounded text-xs text-amber-800 dark:text-amber-200">
         ⚠️ This request is taking longer than usual. It may timeout soon.
       </div>

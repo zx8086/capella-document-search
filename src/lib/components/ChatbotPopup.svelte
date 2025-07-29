@@ -195,6 +195,13 @@
   let requestState = $state<RequestState>('idle');
   let requestId = $state<string | null>(null);
   
+  // Helper function to update request state with logging
+  function setRequestState(newState: RequestState) {
+    const oldState = requestState;
+    requestState = newState;
+    console.log(`📊 [Request State] ${oldState} → ${newState}`);
+  }
+  
   // Derived loading state from request state
   let isLoading = $derived(requestState !== 'idle');
   let canSubmit = $derived(requestState === 'idle');
@@ -213,9 +220,7 @@
   // Progress tracking
   let progressMessage = $state('');
   let progressDetails = $state('');
-  let requestStartTime = $state<number | null>(null);
   let showProgress = $state(false);
-  let requestElapsedTime = $state(0);
   let currentTokenUsage = $state<{ input: number; output: number; total: number } | null>(null);
   let currentEstimatedCost = $state<number | null>(null);
   
@@ -239,6 +244,47 @@
   
   // Derive button disabled state for better reactivity
   let isButtonDisabled = $derived(canAbort ? false : !newMessage.trim());
+  
+  // Track progress indicator visibility state
+  let progressIndicatorActive = $derived(showProgress && isLoading && !isThinking);
+  
+  // Log when progress indicator visibility changes
+  let previousProgressState = $state(false);
+  let previousShowProgress = $state(false);
+  
+  $effect(() => {
+    const isActive = progressIndicatorActive;
+    
+    // Log showProgress changes
+    if (showProgress !== previousShowProgress) {
+      console.log(`📌 [Progress Control] showProgress changed: ${previousShowProgress} → ${showProgress}`);
+      previousShowProgress = showProgress;
+    }
+    
+    // Log overall visibility changes
+    if (isActive !== previousProgressState) {
+      if (isActive) {
+        console.log('🎯 [Progress Indicator State] VISIBLE - Conditions met:', {
+          showProgress,
+          isLoading,
+          isThinking,
+          requestState,
+          combined: isActive,
+          timestamp: new Date().toISOString()
+        });
+      } else {
+        console.log('🎯 [Progress Indicator State] HIDDEN - Conditions changed:', {
+          showProgress,
+          isLoading,
+          isThinking,
+          requestState,
+          combined: isActive,
+          timestamp: new Date().toISOString()
+        });
+      }
+      previousProgressState = isActive;
+    }
+  });
   
   // Get first name from full name
   function getFirstName(fullName: string = ''): string {
@@ -331,7 +377,7 @@
             // Force clear thinking state
             if ((requestState === 'thinking' || requestState === 'streaming') || currentLoadingMessageId) {
               currentThinking = '';
-              requestState = 'idle';
+              setRequestState('idle');
               requestId = null;
               currentLoadingMessageId = null;
             }
@@ -400,7 +446,7 @@
     }
     
     // Update state to aborting
-    requestState = 'aborting';
+    setRequestState('aborting');
     
     if (abortController) {
       console.log('🛑 User requested to abort chat request');
@@ -419,9 +465,8 @@
       // Clear progress
       progressMessage = '';
       progressDetails = '';
-      requestStartTime = null;
       showProgress = false;
-      requestElapsedTime = 0;
+      console.log('🔴 [Progress Indicator] DISABLED - clearProgress() called');
       currentTokenUsage = null;
       currentEstimatedCost = null;
     } else {
@@ -429,7 +474,7 @@
     }
     
     // Reset to idle state
-    requestState = 'idle';
+    setRequestState('idle');
     requestId = null;
   }
 
@@ -448,15 +493,14 @@
     console.log('🆔 Starting new request:', requestId);
     
     // Update state machine
-    requestState = 'initializing';
+    setRequestState('initializing');
     currentThinking = `Analyzing your question: "${userMessage}"\n\nProcessing context and searching relevant information...`;
     
     // Initialize progress tracking
-    requestStartTime = Date.now();
-    requestElapsedTime = 0;
     progressMessage = "Initializing request...";
     progressDetails = "Connecting to AI services";
     showProgress = true;
+    console.log('🟢 [Progress Indicator] ENABLED - Starting request processing');
     
     // Create new AbortController for this request
     abortController = new AbortController();
@@ -476,7 +520,7 @@
         // Force clear the loading state
         chatStore.updateMessage(currentLoadingMessageId, 'Request is taking longer than expected. The response may be truncated.', false);
         currentThinking = '';
-        requestState = 'idle';
+        setRequestState('idle');
         requestId = null;
       }
     }, CHAT_FAILSAFE_TIMEOUT);
@@ -496,7 +540,7 @@
         }
 
         // Transition to thinking state
-        requestState = 'thinking';
+        setRequestState('thinking');
         progressMessage = "AI is processing your request...";
         progressDetails = "Analyzing context and formulating response";
         
@@ -560,7 +604,7 @@
         console.log('🔄 Starting stream processing');
         
         // Transition to streaming state
-        requestState = 'streaming';
+        setRequestState('streaming');
         progressMessage = "Receiving response...";
         progressDetails = "Streaming AI response";
 
@@ -636,7 +680,14 @@
                             }
                             
                             if (data.done) {
-                                console.log('🏁 Received done signal', { hasError: data.error });
+                                console.log('🏁 [Done Signal] Received done signal', { 
+                                    hasError: data.error,
+                                    runId: data.runId,
+                                    requestState,
+                                    showProgress,
+                                    isLoading,
+                                    currentThinking: currentThinking ? 'has content' : 'empty'
+                                });
                                 // Capture runId if provided in done message
                                 if (data.runId && !data.error) {
                                     console.log('📝 Captured runId for feedback:', data.runId);
@@ -647,7 +698,7 @@
                                     chatStore.updateMessage(loadingMessageId, cleanedText || accumulatedResponse, false);
                                 }
                                 // Transition to idle state on completion
-                                requestState = 'idle';
+                                setRequestState('idle');
                                 requestId = null;
                                 streamComplete = true;
                                 break;
@@ -668,8 +719,11 @@
                                 // Update progress state for the indicator
                                 progressMessage = data.message || progressMessage;
                                 progressDetails = data.details || '';
-                                if (data.elapsedTime) {
-                                    requestElapsedTime = data.elapsedTime;
+                                
+                                // If tools are being executed, ensure progress stays visible
+                                if (data.isExecutingTools) {
+                                    showProgress = true;
+                                    console.log('🔧 [Progress Indicator] KEPT VISIBLE - Tools are executing');
                                 }
                                 
                                 // Don't show inline progress anymore since we have the indicator
@@ -688,22 +742,34 @@
                                 // Extract thinking content and check if we have visible content
                                 const tempExtraction = extractThinkingContent(accumulatedResponse);
                                 const hasVisibleContent = tempExtraction.cleanedText.trim().length > 0;
-                                const isExecutingTools = accumulatedResponse.includes('[Executing tools...]') && 
-                                                       !accumulatedResponse.includes('### Tool:');
+                                const isExecutingTools = accumulatedResponse.includes('[Executing tools...]');
+                                const hasToolResults = accumulatedResponse.includes('### Tool:');
+                                const toolsStillRunning = isExecutingTools && !hasToolResults;
                                 
-                                // Only hide progress when we have actual visible content and not just tool execution
-                                if (!firstContentReceived && hasVisibleContent && !isExecutingTools) {
+                                // Only hide progress when we have actual visible content and tools are NOT running
+                                if (!firstContentReceived && hasVisibleContent) {
                                     firstContentReceived = true;
-                                    console.log('✅ First visible content received, hiding progress indicator');
-                                    showProgress = false;
-                                } else if (isExecutingTools && showProgress) {
-                                    // Update progress message during tool execution
-                                    progressMessage = "Executing tools...";
+                                    if (!toolsStillRunning) {
+                                        console.log('✅ First visible content received, hiding progress indicator');
+                                        showProgress = false;
+                                        console.log('🔴 [Progress Indicator] DISABLED - First visible content received');
+                                    } else {
+                                        console.log('🔧 First content received but tools are executing, keeping progress visible');
+                                        showProgress = true;
+                                        progressMessage = "🔧 Executing tools...";
+                                        progressDetails = "Retrieving live system data";
+                                    }
+                                } else if (toolsStillRunning) {
+                                    // Keep progress visible during tool execution
+                                    showProgress = true;
+                                    progressMessage = "🔧 Executing tools...";
                                     progressDetails = "Retrieving live system data";
-                                } else if (showProgress && accumulatedResponse.includes('### Tool:')) {
-                                    // Tools have been executed, AI is analyzing results
-                                    progressMessage = "Analyzing results...";
-                                    progressDetails = "Processing tool execution results";
+                                    console.log('🔧 [Progress Indicator] KEPT VISIBLE - Tools still running');
+                                } else if (hasToolResults && showProgress) {
+                                    // Tools have finished, hide progress
+                                    showProgress = false;
+                                    console.log('✅ [Progress Indicator] HIDDEN - Tool results received');
+                                }
                                 }
                                 
                                 // Check for timeout or truncation warnings
@@ -837,9 +903,9 @@
         }, 300);
         
         // Transition to error state
-        requestState = 'error';
+        setRequestState('error');
         setTimeout(() => {
-            requestState = 'idle';
+            setRequestState('idle');
             requestId = null;
         }, 1000);
     } finally {
@@ -851,19 +917,18 @@
         
         // Ensure we're back to idle state
         if (requestState !== 'idle') {
-            requestState = 'idle';
+            setRequestState('idle');
             requestId = null;
         }
         
         // Reset extended thinking after each response
         enableExtendedThinking = false;
         // Clear progress tracking
-        requestStartTime = null;
-        requestElapsedTime = 0;
         progressMessage = '';
         progressDetails = '';
         currentTokenUsage = null;
         showProgress = false;
+        console.log('🔴 [Progress Indicator] DISABLED - Request completed/error in finally block');
         currentEstimatedCost = null;
         console.log('🧹 Cleaned up: timeouts cleared, controllers reset, extended thinking disabled, progress cleared');
     }
@@ -949,7 +1014,7 @@
     chatStore.startNewConversation($userAccount?.name);
     
     // Clear thinking state and reset state machine
-    requestState = 'idle';
+    setRequestState('idle');
     requestId = null;
     currentThinking = '';
     messageThinking.clear();
@@ -1041,10 +1106,9 @@
       
       <!-- Progress Indicator -->
       <ChatProgressIndicator 
-        isActive={showProgress && isLoading && !isThinking} 
+        isActive={progressIndicatorActive} 
         message={progressMessage || "Processing your request..."}
         details={progressDetails}
-        elapsedTime={requestElapsedTime || (requestStartTime ? Date.now() - requestStartTime : 0)}
         showElapsedTime={true}
         tokenUsage={currentTokenUsage}
         estimatedCost={currentEstimatedCost}

@@ -402,6 +402,7 @@ ${contextContent}
 - Prioritize accuracy and completeness in your responses
 - IMPORTANT: When you offer to execute a tool (e.g., "Would you like me to...?") and the user responds with confirmation ("Yes", "OK", "Sure", "Please", "Go ahead"), immediately execute that tool
 - IMPORTANT: If the user provides a very short response like "Yes" without clear context, ask for clarification rather than assuming what they mean
+- CRITICAL: If you announce that you will perform an action (e.g., "Let me check...", "I'll analyze...", "Let me also verify..."), you MUST execute that action immediately. Never announce an action without executing it
 - Keep responses concise and focused - avoid overly long explanations unless specifically requested
 ${metadata.enableExtendedThinking ? `- When asked to think step-by-step, use <thinking> tags to show your reasoning
 - In your thinking section:
@@ -448,17 +449,33 @@ ${metadata.enableExtendedThinking ? `- When asked to think step-by-step, use <th
             // Set up independent progress timer that runs even when no chunks are received
             let progressTimerActive = true;
             let firstContentReceived = false;
+            let toolsInProgress = false;
             const progressTimer = setInterval(() => {
-              if (!progressTimerActive || firstContentReceived) return;
+              if (!progressTimerActive || (firstContentReceived && !toolsInProgress)) return;
               
               const elapsedTime = Date.now() - startTime;
               const elapsedSeconds = Math.floor(elapsedTime / 1000);
               
-              // Different messages based on elapsed time
+              // Different messages based on elapsed time and tool execution
               let progressMessage = "";
               let progressDetails = "";
               
-              if (elapsedSeconds < 10) {
+              if (toolsInProgress) {
+                // Special messages during tool execution
+                if (elapsedSeconds < 5) {
+                  progressMessage = `🔧 Executing tools... (${elapsedSeconds}s)`;
+                  progressDetails = "Retrieving live system data from your cluster";
+                } else if (elapsedSeconds < 10) {
+                  progressMessage = `🔧 Tools still executing... (${elapsedSeconds}s)`;
+                  progressDetails = "Analyzing system performance metrics";
+                } else if (elapsedSeconds < 20) {
+                  progressMessage = `⚙️ Processing tool results... (${elapsedSeconds}s)`;
+                  progressDetails = "Complex queries may take additional time";
+                } else {
+                  progressMessage = `🔄 Extended tool execution... (${elapsedSeconds}s)`;
+                  progressDetails = "Large data analysis in progress - please wait";
+                }
+              } else if (elapsedSeconds < 10) {
                 progressMessage = `🚀 Initializing AI response... (${elapsedSeconds}s)`;
                 progressDetails = "Setting up conversation context and preparing response";
               } else if (elapsedSeconds < 20) {
@@ -574,7 +591,25 @@ ${metadata.enableExtendedThinking ? `- When asked to think step-by-step, use <th
                 // Check if tools are being executed
                 if (content.includes("[Executing tools...]")) {
                   toolsWereExecuted = true;
+                  toolsInProgress = true;
                   log("🔧 [Server] Tools execution detected in stream");
+                  
+                  // Send progress update to keep indicator visible during tool execution
+                  const toolProgress = {
+                    type: "progress",
+                    message: "🔧 Executing tools...",
+                    details: "Retrieving live system data",
+                    elapsedTime: Date.now() - startTime,
+                    chunkCount,
+                    isExecutingTools: true
+                  };
+                  controller.enqueue(new TextEncoder().encode(JSON.stringify(toolProgress) + "\n"));
+                }
+                
+                // Check if tool results are being displayed (tools finished)
+                if (content.includes("### Tool:") && toolsInProgress) {
+                  toolsInProgress = false;
+                  log("✅ [Server] Tool results detected, tools execution completed");
                 }
                 
                 const jsonLine = JSON.stringify({ content }) + "\n";
