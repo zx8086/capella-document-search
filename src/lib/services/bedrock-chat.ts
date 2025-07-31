@@ -98,6 +98,42 @@ function calculateCost(usage: TokenUsage): number {
   return inputCost + outputCost;
 }
 
+// Tool execution verifier to catch hallucinated tool results
+class ToolExecutionVerifier {
+  private static readonly FAKE_TOOL_PATTERNS = [
+    /### Tool:\s*\w+/i,
+    /```json\s*{\s*"[^"]+"/i, // JSON blocks after tool mentions
+    /\[Tool called:\s*\w+\]/i,
+    /I'll check for.*?\n.*?```json/is,
+  ];
+
+  static detectFakeToolExecution(
+    responseText: string, 
+    actualStopReason: string
+  ): boolean {
+    // If stop reason isn't tool_use but response contains tool patterns
+    if (actualStopReason !== "tool_use") {
+      return this.FAKE_TOOL_PATTERNS.some(pattern => 
+        pattern.test(responseText)
+      );
+    }
+    return false;
+  }
+
+  static createVerificationError(responseText: string): string {
+    return `
+❌ CRITICAL ERROR: Tool execution was simulated instead of actually performed.
+
+The response contains tool result patterns but no actual tool was executed.
+This indicates the LLM hallucinated results instead of using function calling.
+
+Response preview: ${responseText.substring(0, 200)}...
+
+REQUIRED ACTION: The system must execute actual tools to retrieve real data.
+`;
+  }
+}
+
 const getSystemVitalsTool: Tool = {
   toolSpec: {
     name: "get_system_vitals",
@@ -442,6 +478,35 @@ export class BedrockChatService {
     // Rough estimation: ~4 characters per token for English text
     // This is a simplified approximation for Claude models
     return Math.ceil(text.length / 4);
+  }
+  
+  // Check if we should use prefill to guide tool execution
+  private shouldUsePrefill(messages: Array<{ role: string; content: string }>): boolean {
+    const lastMessage = messages[messages.length - 1];
+    if (lastMessage?.role !== 'user') return false;
+    
+    // Check if user is asking for data that requires tools
+    const dataRequestKeywords = [
+      'queries', 'cluster', 'nodes', 'vitals', 'indexes', 'performance',
+      'show me', 'check', 'analyze', 'get', 'find', 'list', 'any', 'problematic',
+      'slow', 'long running', 'expensive', 'fatal', 'errors', 'failed'
+    ];
+    
+    return dataRequestKeywords.some(keyword => 
+      lastMessage.content.toLowerCase().includes(keyword)
+    );
+  }
+  
+  // Create prefill message to guide tool execution
+  private createPrefillMessage(): Message {
+    return {
+      role: "assistant",
+      content: [
+        {
+          text: "I'll retrieve the actual data from your Couchbase cluster using the appropriate diagnostic tools."
+        }
+      ]
+    };
   }
   
   // Helper to get normalized model name for Langsmith
@@ -1751,53 +1816,123 @@ export class BedrockChatService {
       // Combine system messages with performance analysis guidance
       const baseSystemPrompt = systemMessages.map((m) => m.content).join("\n\n");
       
-      // Add tool execution guidance
+      // Add XML-structured tool execution guidance with multi-shot examples
       const toolExecutionGuidance = `
 
-CRITICAL TOOL EXECUTION REQUIREMENTS:
+<role>
+You are a Couchbase database analyst with access to real-time diagnostic tools. 
+You MUST use actual function calls to retrieve data, never simulate or mock results.
+</role>
 
-You MUST use actual tool calls (tool_use) to retrieve data. NEVER simulate, mock, or hallucinate tool results.
+<critical_rules>
+1. MANDATORY: Use function calling (tool_use) for ALL data requests
+2. NEVER write fake JSON or simulated tool results  
+3. WAIT for actual tool responses before analysis
+4. Verify tool execution occurred (stopReason === "tool_use")
+</critical_rules>
 
-When asked about system data, queries, nodes, or any cluster information:
-1. You MUST actually call the tools using the tool_use mechanism
-2. You MUST wait for real tool execution results  
-3. You MUST analyze the actual data returned by the tools
-4. NEVER write fake JSON results or pretend to execute tools
+<tools_available>
+${this.tools.map(t => `- ${t.toolSpec.name}: ${t.toolSpec.description.split('.')[0]}`).join('\n')}
+</tools_available>
 
-VERIFICATION RULE: If your response contains "### Tool:" headers with JSON data, but you didn't actually execute tools (stopReason would be "tool_use"), this is a CRITICAL ERROR.
+<execution_protocol>
+<step_1>When user requests cluster data, immediately call appropriate tool</step_1>
+<step_2>Display "Executing tools..." message while waiting</step_2>
+<step_3>Wait for actual tool response</step_3>
+<step_4>Present real data returned by tool</step_4>
+<step_5>Analyze actual results and provide insights</step_5>
+</execution_protocol>
 
-<correct_behavior>
-User: "Do I have any problematic queries?"
-Assistant: I'll check for problematic queries in your cluster.
-[Actually triggers tool_use with get_fatal_requests, get_longest_running_queries, etc.]
-[Waits for real results]
-[Shows actual results and provides analysis]
-</correct_behavior>
+<forbidden_patterns>
+<pattern_1>Writing "### Tool: get_fatal_requests" followed by fake JSON</pattern_1>
+<pattern_2>Saying "I'll check..." then showing simulated results</pattern_2>
+<pattern_3>Providing analysis without actual tool execution</pattern_3>
+</forbidden_patterns>
 
-<incorrect_behavior>
-User: "Do I have any problematic queries?" 
-Assistant: I'll check for problematic queries...
-### Tool: get_fatal_requests
-[Shows made-up JSON without executing tool] ← THIS IS WRONG
-</incorrect_behavior>
+<verification_prompt>
+Before ANY response containing cluster analysis, ask yourself:
+- Did I call a function using tool_use?
+- Did I receive actual data back?
+- Am I analyzing real results?
 
-AVAILABLE TOOLS: ${this.tools.map(t => t.toolSpec.name).join(', ')}
+If any answer is NO, execute tools first.
+</verification_prompt>
 
-IMPORTANT: Always call tools with an object as input:
-- ✅ CORRECT: {"limit": 10} or {} for defaults
-- ❌ WRONG: 10 or "week" (bare values)
+<input_format>
+CRITICAL: Tool inputs must be objects:
+✅ Correct: {"limit": 10, "period": "week"} or {} for defaults
+❌ Wrong: 10 or "week" as bare values
+</input_format>
 
-EXECUTION FLOW:
-1. Execute the tool(s) to get real data
-2. Show the actual results
-3. ALWAYS provide analysis of what the data means
-4. Give recommendations or next steps
+<examples>
+<example_1>
+<user>Do I have any slow queries?</user>
+<assistant_correct>I'll check for slow queries in your cluster by analyzing the longest running queries.
 
-AFTER EXECUTING TOOLS, YOU MUST:
-- Summarize what you found
-- Explain if it's good or bad
-- Suggest improvements if needed
-- Answer the user's original question`;
+[Function call to get_longest_running_queries with {"limit": 10}]
+[Actual tool execution occurs - stopReason: "tool_use"]
+[Real data returned from Couchbase]
+
+Based on the actual query analysis results, I found [specific findings from real data]. Here are the queries that need attention: [actual query details].
+
+Recommendations:
+1. [Specific recommendations based on real data]
+2. [Index suggestions based on actual queries]
+</assistant_correct>
+
+<assistant_wrong>I'll check for slow queries in your cluster.
+
+### Tool: get_longest_running_queries
+\`\`\`json
+{
+  "results": [
+    {"query": "SELECT * FROM users", "avg_time": "2.5s"}
+  ]
+}
+\`\`\`
+
+Based on this analysis... [This is WRONG - no actual tool was executed]
+</assistant_wrong>
+</example_1>
+
+<example_2>
+<user>Show me system vitals</user>
+<assistant_correct>I'll retrieve the current system vitals for your Couchbase cluster.
+
+[Function call to get_system_vitals with {}]
+[Tool execution in progress...]
+[Real vitals data returned]
+
+Here are your current cluster vitals: [actual vitals data from tool execution]
+
+System Analysis:
+- CPU Usage: [real data]
+- Memory: [real data] 
+- Disk I/O: [real data]
+
+[Recommendations based on actual metrics]
+</assistant_correct>
+
+<assistant_wrong>I'll check the system vitals for your cluster.
+
+### Tool: get_system_vitals
+\`\`\`json
+{
+  "cpu_usage": "45%",
+  "memory": "8GB used"
+}
+\`\`\`
+
+Your system looks healthy... [This is WRONG - fake data]
+</assistant_wrong>
+</example_2>
+</examples>
+
+KEY PATTERN: The correct behavior ALWAYS includes:
+1. Function call execution (actual tool_use)
+2. Waiting for real results  
+3. Analysis of actual returned data
+4. No fabricated JSON responses`;
       
       const systemPrompt = baseSystemPrompt ? baseSystemPrompt + toolExecutionGuidance : toolExecutionGuidance;
 
@@ -1814,10 +1949,15 @@ AFTER EXECUTING TOOLS, YOU MUST:
       // AWS Documentation: Include tools with corrected schema
       const toolConfig: ToolConfiguration = { tools: this.tools };
 
+      // Check if we should add prefill to guide tool execution
+      const messagesWithPrefill = this.shouldUsePrefill(messages) 
+        ? [...converseMessages, this.createPrefillMessage()]
+        : converseMessages;
+      
       // Create the ConverseStream command
       const command = new ConverseStreamCommand({
         modelId: this.modelId,
-        messages: converseMessages,
+        messages: messagesWithPrefill,
         system: systemPrompt ? [{ text: systemPrompt }] : undefined,
         toolConfig,
         inferenceConfig: {
@@ -2000,6 +2140,18 @@ AFTER EXECUTING TOOLS, YOU MUST:
               }
             } else if (event.messageStop) {
               stopReason = event.messageStop.stopReason || "";
+              
+              // Verify tool execution authenticity
+              if (ToolExecutionVerifier.detectFakeToolExecution(fullResponseText, stopReason)) {
+                const errorMessage = ToolExecutionVerifier.createVerificationError(fullResponseText);
+                log("🚨 [BedrockChat] Detected fake tool execution", {
+                  stopReason,
+                  responseLength: fullResponseText.length,
+                  detectedPatterns: true
+                });
+                yield errorMessage;
+                // Continue to allow metadata event processing, but flag the error
+              }
               
               // Debug: Check if messageStop contains any usage info
               log("🛑 [BedrockChat] MessageStop event - Response completed", {

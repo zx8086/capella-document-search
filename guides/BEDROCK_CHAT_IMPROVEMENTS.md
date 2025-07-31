@@ -105,6 +105,32 @@ Examples:
   - Clear examples of correct vs incorrect behavior
   - Reinforces that tools MUST be called via tool_use mechanism
 
+### 12. Comprehensive Tool Execution Fix (XML-Structured + Multi-Shot + Verification)
+- **XML-Structured System Prompt**: Following Anthropic's best practices
+  - `<role>` tag defines the assistant as a Couchbase analyst
+  - `<critical_rules>` section with mandatory tool execution requirements
+  - `<tools_available>` dynamically lists all available tools
+  - `<execution_protocol>` provides step-by-step instructions
+  - `<forbidden_patterns>` explicitly lists what NOT to do
+  - `<verification_prompt>` for self-checking before responses
+  
+- **Multi-Shot Examples**: Concrete right vs wrong behaviors
+  - Example 1: Slow query checking with correct tool execution vs fake results
+  - Example 2: System vitals retrieval with actual data vs hallucinated JSON
+  - Clear pattern: Function call → Wait for results → Analyze real data
+  
+- **Tool Execution Verifier**: Runtime safety mechanism
+  - `ToolExecutionVerifier` class with regex patterns to detect fake tool results
+  - Checks if response contains tool patterns when `stopReason !== "tool_use"`
+  - Returns error message if fake execution detected
+  - Acts as failsafe to catch and prevent hallucinated results
+  
+- **Prefill Mechanism**: Proactive guidance for data requests
+  - `shouldUsePrefill()` detects keywords that typically require tools
+  - Keywords: 'queries', 'cluster', 'nodes', 'vitals', 'indexes', 'performance', etc.
+  - Adds assistant message: "I'll retrieve the actual data from your Couchbase cluster..."
+  - Sets expectation for real tool execution from the start
+
 ## Benefits
 1. **Better Agent Understanding**: Clear descriptions help AI choose the right tool
 2. **Fewer Errors**: Validation catches issues before execution
