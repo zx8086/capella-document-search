@@ -121,6 +121,65 @@ export const toolInputSchemas = {
 // Type for tool names
 export type ToolName = keyof typeof toolInputSchemas;
 
+// Helper function to sanitize common input mistakes
+export function sanitizeToolInput(toolName: string, input: unknown): unknown {
+  // Handle bare numbers for query limit tools
+  if (typeof input === 'number') {
+    const queryTools = [
+      'get_most_expensive_queries',
+      'get_longest_running_queries',
+      'get_most_frequent_queries',
+      'get_largest_result_size_queries',
+      'get_largest_result_count_queries',
+      'get_primary_index_queries',
+      'get_completed_requests',
+      'get_fatal_requests'
+    ];
+    
+    if (queryTools.includes(toolName)) {
+      return { limit: input };
+    }
+  }
+  
+  // Handle bare string for node filter
+  if (typeof input === 'string' && toolName === 'get_system_vitals') {
+    return { node_filter: input };
+  }
+  
+  // Handle bare string for service filter
+  if (typeof input === 'string' && toolName === 'get_system_nodes') {
+    return { service_filter: input };
+  }
+  
+  // Return input as-is if no sanitization needed
+  return input;
+}
+
+// Get format hints for tools
+export function getFormatHints(toolName: string): string {
+  const hints: Record<string, string> = {
+    get_system_vitals: 'object with optional node_filter: string',
+    get_system_nodes: 'object with optional service_filter: "n1ql" | "kv" | "index" | "fts" | "eventing" | "analytics" | "backup"',
+    get_fatal_requests: 'object with optional period: "day" | "week" | "month" | "quarter" and limit: number',
+    get_most_expensive_queries: 'object with optional limit: number (1-1000) and period: "day" | "week" | "month"',
+    get_longest_running_queries: 'object with optional limit: number (1-1000)',
+    get_most_frequent_queries: 'object with optional limit: number (1-1000)',
+    get_largest_result_size_queries: 'object with optional limit: number (1-1000)',
+    get_largest_result_count_queries: 'object with optional limit: number (1-1000)',
+    get_primary_index_queries: 'object with optional limit: number (1-1000)',
+    get_system_indexes: 'empty object {}',
+    get_completed_requests: 'object with optional limit: number (1-1000)',
+    get_prepared_statements: 'empty object {}',
+    get_indexes_to_drop: 'empty object {}',
+    get_detailed_indexes: 'empty object {}',
+    get_detailed_prepared_statements: 'empty object {}',
+    get_schema_for_collection: 'object with scope_name: string and collection_name: string',
+    run_sql_plus_plus_query: 'object with scope_name: string and query: string',
+  };
+  
+  return hints[toolName] || 'object with appropriate parameters';
+}
+
 // Helper function to validate tool input
 export function validateToolInput(toolName: string, input: unknown): { success: true; data: any } | { success: false; error: string } {
   const schema = toolInputSchemas[toolName as ToolName];
@@ -151,4 +210,38 @@ export function validateToolInput(toolName: string, input: unknown): { success: 
       error: `Validation error: ${error instanceof Error ? error.message : String(error)}`
     };
   }
+}
+
+// Enhanced validation function with sanitization and hints
+export function validateToolInputWithRetry(toolName: string, input: unknown): { 
+  success: true; 
+  data: any; 
+  wasAutoCorrected?: boolean;
+} | { 
+  success: false; 
+  error: string; 
+  sanitizedInput?: unknown;
+  hint?: string;
+} {
+  // First try with sanitized input
+  const sanitizedInput = sanitizeToolInput(toolName, input);
+  const wasAutoCorrected = sanitizedInput !== input;
+  
+  const result = validateToolInput(toolName, sanitizedInput);
+  
+  if (result.success) {
+    return {
+      ...result,
+      wasAutoCorrected
+    };
+  }
+  
+  // If validation failed, provide helpful hints
+  const hint = getFormatHints(toolName);
+  return {
+    ...result,
+    error: `${result.error}. Expected format: ${hint}`,
+    sanitizedInput: wasAutoCorrected ? sanitizedInput : undefined,
+    hint
+  };
 }

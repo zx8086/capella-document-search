@@ -42,7 +42,7 @@ import { backendConfig } from "../../backend-config";
 import { traceable } from "langsmith/traceable";
 import { getCurrentRunTree, withRunTree } from "langsmith/singletons/traceable";
 import { RunTree } from "langsmith/run_trees";
-import { validateToolInput } from "./bedrock-chat-schemas";
+import { validateToolInput, validateToolInputWithRetry, sanitizeToolInput } from "./bedrock-chat-schemas";
 // import { usageTracker } from "./usage-tracking"; // Removed - using LangSmith only
 
 // Token usage interface for type safety
@@ -53,6 +53,8 @@ interface TokenUsage {
   model: string;
   timestamp: string;
   estimatedCost?: number;
+  cacheReadTokens?: number;
+  cacheWriteTokens?: number;
 }
 
 // Tool execution result interface
@@ -132,6 +134,10 @@ Response preview: ${responseText.substring(0, 200)}...
 
 REQUIRED ACTION: The system must execute actual tools to retrieve real data.
 `;
+  }
+  
+  static createUserFriendlyMessage(): string {
+    return "I apologize, but I'm having trouble accessing the tools needed to answer your question. Please try rephrasing your request or asking a different question.";
   }
 }
 
@@ -622,8 +628,17 @@ export class BedrockChatService {
           text: systemPrompt,
           cacheControl: this.CACHE_CONFIG
         });
+        log("📦 [BedrockChat] Created cached system prompt block", {
+          blockLength: systemPrompt.length,
+          estimatedTokens: Math.ceil(systemPrompt.length / 4),
+          cacheConfig: this.CACHE_CONFIG,
+        });
       } else {
         systemBlocks.push({ text: systemPrompt });
+        log("⚠️ [BedrockChat] System prompt too short for caching", {
+          blockLength: systemPrompt.length,
+          requiredLength: this.MIN_TOKENS_FOR_CACHE * 4, // Approximate chars
+        });
       }
       return systemBlocks;
     }
@@ -656,20 +671,49 @@ export class BedrockChatService {
     return systemBlocks;
   }
 
-  private executeToolInContext = async (name: string, input: any, parentRunTree?: RunTree): Promise<ToolExecutionResult> => {
-    // Validate input first
-    const validation = validateToolInput(name, input);
+  private executeToolInContext = async (name: string, input: any, parentRunTree?: RunTree, retryCount: number = 0): Promise<ToolExecutionResult> => {
+    const maxRetries = 2;
+    
+    // Use enhanced validation with sanitization
+    const validation = validateToolInputWithRetry(name, input);
+    
     if (!validation.success) {
+      // If validation failed but we have a sanitized input and haven't exceeded retries
+      if (validation.sanitizedInput && retryCount < maxRetries) {
+        log("🔄 [Tool] Auto-correcting input format", {
+          toolName: name,
+          originalInput: JSON.stringify(input).substring(0, 200),
+          sanitizedInput: JSON.stringify(validation.sanitizedInput).substring(0, 200),
+          retryCount: retryCount + 1,
+          hint: validation.hint,
+        });
+        
+        // Retry with sanitized input
+        return this.executeToolInContext(name, validation.sanitizedInput, parentRunTree, retryCount + 1);
+      }
+      
+      // If no sanitization available or max retries reached
       log("❌ [Tool] Input validation failed", {
         toolName: name,
         error: validation.error,
         input: JSON.stringify(input).substring(0, 200),
+        retriesExhausted: retryCount >= maxRetries,
       });
+      
       return {
         success: false,
         error: validation.error,
         content: `❌ Invalid input: ${validation.error}`,
       };
+    }
+
+    // Log if input was auto-corrected
+    if (validation.wasAutoCorrected) {
+      log("✅ [Tool] Input auto-corrected successfully", {
+        toolName: name,
+        originalInput: JSON.stringify(input).substring(0, 200),
+        correctedInput: JSON.stringify(validation.data).substring(0, 200),
+      });
     }
 
     // Use validated input
@@ -1366,6 +1410,55 @@ export class BedrockChatService {
     }
   };
 
+  // Helper function to handle large tool outputs and prevent context exhaustion
+  private formatLargeToolOutput = (
+    rows: any[],
+    title: string,
+    options: {
+      maxItems?: number;
+      maxOutputSize?: number;
+      generateSummary?: (rows: any[]) => string;
+      itemName?: string;
+    } = {}
+  ): string => {
+    const {
+      maxItems = 20,
+      maxOutputSize = 50000,
+      generateSummary,
+      itemName = "result"
+    } = options;
+
+    let responseText = "";
+
+    // If we have many results and a summary generator, use it
+    if (rows.length > maxItems && generateSummary) {
+      responseText = generateSummary(rows);
+    } else if (rows.length > maxItems) {
+      // Generic truncation message
+      const limitedRows = rows.slice(0, maxItems);
+      responseText = `# ${title} (showing ${maxItems} of ${rows.length} total)\n\n` +
+        `⚠️ **Large result set**: Showing first ${maxItems} ${itemName}s to prevent context exhaustion.\n` +
+        `To see specific results, use more targeted queries or filters.\n\n` +
+        `\`\`\`json\n${JSON.stringify(limitedRows, null, 2)}\n\`\`\``;
+    } else {
+      // Small result set, show full output
+      responseText = `# ${title} (${rows.length} ${itemName}${rows.length !== 1 ? "s" : ""})\n\n` +
+        (rows.length === 0
+          ? `No ${itemName}s found.`
+          : `\`\`\`json\n${JSON.stringify(rows, null, 2)}\n\`\`\``);
+    }
+
+    // Final size check
+    if (responseText.length > maxOutputSize) {
+      const truncatedText = responseText.substring(0, maxOutputSize);
+      responseText = truncatedText +
+        `\n\`\`\`\n\n⚠️ **Output truncated** - Result was too large (${responseText.length} chars). ` +
+        `Context window preservation in effect. Please use more specific queries.`;
+    }
+
+    return responseText;
+  };
+
   private executeGetSystemIndexes = async (): Promise<any> => {
     try {
       log("🔍 [Tool] Executing get_system_indexes");
@@ -1376,16 +1469,95 @@ export class BedrockChatService {
       const rows = await result.rows;
       const executionTime = Date.now() - startTime;
 
-      const responseText =
-        `# System Indexes (${rows.length} result${rows.length !== 1 ? "s" : ""})\n\n` +
-        (rows.length === 0
-          ? "No system indexes found."
-          : `\`\`\`json\n${JSON.stringify(rows, null, 2)}\n\`\`\``);
+      // Implement result limits to prevent context exhaustion
+      const MAX_INDEXES_TO_SHOW = 20;
+      const MAX_OUTPUT_SIZE = 50000; // ~12.5k tokens
+      
+      let responseText = "";
+      
+      // If we have many results, provide a summary instead of full output
+      if (rows.length > MAX_INDEXES_TO_SHOW) {
+        // Calculate statistics for summary
+        const indexesByKeyspace: Record<string, number> = {};
+        const indexesByType: Record<string, number> = { primary: 0, secondary: 0, array: 0 };
+        const indexesByState: Record<string, number> = { online: 0, building: 0, deferred: 0 };
+        
+        rows.forEach((row: any) => {
+          // Count by keyspace
+          const keyspace = `${row.bucket_id || 'unknown'}.${row.scope_id || '_default'}.${row.keyspace_id || '_default'}`;
+          indexesByKeyspace[keyspace] = (indexesByKeyspace[keyspace] || 0) + 1;
+          
+          // Count by type
+          if (row.is_primary) indexesByType.primary++;
+          else if (row.index_key?.includes('ARRAY')) indexesByType.array++;
+          else indexesByType.secondary++;
+          
+          // Count by state
+          const state = row.state?.toLowerCase() || 'unknown';
+          if (state in indexesByState) {
+            indexesByState[state]++;
+          }
+        });
+        
+        // Sort keyspaces by count
+        const topKeyspaces = Object.entries(indexesByKeyspace)
+          .sort(([, a], [, b]) => b - a)
+          .slice(0, 10);
+        
+        responseText = `# System Indexes Summary\n\n` +
+          `**Total Indexes**: ${rows.length} (showing summary due to large result set)\n\n` +
+          `## By Type:\n` +
+          `- Primary: ${indexesByType.primary}\n` +
+          `- Secondary: ${indexesByType.secondary}\n` +
+          `- Array: ${indexesByType.array}\n\n` +
+          `## By State:\n` +
+          `- Online: ${indexesByState.online}\n` +
+          `- Building: ${indexesByState.building}\n` +
+          `- Deferred: ${indexesByState.deferred}\n\n` +
+          `## Top Keyspaces by Index Count:\n` +
+          topKeyspaces.map(([ks, count]) => `- ${ks}: ${count} indexes`).join('\n') +
+          `\n\n⚠️ **Note**: Showing summary of ${rows.length} indexes to prevent context exhaustion.\n` +
+          `To see specific indexes:\n` +
+          `- Use \`get_detailed_indexes\` with filters\n` +
+          `- Query for indexes on a specific keyspace\n` +
+          `- Search by index name or type`;
+          
+        // Include first few indexes as examples
+        if (rows.length > 0) {
+          const exampleRows = rows.slice(0, 3);
+          responseText += `\n\n### Example Indexes (first 3):\n\`\`\`json\n${JSON.stringify(exampleRows, null, 2)}\n\`\`\``;
+        }
+      } else {
+        // Small result set, show full output but check size
+        const fullJson = JSON.stringify(rows, null, 2);
+        responseText = `# System Indexes (${rows.length} result${rows.length !== 1 ? "s" : ""})\n\n` +
+          (rows.length === 0
+            ? "No system indexes found."
+            : `\`\`\`json\n${fullJson}\n\`\`\``);
+            
+        // Still check total output size
+        if (responseText.length > MAX_OUTPUT_SIZE) {
+          responseText = responseText.substring(0, MAX_OUTPUT_SIZE) +
+            `\n\`\`\`\n\n⚠️ **Output truncated** - Result was too large (${responseText.length} chars). ` +
+            `Please use more specific queries.`;
+        }
+      }
+
+      log("✅ [Tool] System indexes query completed", {
+        totalIndexes: rows.length,
+        outputSize: responseText.length,
+        wasLimited: rows.length > MAX_INDEXES_TO_SHOW,
+      });
 
       return {
         success: true,
         content: responseText,
-        data: { rows, count: rows.length, executionTimeMs: executionTime },
+        data: { 
+          rows: rows.slice(0, MAX_INDEXES_TO_SHOW), // Limit data returned
+          totalCount: rows.length,
+          limited: rows.length > MAX_INDEXES_TO_SHOW,
+          executionTimeMs: executionTime 
+        },
       };
     } catch (error) {
       err("❌ [Tool] Get system indexes failed", { error: error.message });
@@ -1452,16 +1624,45 @@ export class BedrockChatService {
       const rows = await result.rows;
       const executionTime = Date.now() - startTime;
 
-      const responseText =
-        `# Prepared Statements (${rows.length} result${rows.length !== 1 ? "s" : ""})\n\n` +
-        (rows.length === 0
-          ? "No prepared statements found."
-          : `\`\`\`json\n${JSON.stringify(rows, null, 2)}\n\`\`\``);
+      // Use the helper to format output with size limits
+      const responseText = this.formatLargeToolOutput(
+        rows,
+        "Prepared Statements",
+        {
+          maxItems: 20,
+          itemName: "prepared statement",
+          generateSummary: (rows) => {
+            // Group by status or other attributes
+            const byStatus: Record<string, number> = {};
+            rows.forEach((row: any) => {
+              const status = row.state || 'unknown';
+              byStatus[status] = (byStatus[status] || 0) + 1;
+            });
+            
+            return `# Prepared Statements Summary\n\n` +
+              `**Total Prepared Statements**: ${rows.length}\n\n` +
+              `## By Status:\n` +
+              Object.entries(byStatus).map(([status, count]) => `- ${status}: ${count}`).join('\n') +
+              `\n\n⚠️ **Note**: Showing summary of ${rows.length} prepared statements to prevent context exhaustion.\n` +
+              `To see specific statements, use filters or query for specific names.`;
+          }
+        }
+      );
+
+      log("✅ [Tool] Prepared statements query completed", {
+        totalStatements: rows.length,
+        outputSize: responseText.length,
+      });
 
       return {
         success: true,
         content: responseText,
-        data: { rows, count: rows.length, executionTimeMs: executionTime },
+        data: { 
+          rows: rows.slice(0, 20), // Limit data returned
+          totalCount: rows.length,
+          limited: rows.length > 20,
+          executionTimeMs: executionTime 
+        },
       };
     } catch (error) {
       err("❌ [Tool] Get prepared statements failed", { error: error.message });
@@ -1514,16 +1715,67 @@ export class BedrockChatService {
       const rows = await result.rows;
       const executionTime = Date.now() - startTime;
 
-      const responseText =
-        `# Detailed Indexes (${rows.length} result${rows.length !== 1 ? "s" : ""})\n\n` +
-        (rows.length === 0
-          ? "No indexes found."
-          : `\`\`\`json\n${JSON.stringify(rows, null, 2)}\n\`\`\``);
+      // Use the helper to format output with size limits
+      const responseText = this.formatLargeToolOutput(
+        rows,
+        "Detailed Indexes",
+        {
+          maxItems: 15, // Even more restrictive for detailed view
+          itemName: "index",
+          generateSummary: (rows) => {
+            const indexesByBucket: Record<string, number> = {};
+            const indexesByType: Record<string, number> = {};
+            let totalStorageSize = 0;
+            
+            rows.forEach((row: any) => {
+              // Count by bucket
+              const bucket = row.bucket || row.bucket_id || 'unknown';
+              indexesByBucket[bucket] = (indexesByBucket[bucket] || 0) + 1;
+              
+              // Count by index type
+              const indexType = row.using || 'gsi';
+              indexesByType[indexType] = (indexesByType[indexType] || 0) + 1;
+              
+              // Sum storage if available
+              if (row.storageSize) {
+                totalStorageSize += parseInt(row.storageSize) || 0;
+              }
+            });
+            
+            const topBuckets = Object.entries(indexesByBucket)
+              .sort(([, a], [, b]) => b - a)
+              .slice(0, 5);
+            
+            return `# Detailed Indexes Summary\n\n` +
+              `**Total Indexes**: ${rows.length}\n` +
+              `**Total Storage**: ${(totalStorageSize / 1024 / 1024 / 1024).toFixed(2)} GB\n\n` +
+              `## By Index Type:\n` +
+              Object.entries(indexesByType).map(([type, count]) => `- ${type}: ${count}`).join('\n') +
+              `\n\n## Top Buckets by Index Count:\n` +
+              topBuckets.map(([bucket, count]) => `- ${bucket}: ${count} indexes`).join('\n') +
+              `\n\n⚠️ **Note**: Detailed index information can be very large. Showing summary only.\n` +
+              `For specific index details:\n` +
+              `- Query for indexes on a specific bucket/scope/collection\n` +
+              `- Use index name filters\n` +
+              `- Request specific index properties`;
+          }
+        }
+      );
+
+      log("✅ [Tool] Detailed indexes query completed", {
+        totalIndexes: rows.length,
+        outputSize: responseText.length,
+      });
 
       return {
         success: true,
         content: responseText,
-        data: { rows, count: rows.length, executionTimeMs: executionTime },
+        data: { 
+          rows: rows.slice(0, 15), // Limit data returned
+          totalCount: rows.length,
+          limited: rows.length > 15,
+          executionTimeMs: executionTime 
+        },
       };
     } catch (error) {
       err("❌ [Tool] Get detailed indexes failed", { error: error.message });
@@ -1545,16 +1797,61 @@ export class BedrockChatService {
       const rows = await result.rows;
       const executionTime = Date.now() - startTime;
 
-      const responseText =
-        `# Detailed Prepared Statements (${rows.length} result${rows.length !== 1 ? "s" : ""})\n\n` +
-        (rows.length === 0
-          ? "No prepared statements found."
-          : `\`\`\`json\n${JSON.stringify(rows, null, 2)}\n\`\`\``);
+      // Use the helper to format output with size limits
+      const responseText = this.formatLargeToolOutput(
+        rows,
+        "Detailed Prepared Statements",
+        {
+          maxItems: 10, // Very restrictive for detailed statements
+          itemName: "prepared statement",
+          generateSummary: (rows) => {
+            const statementsByNode: Record<string, number> = {};
+            const recentStatements: any[] = [];
+            
+            rows.forEach((row: any) => {
+              // Count by node
+              const node = row.node || 'unknown';
+              statementsByNode[node] = (statementsByNode[node] || 0) + 1;
+              
+              // Track recent statements
+              if (row.lastUse && recentStatements.length < 5) {
+                recentStatements.push({
+                  name: row.name || 'unnamed',
+                  lastUse: row.lastUse,
+                  uses: row.uses || 0
+                });
+              }
+            });
+            
+            return `# Detailed Prepared Statements Summary\n\n` +
+              `**Total Prepared Statements**: ${rows.length}\n\n` +
+              `## Distribution by Node:\n` +
+              Object.entries(statementsByNode).map(([node, count]) => `- ${node}: ${count} statements`).join('\n') +
+              `\n\n## Most Recently Used:\n` +
+              recentStatements.map(s => `- ${s.name} (${s.uses} uses)`).join('\n') +
+              `\n\n⚠️ **Note**: Detailed statement information includes full query text which can be very large.\n` +
+              `To see specific statements:\n` +
+              `- Query by statement name\n` +
+              `- Filter by node\n` +
+              `- Request recently used statements only`;
+          }
+        }
+      );
+
+      log("✅ [Tool] Detailed prepared statements query completed", {
+        totalStatements: rows.length,
+        outputSize: responseText.length,
+      });
 
       return {
         success: true,
         content: responseText,
-        data: { rows, count: rows.length, executionTimeMs: executionTime },
+        data: { 
+          rows: rows.slice(0, 10), // Limit data returned
+          totalCount: rows.length,
+          limited: rows.length > 10,
+          executionTimeMs: executionTime 
+        },
       };
     } catch (error) {
       err("❌ [Tool] Get detailed prepared statements failed", {
@@ -2134,6 +2431,7 @@ KEY PATTERN: The correct behavior ALWAYS includes:
       let stopReason = "";
       let chunkCount = 0;
       let tokenUsage: TokenUsage | null = null;
+      let fakeToolExecutionDetected = false;
 
       try {
         for await (const event of response.stream) {
@@ -2234,14 +2532,14 @@ KEY PATTERN: The correct behavior ALWAYS includes:
               
               // Verify tool execution authenticity
               if (ToolExecutionVerifier.detectFakeToolExecution(fullResponseText, stopReason)) {
-                const errorMessage = ToolExecutionVerifier.createVerificationError(fullResponseText);
                 log("🚨 [BedrockChat] Detected fake tool execution", {
                   stopReason,
                   responseLength: fullResponseText.length,
                   detectedPatterns: true
                 });
-                yield errorMessage;
-                // Continue to allow metadata event processing, but flag the error
+                // Set flag to handle retry after stream completes
+                fakeToolExecutionDetected = true;
+                // Don't yield error to user - we'll handle it internally
               }
               
               // Debug: Check if messageStop contains any usage info
@@ -2274,10 +2572,18 @@ KEY PATTERN: The correct behavior ALWAYS includes:
                 fullMetadata: JSON.stringify(event.metadata, null, 2).substring(0, 500),
               });
               
+              // Log complete usage object to debug cache fields
               if (event.metadata.usage) {
-                // Track cache metrics if available
+                log("📊 [BedrockChat] Full usage object for cache debugging", {
+                  allUsageFields: Object.keys(event.metadata.usage),
+                  fullUsage: JSON.stringify(event.metadata.usage, null, 2),
+                });
+              }
+              
+              if (event.metadata.usage) {
+                // Track cache metrics if available (AWS uses different field names)
                 const cacheReadTokens = event.metadata.usage.cacheReadInputTokens || 0;
-                const cacheCreationTokens = event.metadata.usage.cacheCreationInputTokens || 0;
+                const cacheCreationTokens = event.metadata.usage.cacheWriteInputTokens || 0;
                 
                 tokenUsage = {
                   inputTokens: event.metadata.usage.inputTokens || event.metadata.usage.input_tokens || 0,
@@ -2285,6 +2591,8 @@ KEY PATTERN: The correct behavior ALWAYS includes:
                   totalTokens: 0, // Will be calculated below
                   model: this.modelId,
                   timestamp: new Date().toISOString(),
+                  cacheReadTokens: cacheReadTokens,
+                  cacheWriteTokens: cacheCreationTokens,
                 };
                 tokenUsage.totalTokens = tokenUsage.inputTokens + tokenUsage.outputTokens;
                 tokenUsage.estimatedCost = calculateCost(tokenUsage);
@@ -2303,10 +2611,28 @@ KEY PATTERN: The correct behavior ALWAYS includes:
                   totalTokens: tokenUsage.totalTokens,
                   estimatedCost: tokenUsage.estimatedCost,
                   cacheReadTokens,
-                  cacheCreationTokens,
+                  cacheWriteTokens: cacheCreationTokens,
                   cacheSavings,
                   cacheHitRatio: tokenUsage.inputTokens > 0 ? (cacheReadTokens / tokenUsage.inputTokens) : 0,
                 });
+                
+                // Additional cache analysis
+                if (cacheReadTokens > 0 || cacheCreationTokens > 0) {
+                  log("✅ [BedrockChat] Cache is working!", {
+                    cacheType: cacheReadTokens > 0 ? "cache_hit" : "cache_creation",
+                    tokensSaved: cacheReadTokens,
+                    costSaved: cacheSavings.toFixed(4),
+                  });
+                } else if (systemPromptBlocks.some(block => 'cacheControl' in block)) {
+                  log("⚠️ [BedrockChat] Cache blocks present but no cache usage reported", {
+                    possibleReasons: [
+                      "First request with this prompt (cache being created)",
+                      "Model/region doesn't support caching",
+                      "Cache expired (5 minute TTL)",
+                      "AWS Bedrock not reporting cache metrics"
+                    ],
+                  });
+                }
               }
             } else if (event.contentBlockStop) {
               // Handle content block stop event - this signals the end of a content block
@@ -2422,8 +2748,8 @@ KEY PATTERN: The correct behavior ALWAYS includes:
                   total_tokens: tokenUsage.totalTokens,
                   // Optional token details
                   input_token_details: usageData ? {
-                    cache_creation: usageData.cacheWriteInputTokens || 0,
-                    cache_read: usageData.cacheReadInputTokens || 0
+                    cache_read: cacheReadTokens || 0,
+                    cache_write: cacheCreationTokens || 0
                   } : {},
                   output_token_details: {},
                   // Model information
@@ -2530,6 +2856,49 @@ KEY PATTERN: The correct behavior ALWAYS includes:
           yield "\n\n[Response truncated due to length limit. Please ask me to continue or be more specific about what you'd like to know.]";
         }
 
+        // Handle fake tool execution by retrying with stronger instructions
+        if (fakeToolExecutionDetected && stopReason === "end_turn") {
+          log("🔄 [BedrockChat] Retrying due to fake tool execution", {
+            originalStopReason: stopReason,
+            recursionDepth: options.recursionDepth || 0
+          });
+          
+          // Add a system message to force proper tool use
+          const retryMessages = [...converseMessages];
+          retryMessages.push(assistantMessage);
+          retryMessages.push({
+            role: "user",
+            content: "I notice you tried to simulate tool results instead of actually executing tools. Please try again and use the actual tool functions provided. Do not make up or simulate tool results. Use the proper tool calling mechanism."
+          });
+          
+          // Retry once with stronger instructions
+          const retryOptions = { 
+            ...options,
+            recursionDepth: (options.recursionDepth || 0) + 1,
+            traceHeaders: options.traceHeaders,
+            enableCaching: options.enableCaching
+          };
+          
+          try {
+            for await (const chunk of this._createChatCompletion(
+              retryMessages.map(m => ({ 
+                role: m.role, 
+                content: typeof m.content === 'string' ? m.content : JSON.stringify(m.content) 
+              })), 
+              retryOptions
+            )) {
+              yield chunk;
+            }
+            return; // Exit after retry
+          } catch (retryError) {
+            err("❌ [BedrockChat] Retry after fake tool execution failed", {
+              error: retryError instanceof Error ? retryError.message : String(retryError)
+            });
+            yield "\n\nI apologize, but I'm having trouble accessing the tools needed to answer your question. Please try rephrasing your request or asking a different question.";
+            return;
+          }
+        }
+        
         // AWS Documentation: Handle tool use
         if (stopReason === "tool_use") {
           const toolCalls = assistantMessage.content.filter(c => c.toolUse);
@@ -2748,6 +3117,36 @@ KEY PATTERN: The correct behavior ALWAYS includes:
               }
             }
             
+            // Check if continuation response was truncated or abnormally short
+            if (continuationStopReason === "max_tokens") {
+              log("⚠️ [BedrockChat] Continuation response truncated due to max tokens limit", {
+                continuationResponseLength: continuationFullResponse.length,
+                continuationStopReason,
+              });
+              yield "\n\n⚠️ **Response was truncated due to token limit.** The large tool output consumed most of the available context. Please ask a more specific question or request a summary of specific parts.";
+            } else if (continuationStopReason === "end_turn" && continueResponse.metadata?.usage?.outputTokens < 10) {
+              // Detect when the model outputs very few tokens (like our 3-token case)
+              log("⚠️ [BedrockChat] Abnormally short continuation response detected", {
+                outputTokens: continueResponse.metadata?.usage?.outputTokens,
+                inputTokens: continueResponse.metadata?.usage?.inputTokens,
+                continuationResponseLength: continuationFullResponse.length,
+                continuationStopReason,
+              });
+              
+              const totalInputTokens = (tokenUsage?.inputTokens || 0) + (continueResponse.metadata?.usage?.inputTokens || 0);
+              
+              // Estimate if we're near context limit (typically 200k for Claude 3)
+              const contextLimitEstimate = 200000; // Claude 3 context window
+              const contextUsagePercent = Math.round((totalInputTokens / contextLimitEstimate) * 100);
+              
+              yield `\n\n⚠️ **The response was cut short** (only ${continueResponse.metadata?.usage?.outputTokens || 0} tokens generated). This typically happens when:\n`;
+              yield `- The tool output was too large (${toolResultsForDisplay.join('').length} characters)\n`;
+              yield `- Context window is nearly full (approximately ${contextUsagePercent}% used)\n`;
+              yield `\n**Suggestions:**\n`;
+              yield `- Ask for specific information from the tool results\n`;
+              yield `- Request a summary of particular sections\n`;
+              yield `- Start a new conversation for complex analyses\n`;
+            }
             
             // Handle recursive tool use if continuation also requests tools
             if (continuationStopReason === "tool_use" && recursionDepth < maxRecursionDepth) {
@@ -2826,6 +3225,8 @@ KEY PATTERN: The correct behavior ALWAYS includes:
                 totalTokens: continueResponse.metadata.usage.totalTokens || (continueResponse.metadata.usage.inputTokens || 0) + (continueResponse.metadata.usage.outputTokens || 0),
                 model: this.modelId,
                 timestamp: new Date().toISOString(),
+                cacheReadTokens: continueResponse.metadata.usage.cacheReadInputTokens || 0,
+                cacheWriteTokens: continueResponse.metadata.usage.cacheWriteInputTokens || 0,
               };
               continueTokenUsage.estimatedCost = calculateCost(continueTokenUsage);
               
@@ -2835,12 +3236,16 @@ KEY PATTERN: The correct behavior ALWAYS includes:
                 tokenUsage.outputTokens += continueTokenUsage.outputTokens;
                 tokenUsage.totalTokens += continueTokenUsage.totalTokens;
                 tokenUsage.estimatedCost! += continueTokenUsage.estimatedCost!;
+                tokenUsage.cacheReadTokens = (tokenUsage.cacheReadTokens || 0) + continueTokenUsage.cacheReadTokens;
+                tokenUsage.cacheWriteTokens = (tokenUsage.cacheWriteTokens || 0) + continueTokenUsage.cacheWriteTokens;
                 
                 log("📊 [BedrockChat] Aggregated token usage after tool execution", {
                   totalInputTokens: tokenUsage.inputTokens,
                   totalOutputTokens: tokenUsage.outputTokens,
                   totalTokens: tokenUsage.totalTokens,
                   totalCost: tokenUsage.estimatedCost,
+                  totalCacheReadTokens: tokenUsage.cacheReadTokens || 0,
+                  totalCacheWriteTokens: tokenUsage.cacheWriteTokens || 0,
                 });
                 
                 // Update trace with aggregated usage using LangSmith metadata format
@@ -2856,8 +3261,8 @@ KEY PATTERN: The correct behavior ALWAYS includes:
                       total_tokens: tokenUsage.totalTokens,
                       // Optional token details (aggregated from all tool calls)
                       input_token_details: {
-                        cache_creation: 0,
-                        cache_read: 0
+                        cache_write: tokenUsage.cacheWriteTokens || 0,
+                        cache_read: tokenUsage.cacheReadTokens || 0
                       },
                       output_token_details: {},
                       // Model information
