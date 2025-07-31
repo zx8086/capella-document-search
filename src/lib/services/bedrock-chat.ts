@@ -16,6 +16,7 @@ import {
   type ToolConfiguration,
   type Message,
   type ContentBlock,
+  type SystemContentBlock,
 } from "@aws-sdk/client-bedrock-runtime";
 import { NodeHttpHandler } from "@smithy/node-http-handler";
 import { log, err } from "$utils/unifiedLogger";
@@ -473,11 +474,33 @@ export class BedrockChatService {
   private client: BedrockRuntimeClient;
   private modelId: string;
   
+  // Caching configuration
+  private readonly CACHE_CONFIG = {
+    type: "ephemeral" as const,
+    // TTL is managed automatically by AWS (5 minutes default)
+  };
+
+  // Minimum token requirements for caching (per AWS Bedrock docs)
+  private readonly MIN_CACHE_TOKENS: Record<string, number> = {
+    "anthropic.claude-3-5-sonnet-20241022-v2:0": 1024,
+    "anthropic.claude-3-5-sonnet-20240620-v1:0": 1024,
+    "eu.anthropic.claude-3-7-sonnet-20250219-v1:0": 1024,
+    "anthropic.claude-3-5-haiku-20241022-v1:0": 2048,
+    "eu.amazon.nova-pro-v1:0": 1024, // Check AWS docs for exact requirements
+  };
+  
   // Simple token estimation for when AWS doesn't provide counts
   private estimateTokens(text: string): number {
     // Rough estimation: ~4 characters per token for English text
     // This is a simplified approximation for Claude models
     return Math.ceil(text.length / 4);
+  }
+  
+  // Check if content meets minimum token requirements for caching
+  private meetsMinTokenRequirement(content: string): boolean {
+    const minTokens = this.MIN_CACHE_TOKENS[this.modelId] || 1024;
+    const estimatedTokens = this.estimateTokens(content);
+    return estimatedTokens >= minTokens;
   }
   
   // Check if we should use prefill to guide tool execution
@@ -577,6 +600,60 @@ export class BedrockChatService {
       }),
     });
     this.modelId = Bun.env.BEDROCK_CHAT_MODEL || "anthropic.claude-3-5-sonnet-20241022-v2:0";
+  }
+  
+  // Create cached system content blocks
+  private createCachedSystemPrompt(systemPrompt: string, enableCaching: boolean = true): SystemContentBlock[] {
+    if (!enableCaching) {
+      // Return non-cached version
+      return systemPrompt ? [{ text: systemPrompt }] : [];
+    }
+    
+    const systemBlocks: SystemContentBlock[] = [];
+
+    // Split the system prompt to separate dynamic from static content
+    // Extract base instructions (before tool_execution_rules) if present
+    const toolRulesStart = systemPrompt.indexOf('<tool_execution_rules>');
+    
+    if (toolRulesStart === -1) {
+      // No tool rules found, check if entire prompt meets caching requirements
+      if (this.meetsMinTokenRequirement(systemPrompt)) {
+        systemBlocks.push({
+          text: systemPrompt,
+          cacheControl: this.CACHE_CONFIG
+        });
+      } else {
+        systemBlocks.push({ text: systemPrompt });
+      }
+      return systemBlocks;
+    }
+    
+    // Split into base instructions and tool guidance
+    const baseInstructions = systemPrompt.substring(0, toolRulesStart).trim();
+    const toolGuidance = systemPrompt.substring(toolRulesStart).trim();
+    
+    // Add base instructions (not cached - usually small and may be dynamic)
+    if (baseInstructions) {
+      systemBlocks.push({ text: baseInstructions });
+    }
+    
+    // Add tool guidance (cached if meets requirements)
+    if (toolGuidance && this.meetsMinTokenRequirement(toolGuidance)) {
+      systemBlocks.push({
+        text: toolGuidance,
+        cacheControl: this.CACHE_CONFIG
+      });
+      
+      log("🔄 [BedrockChat] Created cached system prompt block", {
+        toolGuidanceLength: toolGuidance.length,
+        estimatedTokens: this.estimateTokens(toolGuidance),
+        minTokenRequirement: this.MIN_CACHE_TOKENS[this.modelId] || 1024,
+      });
+    } else if (toolGuidance) {
+      systemBlocks.push({ text: toolGuidance });
+    }
+    
+    return systemBlocks;
   }
 
   private executeToolInContext = async (name: string, input: any, parentRunTree?: RunTree): Promise<ToolExecutionResult> => {
@@ -1762,6 +1839,7 @@ export class BedrockChatService {
       sessionId?: string;
       conversationId?: string;
       recursionDepth?: number;
+      enableCaching?: boolean;
     } = {},
   ): AsyncGenerator<string, void, unknown> {
     try {
@@ -1934,7 +2012,19 @@ KEY PATTERN: The correct behavior ALWAYS includes:
 3. Analysis of actual returned data
 4. No fabricated JSON responses`;
       
-      const systemPrompt = baseSystemPrompt ? baseSystemPrompt + toolExecutionGuidance : toolExecutionGuidance;
+      const fullSystemPrompt = baseSystemPrompt ? baseSystemPrompt + toolExecutionGuidance : toolExecutionGuidance;
+      
+      // Create cached system prompt blocks (default enabled unless explicitly disabled)
+      const enableCaching = options.enableCaching !== false;
+      const systemPromptBlocks = this.createCachedSystemPrompt(fullSystemPrompt, enableCaching);
+      
+      log("🔄 [BedrockChat] System prompt configuration", {
+        systemBlockCount: systemPromptBlocks.length,
+        hasCachedBlocks: systemPromptBlocks.some(block => 'cacheControl' in block),
+        totalSystemLength: systemPromptBlocks.reduce((sum, block) => sum + block.text.length, 0),
+        cachingEnabled: enableCaching,
+        modelId: this.modelId,
+      });
 
       // Convert conversation messages to Converse API format
       const converseMessages: Message[] = conversationMessages.map((msg) => ({
@@ -1958,7 +2048,7 @@ KEY PATTERN: The correct behavior ALWAYS includes:
       const command = new ConverseStreamCommand({
         modelId: this.modelId,
         messages: messagesWithPrefill,
-        system: systemPrompt ? [{ text: systemPrompt }] : undefined,
+        system: systemPromptBlocks.length > 0 ? systemPromptBlocks : undefined,
         toolConfig,
         inferenceConfig: {
           maxTokens: options.max_tokens || backendConfig.rag.BEDROCK_MAX_TOKENS,
@@ -1993,11 +2083,12 @@ KEY PATTERN: The correct behavior ALWAYS includes:
       log("🚀 [BedrockChat] Starting Converse stream", {
         modelId: this.modelId,
         messagesCount: converseMessages.length,
-        hasSystem: !!systemPrompt,
+        hasSystem: systemPromptBlocks.length > 0,
         toolsEnabled: true,
         toolCount: this.tools.length,
         availableTools: this.tools.map(t => t.toolSpec.name),
         hasLLMRunTree: !!llmRunTree,
+        cachingEnabled: enableCaching,
       });
 
       let response;
@@ -2184,6 +2275,10 @@ KEY PATTERN: The correct behavior ALWAYS includes:
               });
               
               if (event.metadata.usage) {
+                // Track cache metrics if available
+                const cacheReadTokens = event.metadata.usage.cacheReadInputTokens || 0;
+                const cacheCreationTokens = event.metadata.usage.cacheCreationInputTokens || 0;
+                
                 tokenUsage = {
                   inputTokens: event.metadata.usage.inputTokens || event.metadata.usage.input_tokens || 0,
                   outputTokens: event.metadata.usage.outputTokens || event.metadata.usage.output_tokens || 0,
@@ -2194,11 +2289,23 @@ KEY PATTERN: The correct behavior ALWAYS includes:
                 tokenUsage.totalTokens = tokenUsage.inputTokens + tokenUsage.outputTokens;
                 tokenUsage.estimatedCost = calculateCost(tokenUsage);
                 
+                // Calculate cache savings if cache was hit
+                let cacheSavings = 0;
+                if (cacheReadTokens > 0) {
+                  const normalCost = (cacheReadTokens / 1000) * (MODEL_PRICING[this.modelId]?.inputTokensPerThousand || 0.003);
+                  const cachedCost = normalCost * 0.1; // Cache reads cost 10% of normal
+                  cacheSavings = normalCost - cachedCost;
+                }
+                
                 log("📊 [BedrockChat] Token usage extracted from metadata event", {
                   inputTokens: tokenUsage.inputTokens,
                   outputTokens: tokenUsage.outputTokens,
                   totalTokens: tokenUsage.totalTokens,
                   estimatedCost: tokenUsage.estimatedCost,
+                  cacheReadTokens,
+                  cacheCreationTokens,
+                  cacheSavings,
+                  cacheHitRatio: tokenUsage.inputTokens > 0 ? (cacheReadTokens / tokenUsage.inputTokens) : 0,
                 });
               }
             } else if (event.contentBlockStop) {
@@ -2544,7 +2651,7 @@ KEY PATTERN: The correct behavior ALWAYS includes:
           const continueCommand = new ConverseStreamCommand({
             modelId: this.modelId,
             messages: converseMessages,
-            system: systemPrompt ? [{ text: systemPrompt }] : undefined,
+            system: systemPromptBlocks.length > 0 ? systemPromptBlocks : undefined,
             toolConfig,
             inferenceConfig: {
               maxTokens: options.max_tokens || backendConfig.rag.BEDROCK_MAX_TOKENS,
@@ -2657,7 +2764,8 @@ KEY PATTERN: The correct behavior ALWAYS includes:
               const recursiveOptions = { 
                 ...options, 
                 recursionDepth: recursionDepth + 1,
-                traceHeaders: options.traceHeaders // Preserve trace headers
+                traceHeaders: options.traceHeaders, // Preserve trace headers
+                enableCaching: options.enableCaching // Preserve caching option
               };
               
               // Convert messages to simple format for recursive call
@@ -2803,6 +2911,7 @@ KEY PATTERN: The correct behavior ALWAYS includes:
       sessionId?: string;
       conversationId?: string;
       recursionDepth?: number;
+      enableCaching?: boolean;
     } = {},
   ) => {
     return this._createChatCompletion(messages, options);
@@ -2847,6 +2956,21 @@ KEY PATTERN: The correct behavior ALWAYS includes:
           });
         },
       },
+    };
+  }
+  
+  // Utility method to check if model supports caching
+  supportsPromptCaching(): boolean {
+    return Object.keys(this.MIN_CACHE_TOKENS).includes(this.modelId);
+  }
+
+  // Method to get cache performance stats
+  getCacheConfig() {
+    return {
+      supported: this.supportsPromptCaching(),
+      minTokens: this.MIN_CACHE_TOKENS[this.modelId] || 1024,
+      cacheType: this.CACHE_CONFIG.type,
+      model: this.modelId,
     };
   }
 }
