@@ -2,6 +2,12 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Documentation Guidelines
+
+- Always place implementation guides and technical documentation in the `/guides/` folder
+- If a `/docs/` folder exists, also consider placing relevant documentation there
+- Implementation guides should follow the naming pattern: `[FEATURE]_[TYPE]_GUIDE.md` (e.g., `BEDROCK_CHAT_IMPROVEMENTS.md`)
+
 ## Project Overview
 
 Capella Document Search is a modern document search application built with SvelteKit 5 and Bun. It provides document search capabilities across Capella scopes and collections with AI-powered chat functionality using RAG (Retrieval-Augmented Generation).

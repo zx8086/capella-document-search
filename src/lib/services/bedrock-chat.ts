@@ -1,5 +1,13 @@
 /* src/lib/services/bedrock-chat.ts */
 
+// This service handles Bedrock chat completions with comprehensive tool execution support
+// Key features:
+// - Zod validation for all tool inputs
+// - Stop reason tracking for debugging and monitoring
+// - Recursion depth tracking to prevent infinite loops
+// - Tool execution guidance with mandatory post-execution analysis
+// - LangSmith integration with detailed metadata
+
 import {
   BedrockRuntimeClient,
   ConverseStreamCommand,
@@ -33,6 +41,7 @@ import { backendConfig } from "../../backend-config";
 import { traceable } from "langsmith/traceable";
 import { getCurrentRunTree, withRunTree } from "langsmith/singletons/traceable";
 import { RunTree } from "langsmith/run_trees";
+import { validateToolInput } from "./bedrock-chat-schemas";
 // import { usageTracker } from "./usage-tracking"; // Removed - using LangSmith only
 
 // Token usage interface for type safety
@@ -43,6 +52,19 @@ interface TokenUsage {
   model: string;
   timestamp: string;
   estimatedCost?: number;
+}
+
+// Tool execution result interface
+interface ToolExecutionResult {
+  success: boolean;
+  content: string;
+  error?: string;
+  data?: {
+    rows?: any[];
+    count?: number;
+    executionTimeMs?: number;
+    [key: string]: any;
+  };
 }
 
 // Cost calculation based on model type
@@ -80,7 +102,7 @@ const getSystemVitalsTool: Tool = {
   toolSpec: {
     name: "get_system_vitals",
     description:
-      "Get detailed system vitals and performance metrics for the Couchbase cluster including CPU, memory, disk usage, and operational metrics",
+      "Retrieve real-time system performance metrics for Couchbase cluster nodes including CPU usage, memory consumption, disk I/O, and network statistics. Use this to diagnose performance issues, monitor resource utilization, or check cluster health. Returns detailed metrics for all nodes or filtered by specific node hostname.",
     inputSchema: {
       json: {
         type: "object",
@@ -88,7 +110,7 @@ const getSystemVitalsTool: Tool = {
           node_filter: {
             type: "string",
             description:
-              "Optional filter by node name (e.g., 'node1.example.com:8091'). If not provided, returns vitals for all nodes.",
+              "Optional hostname filter to retrieve vitals for specific node(s). Supports partial matching. Examples: 'node1.example.com:8091', 'node1', 'example.com'. If omitted, returns vitals for all cluster nodes. Case-insensitive.",
           },
         },
         required: [],
@@ -101,7 +123,7 @@ const getSystemNodesTool: Tool = {
   toolSpec: {
     name: "get_system_nodes",
     description:
-      "Get information about all nodes in the Couchbase cluster including their services, status, and configuration",
+      "List all nodes in the Couchbase cluster with their assigned services (n1ql, kv, index, fts), current status, version info, and resource allocation. Use this to understand cluster topology, verify service distribution, or check node availability. Can filter by specific service type.",
     inputSchema: {
       json: {
         type: "object",
@@ -109,7 +131,7 @@ const getSystemNodesTool: Tool = {
           service_filter: {
             type: "string",
             description:
-              "Optional filter by service type (e.g., 'n1ql', 'kv', 'index', 'fts'). If not provided, returns all nodes.",
+              "Optional filter by Couchbase service type. Valid values: 'n1ql' (Query), 'kv' (Data), 'index' (Index), 'fts' (Search), 'eventing' (Eventing), 'analytics' (Analytics), 'backup' (Backup). Returns only nodes running the specified service. If omitted, returns all nodes.",
           },
         },
         required: [],
@@ -122,7 +144,7 @@ const getFatalRequestsTool: Tool = {
   toolSpec: {
     name: "get_fatal_requests",
     description:
-      "Find queries that have FAILED, TIMED OUT, or caused ERRORS. Critical for identifying stability issues, query failures, and operational problems. Use this to diagnose query errors and failures.",
+      "Analyze failed N1QL queries including timeouts (>1000ms), errors, and fatal exceptions. Essential for troubleshooting query failures, identifying problematic patterns, and debugging application issues. Returns error details, stack traces, and query text. Default time range: last 7 days. Call with empty object {} for defaults, or specify parameters like {\"limit\": 10, \"period\": \"day\"}.",
     inputSchema: {
       json: {
         type: "object",
@@ -131,12 +153,12 @@ const getFatalRequestsTool: Tool = {
             type: "string",
             enum: ["day", "week", "month", "quarter"],
             description:
-              "Time period to analyze (day, week, month, quarter). Defaults to week if not specified.",
+              "Time range for analysis. 'day' = last 24 hours, 'week' = last 7 days (default), 'month' = last 30 days, 'quarter' = last 90 days. Longer periods may return more results but take longer to process.",
           },
           limit: {
             type: "number",
             description:
-              "Optional limit for the number of results to return. If not specified, returns all results.",
+              "Maximum number of failed queries to return (1-1000). Default: 5. Higher limits may impact response time. Results sorted by most recent failures first.",
             default: 5,
           },
         },
@@ -150,20 +172,20 @@ const getMostExpensiveQueriesTool: Tool = {
   toolSpec: {
     name: "get_most_expensive_queries",
     description:
-      "Get the most expensive queries based on execution time and resource usage",
+      "Identify resource-intensive N1QL queries ranked by total execution time (serviceTime × frequency). Use this to find queries consuming the most cluster resources for optimization. Excludes system queries, INFER, and CREATE INDEX statements. Returns query text, average execution time, and frequency. Call with {} for defaults or {\"limit\": 10, \"period\": \"week\"}.",
     inputSchema: {
       json: {
         type: "object",
         properties: {
           limit: {
             type: "number",
-            description: "Optional limit for the number of results to return.",
+            description: "Maximum results to return (1-1000). Default: 5. Results sorted by total resource consumption (execution time × frequency). Higher limits provide more comprehensive analysis but increase response time.",
             default: 5,
           },
           period: {
             type: "string",
             enum: ["day", "week", "month"],
-            description: "Time period to analyze (day, week, month).",
+            description: "Time window for analysis. 'day' = last 24 hours, 'week' = last 7 days, 'month' = last 30 days. Longer periods provide better statistical accuracy but may include outdated patterns.",
           },
         },
         required: [],
@@ -175,14 +197,14 @@ const getMostExpensiveQueriesTool: Tool = {
 const getLongestRunningQueriesTool: Tool = {
   toolSpec: {
     name: "get_longest_running_queries",
-    description: "Identify queries with longest execution times",
+    description: "Find N1QL queries with the highest average execution times regardless of frequency. Use this to identify slow queries that need optimization, missing indexes, or query plan improvements. Returns query text with average service time in human-readable format. Call with {} for defaults or {\"limit\": 20}.",
     inputSchema: {
       json: {
         type: "object",
         properties: {
           limit: {
             type: "number",
-            description: "Optional limit for the number of results to return.",
+            description: "Maximum results to return (1-1000). Default: 5. Higher limits may impact response time.",
             default: 5,
           },
         },
@@ -195,14 +217,14 @@ const getLongestRunningQueriesTool: Tool = {
 const getMostFrequentQueriesTool: Tool = {
   toolSpec: {
     name: "get_most_frequent_queries",
-    description: "View most commonly executed queries",
+    description: "Discover the most frequently executed N1QL queries sorted by execution count. Use this to identify hot queries for caching opportunities, prepared statement candidates, or workload patterns. Excludes system queries and returns query text with execution counts.",
     inputSchema: {
       json: {
         type: "object",
         properties: {
           limit: {
             type: "number",
-            description: "Optional limit for the number of results to return.",
+            description: "Maximum results to return (1-1000). Default: 5. Higher limits may impact response time.",
             default: 5,
           },
         },
@@ -215,14 +237,14 @@ const getMostFrequentQueriesTool: Tool = {
 const getLargestResultSizeQueriesTool: Tool = {
   toolSpec: {
     name: "get_largest_result_size_queries",
-    description: "Identify queries with largest result sizes",
+    description: "Find N1QL queries returning the largest data volumes (in bytes). Use this to identify queries that may cause memory pressure, network congestion, or client-side performance issues. Essential for optimizing data transfer and implementing pagination.",
     inputSchema: {
       json: {
         type: "object",
         properties: {
           limit: {
             type: "number",
-            description: "Optional limit for the number of results to return.",
+            description: "Maximum results to return (1-1000). Default: 5. Higher limits may impact response time.",
             default: 5,
           },
         },
@@ -235,14 +257,14 @@ const getLargestResultSizeQueriesTool: Tool = {
 const getLargestResultCountQueriesTool: Tool = {
   toolSpec: {
     name: "get_largest_result_count_queries",
-    description: "Find queries returning the most results",
+    description: "Identify N1QL queries returning the highest number of documents. Use this to find queries that may benefit from LIMIT clauses, pagination, or more selective WHERE conditions. Different from result size - focuses on document count rather than data volume.",
     inputSchema: {
       json: {
         type: "object",
         properties: {
           limit: {
             type: "number",
-            description: "Optional limit for the number of results to return.",
+            description: "Maximum results to return (1-1000). Default: 5. Higher limits may impact response time.",
             default: 5,
           },
         },
@@ -255,14 +277,14 @@ const getLargestResultCountQueriesTool: Tool = {
 const getPrimaryIndexQueriesTool: Tool = {
   toolSpec: {
     name: "get_primary_index_queries",
-    description: "Identify queries using primary indexes",
+    description: "Detect N1QL queries using primary indexes instead of secondary indexes. Critical for performance optimization as primary index scans are expensive. Use this to identify queries needing secondary indexes for better performance. Returns query text and execution metrics.",
     inputSchema: {
       json: {
         type: "object",
         properties: {
           limit: {
             type: "number",
-            description: "Optional limit for the number of results to return.",
+            description: "Maximum results to return (1-1000). Default: 5. Higher limits may impact response time.",
             default: 5,
           },
         },
@@ -275,7 +297,7 @@ const getPrimaryIndexQueriesTool: Tool = {
 const getSystemIndexesTool: Tool = {
   toolSpec: {
     name: "get_system_indexes",
-    description: "List all system indexes",
+    description: "List all indexes across all buckets and scopes in the cluster. Use this to audit existing indexes, check index distribution, or identify duplicate/redundant indexes. Returns index names, definitions, bucket/scope/collection info, and index types.",
     inputSchema: {
       json: {
         type: "object",
@@ -289,14 +311,14 @@ const getSystemIndexesTool: Tool = {
 const getCompletedRequestsTool: Tool = {
   toolSpec: {
     name: "get_completed_requests",
-    description: "View completed query requests",
+    description: "Retrieve detailed history of completed N1QL queries from the last 8 weeks including execution plans and performance metrics. Use this for forensic analysis, debugging specific queries, or understanding historical workload patterns. Returns full query details with execution plans.",
     inputSchema: {
       json: {
         type: "object",
         properties: {
           limit: {
             type: "number",
-            description: "Optional limit for the number of results to return.",
+            description: "Maximum results to return (1-1000). Default: 5. Higher limits may impact response time.",
             default: 5,
           },
         },
@@ -309,7 +331,7 @@ const getCompletedRequestsTool: Tool = {
 const getPreparedStatementsTool: Tool = {
   toolSpec: {
     name: "get_prepared_statements",
-    description: "List all prepared statements",
+    description: "Show all cached prepared statements in the query service. Use this to monitor prepared statement usage, verify statement caching, or identify stale prepared statements. Returns statement names, query text, and usage statistics.",
     inputSchema: {
       json: {
         type: "object",
@@ -323,7 +345,7 @@ const getPreparedStatementsTool: Tool = {
 const getIndexesToDropTool: Tool = {
   toolSpec: {
     name: "get_indexes_to_drop",
-    description: "Identify unused or redundant indexes",
+    description: "Analyze index usage to identify candidates for removal including unused indexes, duplicate indexes, or indexes with overlapping coverage. Use this for index optimization and storage reduction. Returns recommendations with rationale for each suggested removal.",
     inputSchema: {
       json: {
         type: "object",
@@ -337,7 +359,7 @@ const getIndexesToDropTool: Tool = {
 const getDetailedIndexesTool: Tool = {
   toolSpec: {
     name: "get_detailed_indexes",
-    description: "Get comprehensive information about database indexes",
+    description: "Retrieve comprehensive metadata for all indexes including creation statements, index keys, partition info, build status, and storage statistics. More detailed than get_system_indexes. Use for deep index analysis, troubleshooting, or capacity planning.",
     inputSchema: {
       json: {
         type: "object",
@@ -351,7 +373,7 @@ const getDetailedIndexesTool: Tool = {
 const getDetailedPreparedStatementsTool: Tool = {
   toolSpec: {
     name: "get_detailed_prepared_statements",
-    description: "View detailed information about prepared statements",
+    description: "Access extended information about prepared statements including execution counts, average execution times, last use timestamps, and encoded plans. More comprehensive than get_prepared_statements. Use for performance analysis and prepared statement optimization.",
     inputSchema: {
       json: {
         type: "object",
@@ -366,18 +388,18 @@ const getSchemaForCollectionTool: Tool = {
   toolSpec: {
     name: "get_schema_for_collection",
     description:
-      "Get the structure and schema for a specific collection by sampling a document",
+      "Infer the schema structure of a collection by sampling a document. Returns field names, data types, nested object structures, and example values. Use this to understand data models, plan queries, or verify document structure. Requires collection to have at least one document.",
     inputSchema: {
       json: {
         type: "object",
         properties: {
           scope_name: {
             type: "string",
-            description: "Name of the scope containing the collection",
+            description: "Name of the scope containing the target collection. Must exist in the default bucket. Case-sensitive. Example: '_default', 'inventory', 'customers'.",
           },
           collection_name: {
             type: "string",
-            description: "Name of the collection to analyze",
+            description: "Name of the collection to analyze schema for. Must exist within the specified scope. Case-sensitive. Example: '_default', 'users', 'orders'. Requires at least one document.",
           },
         },
         required: ["scope_name", "collection_name"],
@@ -390,19 +412,19 @@ const runSqlPlusPlusQueryTool: Tool = {
   toolSpec: {
     name: "run_sql_plus_plus_query",
     description:
-      "Execute SQL++ queries on a specified scope. Use only collection names in FROM clauses when using scope context.",
+      "Execute custom SQL++ (N1QL) queries within a specific scope context. Supports SELECT, UPDATE, DELETE operations. When using scope context, reference collections directly by name (e.g., FROM `collection` not FROM `bucket`.`scope`.`collection`). Use for data exploration, custom analysis, or operations not covered by other tools.",
     inputSchema: {
       json: {
         type: "object",
         properties: {
           scope_name: {
             type: "string",
-            description: "Name of the scope to execute the query in",
+            description: "Scope context for query execution. Query will run within this scope's context. Case-sensitive. Example: '_default', 'inventory'.",
           },
           query: {
             type: "string",
             description:
-              "SQL++ query to execute. Use only the collection name in the FROM clause if using scope context (e.g., SELECT * FROM `_default` NOT FROM `bucket`.`scope`.`collection`)",
+              "SQL++ (N1QL) query to execute. When using scope context, reference collections directly by name only (e.g., 'SELECT * FROM `users`' not 'SELECT * FROM `bucket`.`scope`.`users`'). Supports SELECT, UPDATE, DELETE. Max length: 65536 characters.",
           },
         },
         required: ["scope_name", "query"],
@@ -492,7 +514,25 @@ export class BedrockChatService {
     this.modelId = Bun.env.BEDROCK_CHAT_MODEL || "anthropic.claude-3-5-sonnet-20241022-v2:0";
   }
 
-  private executeToolInContext = async (name: string, input: any, parentRunTree?: RunTree): Promise<any> => {
+  private executeToolInContext = async (name: string, input: any, parentRunTree?: RunTree): Promise<ToolExecutionResult> => {
+    // Validate input first
+    const validation = validateToolInput(name, input);
+    if (!validation.success) {
+      log("❌ [Tool] Input validation failed", {
+        toolName: name,
+        error: validation.error,
+        input: JSON.stringify(input).substring(0, 200),
+      });
+      return {
+        success: false,
+        error: validation.error,
+        content: `❌ Invalid input: ${validation.error}`,
+      };
+    }
+
+    // Use validated input
+    const validatedInput = validation.data;
+
     // Try to get the current run tree context, or use the provided parent
     let currentRunTree = parentRunTree;
     if (!currentRunTree) {
@@ -509,7 +549,8 @@ export class BedrockChatService {
       hasParentContext: !!currentRunTree,
       parentTraceId: currentRunTree?.id,
       parentName: currentRunTree?.name,
-      inputKeys: Object.keys(input || {}),
+      inputKeys: Object.keys(validatedInput || {}),
+      validatedInput: JSON.stringify(validatedInput).substring(0, 200),
     });
 
     // Execute tool function with tracing
@@ -611,20 +652,20 @@ export class BedrockChatService {
       });
       
       return await withRunTree(currentRunTree, async () => {
-        return await executeSpecificTool(name, input);
+        return await executeSpecificTool(name, validatedInput);
       });
     } else {
       log("⚠️ [Tool] No parent trace context available, executing directly", {
         toolName: name,
       });
       
-      return await executeSpecificTool(name, input);
+      return await executeSpecificTool(name, validatedInput);
     }
   };
 
   private executeGetSystemVitals = async (
     node_filter?: string,
-  ): Promise<any> => {
+  ): Promise<ToolExecutionResult> => {
     try {
       log("🔍 [Tool] Executing get_system_vitals", {
         node_filter,
@@ -642,9 +683,11 @@ export class BedrockChatService {
 
       // Apply node filter if specified
       if (node_filter) {
+        // Escape special characters to prevent SQL injection
+        const escapedFilter = node_filter.replace(/['"%_\\]/g, '\\$&');
         query = query.replace(
           "SELECT * FROM system:vitals;",
-          `SELECT * FROM system:vitals WHERE node LIKE "%${node_filter}%";`,
+          `SELECT * FROM system:vitals WHERE node LIKE "%${escapedFilter}%";`,
         );
       }
 
@@ -707,6 +750,7 @@ export class BedrockChatService {
 
       // Apply service filter if specified
       if (service_filter) {
+        // Service filter is already validated by Zod enum, so it's safe
         query = query.replace(
           "SELECT * FROM system:nodes;",
           `SELECT * FROM system:nodes WHERE ANY s IN services SATISFIES s = "${service_filter}" END;`,
@@ -1710,29 +1754,50 @@ export class BedrockChatService {
       // Add tool execution guidance
       const toolExecutionGuidance = `
 
-TOOL EXECUTION PROTOCOL:
+CRITICAL TOOL EXECUTION REQUIREMENTS:
 
-1. DIRECT EXECUTION: When you need live system data, call the tool directly without announcing it.
-   
-   CORRECT: [Calls get_system_vitals immediately]
-   INCORRECT: "Let me check system vitals" [then calls tool]
-   
-2. AVAILABLE TOOLS: ${this.tools.map(t => t.toolSpec.name).join(', ')}
+You MUST use actual tool calls (tool_use) to retrieve data. NEVER simulate, mock, or hallucinate tool results.
 
-3. DECISION LOGIC:
-   - Live data request → Call appropriate tool silently  
-   - Documentation question → Use provided context
-   - User confirmation → Execute the previously offered tool
+When asked about system data, queries, nodes, or any cluster information:
+1. You MUST actually call the tools using the tool_use mechanism
+2. You MUST wait for real tool execution results  
+3. You MUST analyze the actual data returned by the tools
+4. NEVER write fake JSON results or pretend to execute tools
 
-4. RESPONSE STYLE: Present results directly rather than narrating your process.
+VERIFICATION RULE: If your response contains "### Tool:" headers with JSON data, but you didn't actually execute tools (stopReason would be "tool_use"), this is a CRITICAL ERROR.
 
-5. POST-EXECUTION ANALYSIS: After executing any tool, always provide:
-   - Clear interpretation of the results
-   - Key findings and their implications
-   - Actionable recommendations when relevant
-   - Context about what the data means for the user
+<correct_behavior>
+User: "Do I have any problematic queries?"
+Assistant: I'll check for problematic queries in your cluster.
+[Actually triggers tool_use with get_fatal_requests, get_longest_running_queries, etc.]
+[Waits for real results]
+[Shows actual results and provides analysis]
+</correct_behavior>
 
-REMEMBER: Tools are for execution, not announcement.`;
+<incorrect_behavior>
+User: "Do I have any problematic queries?" 
+Assistant: I'll check for problematic queries...
+### Tool: get_fatal_requests
+[Shows made-up JSON without executing tool] ← THIS IS WRONG
+</incorrect_behavior>
+
+AVAILABLE TOOLS: ${this.tools.map(t => t.toolSpec.name).join(', ')}
+
+IMPORTANT: Always call tools with an object as input:
+- ✅ CORRECT: {"limit": 10} or {} for defaults
+- ❌ WRONG: 10 or "week" (bare values)
+
+EXECUTION FLOW:
+1. Execute the tool(s) to get real data
+2. Show the actual results
+3. ALWAYS provide analysis of what the data means
+4. Give recommendations or next steps
+
+AFTER EXECUTING TOOLS, YOU MUST:
+- Summarize what you found
+- Explain if it's good or bad
+- Suggest improvements if needed
+- Answer the user's original question`;
       
       const systemPrompt = baseSystemPrompt ? baseSystemPrompt + toolExecutionGuidance : toolExecutionGuidance;
 
@@ -2114,6 +2179,10 @@ REMEMBER: Tools are for execution, not announcement.`;
                   ls_provider: 'anthropic',
                   ls_model_name: this.getNormalizedModelName(),
                   ls_model_type: 'chat',
+                  ls_stop_reason: stopReason,
+                  is_tool_use: stopReason === "tool_use",
+                  is_end_turn: stopReason === "end_turn",
+                  is_max_tokens: stopReason === "max_tokens",
                 }
               }
             });
@@ -2169,6 +2238,10 @@ REMEMBER: Tools are for execution, not announcement.`;
                   ls_provider: 'anthropic',
                   ls_model_name: this.getNormalizedModelName(),
                   ls_model_type: 'chat',
+                  ls_stop_reason: stopReason,
+                  is_tool_use: stopReason === "tool_use",
+                  is_end_turn: stopReason === "end_turn",
+                  is_max_tokens: stopReason === "max_tokens",
                 }
               }
             });
@@ -2205,6 +2278,8 @@ REMEMBER: Tools are for execution, not announcement.`;
             toolCallCount: toolCalls.length,
             toolNames: toolCalls.map(c => c.toolUse?.name),
             stopReason,
+            recursionDepth: options.recursionDepth || 0,
+            maxRecursionDepth: backendConfig.rag.BEDROCK_MAX_TOOL_RECURSION_DEPTH || 1,
           });
           
           yield "\n\n[Executing tools...]\n";
@@ -2271,19 +2346,22 @@ REMEMBER: Tools are for execution, not announcement.`;
                 toolIndex: toolsExecuted,
               });
 
-              // Add instruction to continue if more analysis is needed
-              const analysisPrompt = "";  // Let the model decide what to do next based on context
-              
               toolResults.push({
                 toolResult: {
                   toolUseId,
-                  content: [{ text: (result.content || JSON.stringify(result)) + analysisPrompt }],
+                  content: [{ text: result.content || JSON.stringify(result) }],
                   status: result.success ? "success" : "error",
                 },
               });
               
               // Store formatted result for display
-              toolResultsForDisplay.push(`\n### Tool: ${name}\n${result.content || JSON.stringify(result.data, null, 2)}`);
+              const resultDisplay = `\n### Tool: ${name}\n${result.content || JSON.stringify(result.data, null, 2)}`;
+              toolResultsForDisplay.push(resultDisplay);
+              
+              // Add a prompt for analysis after the last tool
+              if (toolsExecuted === toolCalls.length) {
+                toolResults[toolResults.length - 1].toolResult.content[0].text += '\n\nNow provide your analysis of these results. What do they mean? Are there any issues? What are your recommendations?';
+              }
             }
           }
 
@@ -2295,6 +2373,8 @@ REMEMBER: Tools are for execution, not announcement.`;
             averageExecutionTimeMs: Math.round(
               totalToolExecutionTime / toolsExecuted,
             ),
+            stopReason,
+            recursionDepth: options.recursionDepth || 0,
           });
           
           // Display tool results to user
@@ -2417,6 +2497,7 @@ REMEMBER: Tools are for execution, not announcement.`;
                 toolCount: additionalToolCalls.length,
                 recursionDepth,
                 maxRecursionDepth,
+                continuationStopReason,
               });
               
               // Recursively execute the additional tools
