@@ -31,6 +31,7 @@
     import { marked } from "marked";
     import ThinkingSection from "./ThinkingSection.svelte";
     import ChatProgressIndicator from "./ChatProgressIndicator.svelte";
+    import SuggestedQueries from "./SuggestedQueries.svelte";
     import hljs from "highlight.js/lib/core";
     import "highlight.js/styles/github-dark.css";
 
@@ -272,6 +273,13 @@
     // Track which messages used extended thinking
     let extendedThinkingMessages = $state<Set<string>>(new Set());
     let enableExtendedThinking = $state(false);
+    
+    // Track if we should show suggested queries
+    let showSuggestedQueries = $derived(
+        messages.length <= 1 && // Only greeting message
+        requestState === "idle" && // Not loading
+        !newMessage.trim() // No text in input
+    );
 
     // Use derived with safe access to avoid initialization issues
     let messages = $derived(formatMessagesForDisplay(conversation));
@@ -1848,6 +1856,17 @@
                             </div>
                         {/each}
                     </div>
+
+                    <!-- Suggested Queries -->
+                    {#if showSuggestedQueries}
+                        <SuggestedQueries 
+                            onQuerySelect={(query, useExtendedThinking) => {
+                                newMessage = query;
+                                enableExtendedThinking = useExtendedThinking || false;
+                                handleSubmit();
+                            }}
+                        />
+                    {/if}
 
                     <!-- Disclaimer -->
                     <div class="px-4 py-2 text-center">
