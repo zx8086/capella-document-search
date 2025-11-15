@@ -71,7 +71,7 @@
     "@growthbook/growthbook": "^1.6.0",
     "@huggingface/hub": "^2.4.0",
     "@huggingface/inference": "^4.6.1",
-    "@langchain/community": "^0.3.49",
+    "@langchain/community": "^1.0.2",
     "@langchain/core": "^0.3.65",
     "@langchain/openai": "^0.6.3",
     "@microsoft/microsoft-graph-client": "^3.0.7",
