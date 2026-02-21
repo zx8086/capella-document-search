@@ -1,57 +1,18 @@
-/* src/lib/rag/factory.ts */
+// src/lib/rag/factory.ts
+// DEPRECATED: This factory is no longer used. The LangGraph agent in src/ai/graph/ handles RAG directly.
+// Keeping this file for backward compatibility but it will throw an error if used.
 
-import type { RAGProvider } from './types';
-import { PineconeRAGProvider } from './providers/pinecone';
-import { VectorizeRAGProvider } from './providers/vectorize';
-import { CapellaRAGProvider } from './providers/capella';
-import { AWSKnowledgeBaseRAGProvider } from './providers/aws-knowledge-base';
-import { log, err } from '../../utils/unifiedLogger';
+import { err } from "../../utils/unifiedLogger";
+import type { RAGProvider } from "./types";
 
-export function createRAGProvider(fetch: typeof fetch): RAGProvider {
-    // Add immediate environment check
-    log('🔍 [RAG Factory] Environment check', {
-        RAG_PIPELINE: Bun.env.RAG_PIPELINE,
-        NODE_ENV: Bun.env.NODE_ENV,
-        timestamp: new Date().toISOString()
-    });
+export function createRAGProvider(_fetch: typeof fetch): RAGProvider {
+  err(
+    "[RAG Factory] DEPRECATED: This factory is no longer used. The application now uses the LangGraph agent in src/ai/graph/ which handles RAG directly via @langchain/pinecone."
+  );
 
-    const pipeline = Bun.env.RAG_PIPELINE?.toUpperCase() || 'PINECONE';
-    
-    log('🚀 [RAG Factory] Creating provider', {
-        selectedPipeline: pipeline,
-        rawEnvValue: Bun.env.RAG_PIPELINE,
-        timestamp: new Date().toISOString()
-    });
-    
-    let provider: RAGProvider;
-    
-    switch (pipeline) {
-        case 'PINECONE':
-            log('📌 [RAG Factory] Creating Pinecone provider instance');
-            provider = new PineconeRAGProvider();
-            break;
-        case 'VECTORIZE':
-            log('🔍 [RAG Factory] Creating Vectorize provider instance');
-            provider = new VectorizeRAGProvider();
-            break;
-        case 'CAPELLA':
-            log('🔍 [RAG Factory] Creating Capella provider instance');
-            provider = new CapellaRAGProvider();
-            break;
-        case 'AWS_KNOWLEDGE_BASE':
-            log('🔍 [RAG Factory] Creating AWS Knowledge Base provider instance');
-            provider = new AWSKnowledgeBaseRAGProvider();
-            break;
-        default:
-            err('❌ [RAG Factory] Unsupported pipeline', { pipeline });
-            throw new Error(`Unsupported RAG pipeline: ${pipeline}`);
-    }
-    
-    log('✅ [RAG Factory] Provider created', {
-        type: pipeline,
-        providerClass: provider.constructor.name,
-        timestamp: new Date().toISOString()
-    });
-    
-    return provider;
-} 
+  throw new Error(
+    "RAG Factory is deprecated. The application now uses the LangGraph agent " +
+      "which handles RAG directly via @langchain/pinecone. " +
+      "See src/ai/graph/nodes/retriever.ts for the new implementation."
+  );
+}
