@@ -1,42 +1,42 @@
 <!-- src/lib/components/SuggestedQueries.svelte -->
 
 <script lang="ts">
-  interface Props {
-    onQuerySelect: (query: string, enableExtendedThinking?: boolean) => void;
-  }
+interface Props {
+  onQuerySelect: (query: string, enableExtendedThinking?: boolean) => void;
+}
 
-  const { onQuerySelect } = $props<Props>();
+const { onQuerySelect } = $props<Props>();
 
-  const suggestedQueries = [
-    {
-      text: "How does Tommy Hilfiger use Couchbase?",
-      extendedThinking: false
-    },
-    {
-      text: "Why would Developers use Couchbase?",
-      extendedThinking: true
-    },
-    {
-      text: "Are all my nodes healthy?",
-      extendedThinking: false
-    },
-    {
-      text: "Do I have long running queries?",
-      extendedThinking: false
-    }
-  ];
+const _suggestedQueries = [
+  {
+    text: "How does Tommy Hilfiger use Couchbase?",
+    extendedThinking: false,
+  },
+  {
+    text: "Why would Developers use Couchbase?",
+    extendedThinking: true,
+  },
+  {
+    text: "Are all my nodes healthy?",
+    extendedThinking: false,
+  },
+  {
+    text: "Do I have long running queries?",
+    extendedThinking: false,
+  },
+];
 
-  function handleQueryClick(query: { text: string; extendedThinking: boolean }) {
-    onQuerySelect(query.text, query.extendedThinking);
-  }
+function _handleQueryClick(query: { text: string; extendedThinking: boolean }) {
+  onQuerySelect(query.text, query.extendedThinking);
+}
 </script>
 
 <div class="px-4 py-3">
   <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
-    {#each suggestedQueries as query}
+    {#each _suggestedQueries as query}
       <button
         type="button"
-        onclick={() => handleQueryClick(query)}
+        onclick={() => _handleQueryClick(query)}
         class="relative group text-left p-3 rounded-lg border border-gray-200 dark:border-gray-700 
                bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700
                transition-all duration-200 hover:shadow-md hover:border-gray-300 dark:hover:border-gray-600

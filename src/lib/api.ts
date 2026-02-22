@@ -1,7 +1,7 @@
 /* src/lib/api.ts */
 
-import { log, err } from "$utils/unifiedLogger";
 import { backendConfig } from "$backendConfig";
+import { err, log } from "$utils/unifiedLogger";
 
 const API_BASE_URL = backendConfig.capella.API_BASE_URL;
 const ORG_ID = backendConfig.capella.ORG_ID;
@@ -10,7 +10,14 @@ const CLUSTER_ID = backendConfig.capella.CLUSTER_ID;
 const BUCKET_ID = backendConfig.capella.BUCKET_ID;
 const AUTH_TOKEN = backendConfig.capella.AUTH_TOKEN;
 
-log("Environment Variables loaded for Capella API", { API_BASE_URL, ORG_ID, PROJECT_ID, CLUSTER_ID, BUCKET_ID, AUTH_TOKEN_STATUS: AUTH_TOKEN ? "Set" : "Not set" });
+log("Environment Variables loaded for Capella API", {
+  API_BASE_URL,
+  ORG_ID,
+  PROJECT_ID,
+  CLUSTER_ID,
+  BUCKET_ID,
+  AUTH_TOKEN_STATUS: AUTH_TOKEN ? "Set" : "Not set",
+});
 
 const headers = new Headers({
   Authorization: `Bearer ${AUTH_TOKEN}`,
@@ -40,7 +47,7 @@ interface BucketScopeCollection {
 
 const TIMEOUT_MS = 30000; // 30 seconds timeout
 
-async function fetchWithAuth<T>(endpoint: string): Promise<T> {
+async function _fetchWithAuth<T>(endpoint: string): Promise<T> {
   const url = `${API_BASE_URL.split('"')[0].trim()}${endpoint}`;
   log(`Fetching data from: ${url}`);
   const controller = new AbortController();
@@ -52,14 +59,12 @@ async function fetchWithAuth<T>(endpoint: string): Promise<T> {
         signal: controller.signal,
       }),
       new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error("Request timed out")), TIMEOUT_MS),
+        setTimeout(() => reject(new Error("Request timed out")), TIMEOUT_MS)
       ),
     ]);
     if (!response.ok) {
       const errorBody = await response.text();
-      err(
-        `HTTP error! status: ${response.status}, body: ${errorBody}`,
-      );
+      err(`HTTP error! status: ${response.status}, body: ${errorBody}`);
       throw new Error(`HTTP error! status: ${response.status}`);
     }
     const data = await response.json();
@@ -86,14 +91,14 @@ export async function getAllScopes(): Promise<BucketScopeCollection[]> {
 
     if (!response.ok) {
       const errorBody = await response.text();
-      err(
-        `HTTP error! status: ${response.status}, body: ${errorBody}`,
-      );
+      err(`HTTP error! status: ${response.status}, body: ${errorBody}`);
       throw new Error(`HTTP error! status: ${response.status}`);
     }
 
     const data: ApiResponse = await response.json();
-    log(`Received data from Capella Management API Endpoint: ${data.scopes.length} scopes found`, { scopesCount: data.scopes.length });
+    log(`Received data from Capella Management API Endpoint: ${data.scopes.length} scopes found`, {
+      scopesCount: data.scopes.length,
+    });
 
     if (!data || !data.scopes) {
       err("Unexpected API response structure:", data);

@@ -1,6 +1,7 @@
 /* src/utils/unifiedLogger.ts */
 
 const isBrowser = typeof window !== "undefined";
+
 import type { BackendConfig } from "../models/types";
 
 let serverLogger: any = null;

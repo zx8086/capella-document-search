@@ -1,18 +1,18 @@
+import type { GrowthBook } from "@growthbook/growthbook";
+import { ClientProviderStatus } from "@openfeature/core";
 import type {
+  EvaluationContext,
+  JsonValue,
+  Logger,
   Provider,
   ProviderStatus,
   ResolutionDetails,
-  JsonValue,
-  EvaluationContext,
-  Logger
-} from '@openfeature/web-sdk';
-import { ClientProviderStatus } from '@openfeature/core';
-import { GrowthBook } from '@growthbook/growthbook';
+} from "@openfeature/web-sdk";
 
 export class GrowthBookProvider implements Provider {
-  readonly runsOn = 'client';
+  readonly runsOn = "client";
   readonly metadata = {
-    name: 'GrowthBook Provider',
+    name: "GrowthBook Provider",
   } as const;
 
   private gb: GrowthBook;
@@ -33,49 +33,49 @@ export class GrowthBookProvider implements Provider {
   resolveBooleanEvaluation(
     flagKey: string,
     defaultValue: boolean,
-    context: EvaluationContext,
-    logger: Logger
+    _context: EvaluationContext,
+    _logger: Logger
   ): ResolutionDetails<boolean> {
     const value = this.gb.isOn(flagKey);
     return {
       value: value ?? defaultValue,
-      reason: value !== undefined ? 'TARGETING_MATCH' : 'DEFAULT'
+      reason: value !== undefined ? "TARGETING_MATCH" : "DEFAULT",
     };
   }
 
   resolveStringEvaluation(
     flagKey: string,
     defaultValue: string,
-    context: EvaluationContext,
-    logger: Logger
+    _context: EvaluationContext,
+    _logger: Logger
   ): ResolutionDetails<string> {
     return {
       value: this.gb.getFeatureValue(flagKey, defaultValue) ?? defaultValue,
-      reason: 'DEFAULT'
+      reason: "DEFAULT",
     };
   }
 
   resolveNumberEvaluation(
     flagKey: string,
     defaultValue: number,
-    context: EvaluationContext,
-    logger: Logger
+    _context: EvaluationContext,
+    _logger: Logger
   ): ResolutionDetails<number> {
     return {
       value: this.gb.getFeatureValue(flagKey, defaultValue) ?? defaultValue,
-      reason: 'DEFAULT'
+      reason: "DEFAULT",
     };
   }
 
   resolveObjectEvaluation<T extends JsonValue>(
     flagKey: string,
     defaultValue: T,
-    context: EvaluationContext,
-    logger: Logger
+    _context: EvaluationContext,
+    _logger: Logger
   ): ResolutionDetails<T> {
     return {
       value: this.gb.getFeatureValue(flagKey, defaultValue) ?? defaultValue,
-      reason: 'DEFAULT'
+      reason: "DEFAULT",
     };
   }
-} 
+}

@@ -1,72 +1,76 @@
 <!-- src/lib/components/ChatProgressIndicator.svelte -->
 
 <script lang="ts">
-  import { onMount, onDestroy } from 'svelte';
-  
-  interface Props {
-    isActive: boolean;
-    message?: string;
-    details?: string;
-    showElapsedTime?: boolean;
-    tokenUsage?: {
-      input: number;
-      output: number;
-      total: number;
-    };
-    estimatedCost?: number;
+import { onDestroy } from "svelte";
+
+interface Props {
+  isActive: boolean;
+  message?: string;
+  details?: string;
+  showElapsedTime?: boolean;
+  tokenUsage?: {
+    input: number;
+    output: number;
+    total: number;
+  } | null;
+  estimatedCost?: number | null;
+}
+
+const {
+  isActive = false,
+  message = "Processing your request...",
+  details = "",
+  showElapsedTime = true,
+  tokenUsage = null,
+  estimatedCost = null,
+}: Props = $props();
+
+let startTime = $state<number | null>(null);
+let elapsedTime = $state(0);
+let interval: any;
+
+// Format elapsed time to human-readable format
+function formatElapsedTime(ms: number): string {
+  const seconds = Math.floor(ms / 1000);
+  const minutes = Math.floor(seconds / 60);
+  const remainingSeconds = seconds % 60;
+
+  if (minutes > 0) {
+    return `${minutes}m ${remainingSeconds}s`;
   }
-  
-  const { 
-    isActive = false,
-    message = "Processing your request...",
-    details = "",
-    showElapsedTime = true,
-    tokenUsage = null,
-    estimatedCost = null
-  }: Props = $props();
-  
-  let startTime = $state<number | null>(null);
-  let elapsedTime = $state(0);
-  let interval: any;
-  
-  // Format elapsed time to human-readable format
-  function formatElapsedTime(ms: number): string {
-    const seconds = Math.floor(ms / 1000);
-    const minutes = Math.floor(seconds / 60);
-    const remainingSeconds = seconds % 60;
-    
-    if (minutes > 0) {
-      return `${minutes}m ${remainingSeconds}s`;
+  return `${seconds}s`;
+}
+
+// Start/stop timer based on isActive
+$effect(() => {
+  if (isActive) {
+    if (!startTime) {
+      startTime = Date.now();
+      console.log("[START] [ChatProgressIndicator] Component activated - Starting timer");
     }
-    return `${seconds}s`;
-  }
-  
-  // Start/stop timer based on isActive
-  $effect(() => {
-    if (isActive) {
-      if (!startTime) {
-        startTime = Date.now();
-        console.log('🟢 [ChatProgressIndicator] Component activated - Starting timer');
-      }
-      interval = setInterval(() => {
-        elapsedTime = Date.now() - startTime!;
-      }, 1000);
-    } else {
-      if (interval) {
-        clearInterval(interval);
-        console.log('🔴 [ChatProgressIndicator] Component deactivated - Timer stopped, elapsed time:', elapsedTime, 'ms');
-      }
-      startTime = null;
-      elapsedTime = 0;
-    }
-  });
-  
-  onDestroy(() => {
+    interval = setInterval(() => {
+      elapsedTime = Date.now() - startTime!;
+    }, 1000);
+  } else {
     if (interval) {
       clearInterval(interval);
-      console.log('💀 [ChatProgressIndicator] Component destroyed - Cleanup complete');
+      console.log(
+        "[STOP] [ChatProgressIndicator] Component deactivated - Timer stopped, elapsed time:",
+        elapsedTime,
+        "ms"
+      );
     }
-  });
+    startTime = null;
+    elapsedTime = 0;
+  }
+});
+
+onDestroy(() => {
+  if (interval) {
+    clearInterval(interval);
+    console.log("[DESTROYED] [ChatProgressIndicator] Component destroyed - Cleanup complete");
+  }
+});
 </script>
 
 {#if isActive}

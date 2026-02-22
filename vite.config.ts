@@ -1,20 +1,19 @@
 /* vite.config.ts */
 
+import path from "node:path";
 import { sveltekit } from "@sveltejs/kit/vite";
 import { defineConfig, loadEnv, type UserConfig } from "vite";
-import path from "path";
-import { envSchema } from "./src/env/schema";
 
 export default defineConfig(({ mode }): UserConfig => {
   // Add signal handling
-  process.on('SIGINT', () => {
-    console.log('\nGracefully shutting down from SIGINT (Ctrl+C)');
+  process.on("SIGINT", () => {
+    console.log("\nGracefully shutting down from SIGINT (Ctrl+C)");
     process.exit(0);
   });
 
   try {
     const env = loadEnv(mode, process.cwd(), "");
-    
+
     if (!env) {
       throw new Error("Failed to load environment variables");
     }
@@ -28,21 +27,21 @@ export default defineConfig(({ mode }): UserConfig => {
             console.warn(`Warning: ${key} has no value`);
             return [`import.meta.env.${key}`, '""']; // provide empty string as fallback
           }
-          return [`import.meta.env.${key}`, JSON.stringify(value)]
+          return [`import.meta.env.${key}`, JSON.stringify(value)];
         })
     );
 
     const enableOpenTelemetry = env.ENABLE_OPENTELEMETRY === "true";
-    const isDevelopment = mode === "development";
+    const _isDevelopment = mode === "development";
 
-    const PROD_ORIGIN = "https://shared-services.eu.pvh.cloud";
+    const _PROD_ORIGIN = "https://shared-services.eu.pvh.cloud";
     const CDN_ORIGIN = "https://d2bgp0ri487o97.cloudfront.net";
 
-    const ALLOWED_ORIGINS = [
+    const _ALLOWED_ORIGINS = [
       "https://capella-document-search.prd.shared-services.eu.pvh.cloud",
       "https://capellaql.prd.shared-services.eu.pvh.cloud",
       "https://shared-services.eu.pvh.cloud",
-      CDN_ORIGIN
+      CDN_ORIGIN,
     ];
 
     const config: UserConfig = {
@@ -50,82 +49,82 @@ export default defineConfig(({ mode }): UserConfig => {
       envPrefix: ["PUBLIC_"],
       resolve: {
         alias: {
-          '$app': './.svelte-kit/runtime/app',
-          '$app/environment': './.svelte-kit/runtime/app/environment',
-          '$app/navigation': './.svelte-kit/runtime/app/navigation',
-          '$app/stores': './.svelte-kit/runtime/app/stores',
-          'node:events': 'events',
-          'node:http': 'stream-http',
-          events: 'events-browserify',
-          'sdp': 'sdp/sdp.js',
+          $app: "./.svelte-kit/runtime/app",
+          "$app/environment": "./.svelte-kit/runtime/app/environment",
+          "$app/navigation": "./.svelte-kit/runtime/app/navigation",
+          "$app/stores": "./.svelte-kit/runtime/app/stores",
+          "node:events": "events",
+          "node:http": "stream-http",
+          events: "events-browserify",
+          sdp: "sdp/sdp.js",
           // Add zen-observable alias to handle default export
-          'zen-observable': path.resolve('./node_modules/zen-observable/index.js')
+          "zen-observable": path.resolve("./node_modules/zen-observable/index.js"),
         },
         // Add main fields to improve module resolution
-        mainFields: ['module', 'jsnext:main', 'jsnext', 'browser', 'main']
+        mainFields: ["module", "jsnext:main", "jsnext", "browser", "main"],
       },
       server: {
         fs: {
-          allow: ['.', 'static'],
+          allow: [".", "static"],
           strict: false,
         },
-        port: parseInt(env.PORT || "5173"),
+        port: parseInt(env.PORT || "5173", 10),
         host: true,
         cors: {
-          origin: '*',
-          methods: ['POST', 'OPTIONS'],
+          origin: "*",
+          methods: ["POST", "OPTIONS"],
           allowedHeaders: [
-            'Content-Type',
-            'Authorization',
-            'Content-Encoding',
-            'X-Openreplay-Batch'
+            "Content-Type",
+            "Authorization",
+            "Content-Encoding",
+            "X-Openreplay-Batch",
           ],
-          credentials: false
+          credentials: false,
         },
         hmr: {
           timeout: 5000,
-          protocol: 'ws',
-          host: 'localhost'
+          protocol: "ws",
+          host: "localhost",
         },
         proxy: {
-          '/openreplay': {
+          "/openreplay": {
             target: env.PUBLIC_OPENREPLAY_INGEST_POINT,
             changeOrigin: true,
             secure: true,
             ws: true,
             headers: {
               traceparent: undefined,
-              tracestate: undefined
+              tracestate: undefined,
             },
             configure: (proxy, _options) => {
-              proxy.on('proxyReq', (proxyReq) => {
-                proxyReq.removeHeader('traceparent');
-                proxyReq.removeHeader('tracestate');
+              proxy.on("proxyReq", (proxyReq) => {
+                proxyReq.removeHeader("traceparent");
+                proxyReq.removeHeader("tracestate");
               });
-              proxy.on('error', (err, req) => {
-                console.error('OpenReplay proxy error:', {
+              proxy.on("error", (err, req) => {
+                console.error("OpenReplay proxy error:", {
                   error: err.message,
                   path: req.path,
-                  method: req.method
+                  method: req.method,
                 });
               });
-            }
-          }
-        }
+            },
+          },
+        },
       },
       ssr: {
         noExternal: [
-          '@openfeature/web-sdk',
-          '@growthbook/growthbook',
-          '@openfeature/growthbook-provider',
-          'langsmith'
+          "@openfeature/web-sdk",
+          "@growthbook/growthbook",
+          "@openfeature/growthbook-provider",
+          "langsmith",
         ],
-        external: ['bun:sqlite']
+        external: ["bun:sqlite"],
       },
       build: {
         rollupOptions: {
           external: [
-            'bun:sqlite',
+            "bun:sqlite",
             ...(enableOpenTelemetry
               ? [
                   "winston",
@@ -133,14 +132,14 @@ export default defineConfig(({ mode }): UserConfig => {
                   "@elastic/ecs-winston-format",
                   "@opentelemetry/winston-transport",
                 ]
-              : [])
+              : []),
           ],
           // Add output options to make module interop less strict
           output: {
-            interop: 'auto',
+            interop: "auto",
             esModule: true,
-            strict: false
-          }
+            strict: false,
+          },
         },
         target: "esnext",
         sourcemap: false,
@@ -153,56 +152,59 @@ export default defineConfig(({ mode }): UserConfig => {
             /zen-observable/,
             /sdp/,
             /webrtc-adapter/,
-            /node_modules/
+            /node_modules/,
           ],
           transformMixedEsModules: true,
           // Add this key option to make default exports work
-          defaultIsModuleExports: true
-        }
+          defaultIsModuleExports: true,
+        },
       },
       optimizeDeps: {
         include: [
-          '@openfeature/web-sdk',
-          '@growthbook/growthbook',
-          '@openfeature/growthbook-provider',
-          'svelte',
-          'svelte/internal',
-          'svelte/store',
-          'svelte/easing',
-          'bits-ui',
-          'tailwind-merge',
-          'langsmith/traceable'
+          "@openfeature/web-sdk",
+          "@growthbook/growthbook",
+          "@openfeature/growthbook-provider",
+          "svelte",
+          "svelte/internal",
+          "svelte/store",
+          "svelte/easing",
+          "bits-ui",
+          "tailwind-merge",
+          "langsmith/traceable",
         ],
         exclude: [
-          'node:events',
+          "node:events",
           // Add problematic packages to exclude from pre-bundling
-          '@openreplay/tracker-assist',
-          '@openreplay/tracker-graphql',
-          'webrtc-adapter',
-          ...(enableOpenTelemetry ? ["src/utils/serverLogger"] : [])
+          "@openreplay/tracker-assist",
+          "@openreplay/tracker-graphql",
+          "webrtc-adapter",
+          ...(enableOpenTelemetry ? ["src/utils/serverLogger"] : []),
         ],
         esbuildOptions: {
           plugins: [
             {
-              name: 'sdp-resolver',
+              name: "sdp-resolver",
               setup(build) {
-                build.onResolve({ filter: /^sdp$/ }, args => {
-                  return { path: 'sdp/sdp.js', namespace: 'file' };
+                build.onResolve({ filter: /^sdp$/ }, (_args) => {
+                  return { path: "sdp/sdp.js", namespace: "file" };
                 });
-              }
+              },
             },
             // Add zen-observable resolver
             {
-              name: 'zen-observable-resolver',
+              name: "zen-observable-resolver",
               setup(build) {
-                build.onResolve({ filter: /^zen-observable$/ }, args => {
+                build.onResolve({ filter: /^zen-observable$/ }, (_args) => {
                   // Make this module work with default import
-                  return { path: path.resolve('./node_modules/zen-observable/index.js'), namespace: 'file' };
+                  return {
+                    path: path.resolve("./node_modules/zen-observable/index.js"),
+                    namespace: "file",
+                  };
                 });
-              }
-            }
-          ]
-        }
+              },
+            },
+          ],
+        },
       },
       define: {
         ...publicEnvVars,
@@ -220,10 +222,9 @@ export default defineConfig(({ mode }): UserConfig => {
     }
 
     return config;
-
   } catch (error) {
     console.error("Vite configuration error:", error);
-    
+
     if (mode === "development") {
       console.log("Using fallback development configuration");
       return {
@@ -232,12 +233,12 @@ export default defineConfig(({ mode }): UserConfig => {
           port: 5173,
           host: true,
           hmr: {
-            timeout: 5000
-          }
+            timeout: 5000,
+          },
         },
       };
     }
-    
+
     throw error;
   }
 });

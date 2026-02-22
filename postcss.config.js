@@ -2,10 +2,10 @@
 
 export default {
   plugins: {
-    tailwindcss: {},
+    "@tailwindcss/postcss": {},
     autoprefixer: {
       flexbox: true,
-      grid: true
-    }
+      grid: true,
+    },
   },
 };

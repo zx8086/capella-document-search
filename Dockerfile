@@ -73,4 +73,4 @@ RUN --mount=type=cache,target=/root/.bun/install/cache \
 USER bun
 EXPOSE 3000
 
-CMD ["bun", "run", "--preload", "./src/instrumentation.ts", "./build/index.js"]
+CMD ["bun", "run", "./build/index.js"]

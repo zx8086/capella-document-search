@@ -1,614 +1,555 @@
 <!-- src/routes/+page.svelte-->
 
 <script lang="ts">
-    import { run, preventDefault } from "svelte/legacy";
+import Papa from "papaparse";
+import { getContext, onMount } from "svelte";
+import { toast } from "svelte-sonner";
+import { browser } from "$app/environment";
+import { pushState, replaceState } from "$app/navigation";
+import { page } from "$app/state";
+import { frontendConfig } from "$frontendConfig";
+import { debugTrackerStatus, key, trackEvent } from "$lib/context/tracker";
+import { authStore } from "$lib/stores/auth.svelte";
+import type { Collection } from "../models";
+import { collections } from "$lib/stores/collections.svelte";
+import { videos } from "../stores/videoStore";
+import { enhance } from "$app/forms";
+import DocumentDisplay from "$lib/components/DocumentDisplay.svelte";
+import FileUploadResults from "$lib/components/FileUploadResults.svelte";
+import IdleVideoCarousel from "$lib/components/IdleVideoCarousel.svelte";
+import FeatureFlagDebug from "$lib/components/FeatureFlagDebug.svelte";
 
-    import { enhance } from "$app/forms";
-    import { onMount, getContext } from "svelte";
-    import { toast } from "svelte-sonner";
-    import DocumentDisplay from "$lib/components/DocumentDisplay.svelte";
-    import FileUploadResults from "$lib/components/FileUploadResults.svelte";
-    import Papa from "papaparse";
-    import { page } from "$app/stores";
+interface SearchResult {
+  collection: string;
+  data: any;
+}
 
-    import { key } from "$lib/context/tracker";
-    import { browser } from "$app/environment";
-    import { frontendConfig } from "$frontendConfig";
+const { getTracker } = getContext(key) as {
+  getTracker: typeof import("$lib/context/tracker").getTracker;
+};
 
-    import { videos } from "../stores/videoStore";
-    import IdleVideoCarousel from "$lib/components/IdleVideoCarousel.svelte";
+let currentUser = $state({
+  id: "",
+  email: "",
+  name: "",
+});
 
-    import { collections } from "../stores/collectionsStore";
-    import type { Collection } from "../models";
+function trackClick(elementName: string, action: string) {
+  if (browser) {
+    trackEvent("User_Interaction", {
+      type: "click",
+      element: elementName,
+      action: action,
+      page: "Document Search",
+      userId: currentUser.name,
+      metadata: {
+        isSearchMode,
+        buttonState,
+      },
+    });
+  }
+}
 
-    import { pushState, replaceState } from '$app/navigation';
+let allCollections: Collection[] = $state([]);
+let selectedCollections: Collection[] = $state([]);
+let _errorMessage: string = $state("");
+let _errorDetails: string = "";
 
-    import { userAccount } from '$lib/stores/authStore';
+// Sync collections from the runes-based store - use $effect.pre to avoid loops
+$effect.pre(() => {
+  const fetchedCollections = collections.items;
 
-    import { debugTrackerStatus, trackEvent } from '$lib/context/tracker';
+  // Only update if we have collections and they differ from current
+  if (fetchedCollections.length === 0) return;
+  if (allCollections.length === fetchedCollections.length) return;
 
-    import FeatureFlagDebug from '$lib/components/FeatureFlagDebug.svelte';
+  // Sort the fetched collections
+  const sorted = [...fetchedCollections].sort((a, b) => {
+    if (a.scope_name < b.scope_name) return -1;
+    if (a.scope_name > b.scope_name) return 1;
+    if (a.collection_name < b.collection_name) return -1;
+    if (a.collection_name > b.collection_name) return 1;
+    return 0;
+  });
 
-    interface SearchResult {
-        collection: string;
-        data: any;
-    }
+  allCollections = sorted;
+  selectedCollections = sorted.map(({ bucket, scope_name, collection_name }) => ({
+    bucket,
+    scope_name,
+    collection_name,
+  }));
+});
 
-    const { getTracker } = getContext(key) as { 
-        getTracker: typeof import('$lib/context/tracker').getTracker 
+// Sync userAccount from auth store - use $effect.pre to avoid infinite loops
+$effect.pre(() => {
+  const account = authStore.userAccount;
+  if (account) {
+    const newUser = {
+      id: account.localAccountId || account.homeAccountId || "",
+      email: account.username || "",
+      name: account.name || "",
     };
-
-    let currentUser = $state({
-        id: '',
-        email: '',
-        name: ''
-    });
-
-    function trackClick(elementName: string, action: string) {
-        if (browser) {
-            trackEvent("User_Interaction", {
-                type: "click",
-                element: elementName,
-                action: action,
-                page: "Document Search",
-                userId: currentUser.name,
-                metadata: {
-                    isSearchMode,
-                    buttonState,
-                }
-            });
-        }
+    // Only update if values actually changed to prevent loops
+    if (
+      currentUser.id !== newUser.id ||
+      currentUser.email !== newUser.email ||
+      currentUser.name !== newUser.name
+    ) {
+      currentUser = newUser;
     }
+  }
+});
 
-    let allCollections: Collection[] = $state([]);
-    let selectedCollections: Collection[] = $state([]);
-    let errorMessage: string = $state("");
-    let errorDetails: string = "";
+onMount(() => {
 
-    onMount(() => {
-        const unsubscribe = collections.subscribe((fetchedCollections) => {
-            console.log("Fetched collections:", fetchedCollections);
+  if (browser) {
+    const tracker = getTracker();
+    if (tracker) {
+      trackEvent("Page_View", {
+        page: "Document Search",
+        category: "Navigation",
+        action: "View",
+        userId: currentUser.name,
+      });
+    }
+  }
 
-            // Sort the fetched collections
-            allCollections = fetchedCollections.sort((a, b) => {
-                // First, sort by scope_name
-                if (a.scope_name < b.scope_name) return -1;
-                if (a.scope_name > b.scope_name) return 1;
+  // Initialize the store with data from the server
+  const pageData = page.data;
+  if (pageData?.collections) {
+    collections.set(pageData.collections);
+  }
 
-                // If scope_name is the same, sort by collection_name
-                if (a.collection_name < b.collection_name) return -1;
-                if (a.collection_name > b.collection_name) return 1;
+  if (browser) {
+    debugTrackerStatus();
+  }
+});
 
-                return 0;
-            });
+let _showDebugInfo: boolean = false;
+// let debugInfo = "";
 
-            selectedCollections = allCollections.map(
-                ({ bucket, scope_name, collection_name }) => ({
-                    bucket,
-                    scope_name,
-                    collection_name,
-                }),
-            );
+let documentKey: string = $state("");
+let _processing = $state(false);
+let _searchPerformed = $state(false);
+let _sortedResults: any[] = $state([]);
 
-            // Force a UI update
-            allCollections = [...allCollections];
-            selectedCollections = [...selectedCollections];
+let searchResults: SearchResult[] = $state([]);
+
+let _currentTooltip = $state("");
+let modalIsOpen = $derived(Boolean(page.state.modalIsOpen));
+
+let buttonState = $state("ready");
+let isSearchMode = $state(true);
+let file: File | null = $state(null);
+let _fileUploadResults = $state([]);
+let fileInputFiles: FileList | null = $state(null);
+
+$effect(() => {
+  if (fileInputFiles && fileInputFiles.length > 0) {
+    file = fileInputFiles[0];
+  } else {
+    file = null;
+  }
+});
+
+let isFileValid: boolean = $state(false);
+let _showExampleModal: boolean = $state(false);
+
+function _handleFileChange(event: Event): void {
+  const target = event.target as HTMLInputElement;
+  if (target.files && target.files.length > 0) {
+    file = target.files[0];
+    validateCSVFile(file);
+    _fileUploadResults = [];
+    searchResults = [];
+  } else {
+    file = null;
+    isFileValid = false;
+  }
+}
+
+function validateCSVFile(file: File): void {
+  Papa.parse(file, {
+    complete: (results) => {
+      if (results.data && results.data.length > 0) {
+        let documentKeys: string[] = [];
+
+        documentKeys = results.data.flatMap((row) => {
+          if (Array.isArray(row)) {
+            return row.map((item) => item.trim()).filter((item) => item !== "");
+          } else if (typeof row === "string") {
+            return row
+              .split(",")
+              .map((item) => item.trim())
+              .filter((item) => item !== "");
+          }
+          return [];
         });
 
-        // Add subscription to userAccount store
-        const unsubscribeUser = userAccount.subscribe((account) => {
-            if (account) {
-                currentUser = {
-                    id: account.localAccountId || account.homeAccountId || '',
-                    email: account.username || '',
-                    name: account.name || ''
-                };
-                console.log('👤 Current User Updated:', {
-                    ...currentUser,
-                    timestamp: new Date().toISOString(),
-                    pathname: $page.url.pathname
-                });
-            }
+        const isValidFormat = documentKeys.every((key) => {
+          return /^[A-Z]+_\d+_.+$/.test(key) && !/^["']|["']$/.test(key);
         });
 
-        if (browser) {
-            const tracker = getTracker();
-            if (tracker) {
-                trackEvent("Page_View", {
-                    page: "Document Search",
-                    category: "Navigation",
-                    action: "View",
-                    userId: currentUser.name
-                });
-            }
+        if (!isValidFormat) {
+          isFileValid = false;
+          buttonState = "ready";
+          toast.error(
+            "Invalid file format. Some document keys do not follow the required format. Please check the example and try again.",
+            { duration: Infinity }
+          );
+          _showExampleModal = true;
+          return;
         }
 
-        // Initialize the store with data from the server
-        const pageData = $page.data;
-        if (pageData && pageData.collections) {
-            collections.set(pageData.collections);
-        }
-
-        if (browser) {
-            debugTrackerStatus();
-        }
-
-        return () => {
-            unsubscribe();
-            unsubscribeUser();
-        };
-    });
-
-    let showDebugInfo: boolean = false;
-    // let debugInfo = "";
-
-    let documentKey: string = $state("");
-    let processing = $state(false);
-    let searchPerformed = $state(false);
-    let sortedResults: any[] = $state([]);
-
-    let searchResults: SearchResult[] = $state([]);
-
-    let currentTooltip = $state('');
-    let modalIsOpen = $derived(Boolean($page.state.modalIsOpen));
-
-    let buttonState = $state("ready");
-    let isSearchMode = $state(true);
-    let file: File | null = $state(null);
-    let fileUploadResults = $state([]);
-    let fileInputFiles: FileList | null = $state(null);
-
-    $effect(() => {
-        if (fileInputFiles && fileInputFiles.length > 0) {
-            file = fileInputFiles[0];
+        if (documentKeys.length === 0) {
+          isFileValid = false;
+          buttonState = "ready";
+          toast.error(
+            "Invalid file format. The file contains no valid document keys. Please check the example and try again.",
+            { duration: Infinity }
+          );
+          _showExampleModal = true;
+        } else if (documentKeys.length > frontendConfig.csv.FILE_UPLOAD_LIMIT) {
+          isFileValid = false;
+          buttonState = "ready";
+          toast.error(
+            `Too many document keys. The file contains ${documentKeys.length} keys, but the maximum allowed is ${frontendConfig.csv.FILE_UPLOAD_LIMIT}.`,
+            { duration: Infinity }
+          );
+          _showExampleModal = true;
         } else {
-            file = null;
+          isFileValid = true;
+          buttonState = "ready";
+          toast.success(
+            `The uploaded CSV file is valid. ${documentKeys.length} document key(s) found.`
+          );
         }
-    });
-
-    let isFileValid: boolean = $state(false);
-    let showExampleModal: boolean = $state(false);
-
-    function handleFileChange(event: Event): void {
-        const target = event.target as HTMLInputElement;
-        if (target.files && target.files.length > 0) {
-            file = target.files[0];
-            validateCSVFile(file);
-            fileUploadResults = [];
-            searchResults = [];
-        } else {
-            file = null;
-            isFileValid = false;
-        }
-    }
-
-    function validateCSVFile(file: File): void {
-        Papa.parse(file, {
-            complete: (results) => {
-                if (results.data && results.data.length > 0) {
-                    let documentKeys: string[] = [];
-
-                    documentKeys = results.data.flatMap((row) => {
-                        if (Array.isArray(row)) {
-                            return row
-                                .map((item) => item.trim())
-                                .filter((item) => item !== "");
-                        } else if (typeof row === "string") {
-                            return row
-                                .split(",")
-                                .map((item) => item.trim())
-                                .filter((item) => item !== "");
-                        }
-                        return [];
-                    });
-
-                    const isValidFormat = documentKeys.every((key) => {
-                        return (
-                            /^[A-Z]+_\d+_.+$/.test(key) &&
-                            !/^["']|["']$/.test(key)
-                        );
-                    });
-
-                    if (!isValidFormat) {
-                        isFileValid = false;
-                        buttonState = "ready";
-                        toast.error(
-                            "Invalid file format. Some document keys do not follow the required format. Please check the example and try again.",
-                            { duration: Infinity },
-                        );
-                        showExampleModal = true;
-                        return;
-                    }
-
-                    if (documentKeys.length === 0) {
-                        isFileValid = false;
-                        buttonState = "ready";
-                        toast.error(
-                            "Invalid file format. The file contains no valid document keys. Please check the example and try again.",
-                            { duration: Infinity },
-                        );
-                        showExampleModal = true;
-                    } else if (
-                        documentKeys.length >
-                        frontendConfig.csv.FILE_UPLOAD_LIMIT
-                    ) {
-                        isFileValid = false;
-                        buttonState = "ready";
-                        toast.error(
-                            `Too many document keys. The file contains ${documentKeys.length} keys, but the maximum allowed is ${frontendConfig.csv.FILE_UPLOAD_LIMIT}.`,
-                            { duration: Infinity },
-                        );
-                        showExampleModal = true;
-                    } else {
-                        isFileValid = true;
-                        buttonState = "ready";
-                        toast.success(
-                            `The uploaded CSV file is valid. ${documentKeys.length} document key(s) found.`,
-                        );
-                    }
-                } else {
-                    isFileValid = false;
-                    buttonState = "ready";
-                    toast.error(
-                        "The file appears to be empty. Please check and try again.",
-                        { duration: Infinity },
-                    );
-                }
-            },
-            error: (error) => {
-                console.error("Error parsing CSV:", error);
-                isFileValid = false;
-                buttonState = "ready";
-                toast.error(
-                    "Error parsing the file. Please check the format and try again.",
-                    { duration: Infinity },
-                );
-                showExampleModal = true;
-            },
-        });
-    }
-
-    function closeExampleModal(): void {
-        showExampleModal = false;
-        trackClick("ExampleModal", "Close");
-    }
-
-    function resetFileInput(): void {
-        file = null;
-        const fileInput = document.getElementById(
-            "fileInput",
-        ) as HTMLInputElement;
-        if (fileInput) {
-            fileInput.value = "";
-        }
-    }
-
-    function handleSubmit(
-        event: Event,
-    ): (result: { type: string; data?: any; error?: string }) => Promise<void> {
-        trackClick("SearchButton", isSearchMode ? "Search" : "FileUpload");
-        buttonState = "searching";
-        processing = true;
-        errorMessage = "";
-        searchResults = [];
-        fileUploadResults = [];
-        searchPerformed = true;
-        isLoading = true;
-
-        return async ({ result }) => {
-            try {
-                console.log("Full result object:", result);
-                if (result.type === "success") {
-                    const data = result.data;
-                    console.log("Data object:", data);
-                    if (isSearchMode) {
-                        if (data && data.data && data.data.searchDocuments) {
-                            searchResults = data.data.searchDocuments;
-                            const foundCollectionsCount = data.foundCollectionsCount;
-
-                            if (browser) {
-                                const tracker = getTracker();
-                                if (tracker) {
-                                    tracker.event("GraphQL_Operation", {
-                                        operation: "searchDocuments",
-                                        documentKey: documentKey,
-                                        collectionsSearched: selectedCollections.length,
-                                        resultsFound: foundCollectionsCount,
-                                        success: true
-                                    });
-                                }
-                            }
-
-                            if (foundCollectionsCount === 0) {
-                                toast.error("No results found for the given document key.", {
-                                    duration: Infinity,
-                                });
-                            } else {
-                                toast.success(
-                                    `Search completed successfully. Document found in ${foundCollectionsCount} ${foundCollectionsCount === 1 ? 'collection' : 'collections'}.`,
-                                    { duration: 3000 }
-                                );
-                            }
-                        } else {
-                            console.debug(
-                                "Unexpected result structure:",
-                                result,
-                            );
-                            throw new Error(
-                                "Unexpected search results structure",
-                            );
-                        }
-                    } else {
-                        // File upload handling
-                        if (Array.isArray(data.results)) {
-                            fileUploadResults = data.results;
-                            toast.success(
-                                data.success || "File processed successfully.",
-                                {
-                                    duration: 3000,
-                                },
-                            );
-                        } else if (data && data.error) {
-                            toast.error(data.error, {
-                                duration: Infinity,
-                            });
-                        } else {
-                            console.error(
-                                "Unexpected file upload result structure:",
-                                data,
-                            );
-                            throw new Error(
-                                "Unexpected file upload result structure",
-                            );
-                        }
-                    }
-                    buttonState = "results";
-                } else if (result.type === "error") {
-                    console.error("Error from server:", result.error);
-
-                    let userMessage =
-                        "An unexpected error occurred. Please try again later.";
-
-                    if (
-                        result.error &&
-                        typeof result.error === "object" &&
-                        "message" in result.error
-                    ) {
-                        const errorMessage = result.error.message as string;
-                        if (
-                            errorMessage.includes(
-                                "socket connection was closed unexpectedly",
-                            )
-                        ) {
-                            userMessage =
-                                "The connection to the server was interrupted. Please try again.";
-                        }
-                    }
-
-                    toast.error(userMessage, { duration: Infinity });
-                    buttonState = "ready";
-                }
-            } catch (e) {
-                console.error("Error in form submission:", e);
-                toast.error("An unexpected error occurred. Please try again.", {
-                    duration: Infinity,
-                });
-                buttonState = "ready";
-            } finally {
-                processing = false;
-                isLoading = false;
-                if (!isSearchMode) {
-                    resetFileInput();
-                }
-            }
-        };
-    }
-
-    let fileUploadTooltipContent: string =
-        "Upload a CSV file containing document keys to check in Capella. Each key should be on a separate line or column. No comma is needed after the last document key! The search will be performed across all collections.";
-
-    function openTooltipModal(tooltipContent: string): void {
-        currentTooltip = tooltipContent;
-        pushState('', { modalIsOpen: true });
-        trackClick("TooltipModal", "Open");
-    }
-
-    function closeModal(): void {
-        replaceState('', { modalIsOpen: false });
-        trackClick("TooltipModal", "Close");
-    }
-
-    let buttonClass = $derived(
-        isSearchMode
-            ? {
-                  ready: !documentKey.trim() 
-                      ? "cursor-not-allowed opacity-50" 
-                      : "cursor-pointer hover:bg-[#00174f]/80",
-                  searching: "cursor-not-allowed",
-                  results: "cursor-not-allowed",
-              }[buttonState]
-            : !file || !isFileValid
-                ? "cursor-not-allowed"
-                : {
-                      ready: "cursor-pointer hover:bg-[#00174f]/80",
-                      searching: "cursor-not-allowed",
-                      results: "cursor-not-allowed",
-                  }[buttonState],
-    );
-
-    let buttonText = $derived(
-        {
-            ready: isSearchMode ? "Search" : file ? "Search" : "Search",
-            searching: isSearchMode ? "Searching..." : "Searching...",
-            results: "Done",
-        }[buttonState],
-    );
-
-    function toggleMode(): void {
-        isSearchMode = !isSearchMode;
-        resetForm();
-        trackClick(
-            "ModeToggle",
-            isSearchMode ? "SwitchToSearch" : "SwitchToUpload",
-        );
-        if (browser) {
-            const tracker = getTracker();
-            if (tracker) {
-                tracker.event("Mode_Change", {
-                    newMode: isSearchMode
-                        ? "Search Document Key"
-                        : "Upload Document Keys",
-                    category: "User Interaction",
-                    action: "Toggle Mode",
-                });
-            }
-        }
-    }
-
-    function resetForm(): void {
+      } else {
+        isFileValid = false;
         buttonState = "ready";
-        searchResults = [];
-        fileUploadResults = [];
-        errorMessage = "";
-        searchPerformed = false;
-        documentKey = "";
-        file = null;
-    }
-
-    let isLoading = $state(false);
-
-    function toggleCollection(collection: Collection) {
-        const index = selectedCollections.findIndex(
-            (c) =>
-                c.bucket === collection.bucket &&
-                c.scope_name === collection.scope_name &&
-                c.collection_name === collection.collection_name,
-        );
-
-        if (index !== -1) {
-            selectedCollections = selectedCollections.filter((_, i) => i !== index);
-        } else {
-            selectedCollections = [...selectedCollections, collection];
-        }
-        
-        console.log("Collection selection updated:", {
-            selected: selectedCollections.length,
-            total: allCollections.length
+        toast.error("The file appears to be empty. Please check and try again.", {
+          duration: Infinity,
         });
-    }
+      }
+    },
+    error: (error) => {
+      console.error("Error parsing CSV:", error);
+      isFileValid = false;
+      buttonState = "ready";
+      toast.error("Error parsing the file. Please check the format and try again.", {
+        duration: Infinity,
+      });
+      _showExampleModal = true;
+    },
+  });
+}
 
-    function selectAllCollections(): void {
-        selectedCollections = [...allCollections];
-        trackClick("CollectionSelector", "SelectAll");
-    }
+function _closeExampleModal(): void {
+  _showExampleModal = false;
+  trackClick("ExampleModal", "Close");
+}
 
-    function deselectAllCollections(): void {
-        selectedCollections = [];
-        trackClick("CollectionSelector", "DeselectAll");
-    }
+function resetFileInput(): void {
+  file = null;
+  const fileInput = document.getElementById("fileInput") as HTMLInputElement;
+  if (fileInput) {
+    fileInput.value = "";
+  }
+}
 
-    function resetSearch(): void {
-        buttonState = "ready";
-        searchResults = [];
-        errorMessage = "";
-        searchPerformed = false;
-    }
+function _handleSubmit(
+  _event: Event
+): (result: { type: string; data?: any; error?: string }) => Promise<void> {
+  trackClick("SearchButton", isSearchMode ? "Search" : "FileUpload");
+  buttonState = "searching";
+  _processing = true;
+  _errorMessage = "";
+  searchResults = [];
+  _fileUploadResults = [];
+  _searchPerformed = true;
+  _isLoading = true;
 
-    function handleInputClick(): void {
-        if (buttonState === "results") {
-            resetSearch();
-        }
-    }
+  return async ({ result }) => {
+    try {
+      console.log("Full result object:", result);
+      if (result.type === "success") {
+        const data = result.data;
+        console.log("Data object:", data);
+        if (isSearchMode) {
+          if (data?.data?.searchDocuments) {
+            searchResults = data.data.searchDocuments;
+            const foundCollectionsCount = data.foundCollectionsCount;
 
-    $effect(() => {
-        if (documentKey) {
-            resetSearch();
-        }
-    });
-
-    $effect(() => {
-        if (documentKey) {
-            resetSearch();
-        }
-    });
-
-    let isSelected = $derived(
-        (collection: {
-            bucket: string;
-            scope_name: string;
-            collection_name: string;
-        }) => {
-            return selectedCollections.some(
-                (c) =>
-                    c.bucket === collection.bucket &&
-                    c.scope_name === collection.scope_name &&
-                    c.collection_name === collection.collection_name,
-            );
-        },
-    );
-
-    function groupCollectionsByScope(
-        collections: Collection[],
-    ): Record<string, Collection[]> {
-        const sortedCollections = [...collections].sort((a, b) => {
-            if (a.scope_name < b.scope_name) return -1;
-            if (a.scope_name > b.scope_name) return 1;
-            if (a.collection_name < b.collection_name) return -1;
-            if (a.collection_name > b.collection_name) return 1;
-            return 0;
-        });
-
-        return sortedCollections.reduce((acc, collection) => {
-            if (!acc[collection.scope_name]) {
-                acc[collection.scope_name] = [];
+            if (browser) {
+              const tracker = getTracker();
+              if (tracker) {
+                tracker.event("GraphQL_Operation", {
+                  operation: "searchDocuments",
+                  documentKey: documentKey,
+                  collectionsSearched: selectedCollections.length,
+                  resultsFound: foundCollectionsCount,
+                  success: true,
+                });
+              }
             }
-            acc[collection.scope_name] = [...acc[collection.scope_name], collection];
-            return acc;
-        }, {} as Record<string, Collection[]>);
-    }
 
-    let groupedCollections = $derived(groupCollectionsByScope(allCollections));
-
-    $effect(() => {
-        if (isSearchMode && searchResults.length > 0) {
-            sortedResults = [...searchResults].sort((a, b) => {
-                const aHasData =
-                    a.data !== null && Object.keys(a.data).length > 0;
-                const bHasData =
-                    b.data !== null && Object.keys(b.data).length > 0;
-
-                if (aHasData && !bHasData) {
-                    return -1;
-                } else if (!aHasData && bHasData) {
-                    return 1;
-                } else {
-                    return 0;
-                }
-            });
+            if (foundCollectionsCount === 0) {
+              toast.error("No results found for the given document key.", {
+                duration: Infinity,
+              });
+            } else {
+              toast.success(
+                `Search completed successfully. Document found in ${foundCollectionsCount} ${foundCollectionsCount === 1 ? "collection" : "collections"}.`,
+                { duration: 3000 }
+              );
+            }
+          } else {
+            console.debug("Unexpected result structure:", result);
+            throw new Error("Unexpected search results structure");
+          }
         } else {
-            sortedResults = [];
+          // File upload handling
+          if (Array.isArray(data.results)) {
+            _fileUploadResults = data.results;
+            toast.success(data.success || "File processed successfully.", {
+              duration: 3000,
+            });
+          } else if (data?.error) {
+            toast.error(data.error, {
+              duration: Infinity,
+            });
+          } else {
+            console.error("Unexpected file upload result structure:", data);
+            throw new Error("Unexpected file upload result structure");
+          }
         }
-    });
+        buttonState = "results";
+      } else if (result.type === "error") {
+        console.error("Error from server:", result.error);
 
-    function handleCarouselStart() {
-        console.log("Carousel started on another page");
-    }
+        let userMessage = "An unexpected error occurred. Please try again later.";
 
-    function handleCarouselEnd() {
-        console.log("Carousel ended on another page");
-    }
-
-    let isOpen = false;
-    
-    function toggle() {
-        isOpen = !isOpen;
-    }
-
-    $effect(() => {
-        if (!$page.state.modalIsOpen) {
-            currentTooltip = '';
+        if (result.error && typeof result.error === "object" && "message" in result.error) {
+          const errorMessage = result.error.message as string;
+          if (errorMessage.includes("socket connection was closed unexpectedly")) {
+            userMessage = "The connection to the server was interrupted. Please try again.";
+          }
         }
+
+        toast.error(userMessage, { duration: Infinity });
+        buttonState = "ready";
+      }
+    } catch (e) {
+      console.error("Error in form submission:", e);
+      toast.error("An unexpected error occurred. Please try again.", {
+        duration: Infinity,
+      });
+      buttonState = "ready";
+    } finally {
+      _processing = false;
+      _isLoading = false;
+      if (!isSearchMode) {
+        resetFileInput();
+      }
+    }
+  };
+}
+
+let _fileUploadTooltipContent: string =
+  "Upload a CSV file containing document keys to check in Capella. Each key should be on a separate line or column. No comma is needed after the last document key! The search will be performed across all collections.";
+
+function _openTooltipModal(tooltipContent: string): void {
+  _currentTooltip = tooltipContent;
+  pushState("", { modalIsOpen: true });
+  trackClick("TooltipModal", "Open");
+}
+
+function _closeModal(): void {
+  replaceState("", { modalIsOpen: false });
+  trackClick("TooltipModal", "Close");
+}
+
+let _buttonClass = $derived(
+  isSearchMode
+    ? {
+        ready: !documentKey.trim()
+          ? "cursor-not-allowed opacity-50"
+          : "cursor-pointer hover:bg-[#00174f]/80",
+        searching: "cursor-not-allowed",
+        results: "cursor-not-allowed",
+      }[buttonState]
+    : !file || !isFileValid
+      ? "cursor-not-allowed"
+      : {
+          ready: "cursor-pointer hover:bg-[#00174f]/80",
+          searching: "cursor-not-allowed",
+          results: "cursor-not-allowed",
+        }[buttonState]
+);
+
+let _buttonText = $derived(
+  {
+    ready: isSearchMode ? "Search" : file ? "Search" : "Search",
+    searching: isSearchMode ? "Searching..." : "Searching...",
+    results: "Done",
+  }[buttonState]
+);
+
+function _toggleMode(): void {
+  isSearchMode = !isSearchMode;
+  resetForm();
+  trackClick("ModeToggle", isSearchMode ? "SwitchToSearch" : "SwitchToUpload");
+  if (browser) {
+    const tracker = getTracker();
+    if (tracker) {
+      tracker.event("Mode_Change", {
+        newMode: isSearchMode ? "Search Document Key" : "Upload Document Keys",
+        category: "User Interaction",
+        action: "Toggle Mode",
+      });
+    }
+  }
+}
+
+function resetForm(): void {
+  buttonState = "ready";
+  searchResults = [];
+  _fileUploadResults = [];
+  _errorMessage = "";
+  _searchPerformed = false;
+  documentKey = "";
+  file = null;
+}
+
+let _isLoading = $state(false);
+
+function _toggleCollection(collection: Collection) {
+  const index = selectedCollections.findIndex(
+    (c) =>
+      c.bucket === collection.bucket &&
+      c.scope_name === collection.scope_name &&
+      c.collection_name === collection.collection_name
+  );
+
+  if (index !== -1) {
+    selectedCollections = selectedCollections.filter((_, i) => i !== index);
+  } else {
+    selectedCollections = [...selectedCollections, collection];
+  }
+
+  console.log("Collection selection updated:", {
+    selected: selectedCollections.length,
+    total: allCollections.length,
+  });
+}
+
+function _selectAllCollections(): void {
+  selectedCollections = [...allCollections];
+  trackClick("CollectionSelector", "SelectAll");
+}
+
+function _deselectAllCollections(): void {
+  selectedCollections = [];
+  trackClick("CollectionSelector", "DeselectAll");
+}
+
+function resetSearch(): void {
+  buttonState = "ready";
+  searchResults = [];
+  _errorMessage = "";
+  _searchPerformed = false;
+}
+
+function _handleInputClick(): void {
+  if (buttonState === "results") {
+    resetSearch();
+  }
+}
+
+$effect(() => {
+  if (documentKey) {
+    resetSearch();
+  }
+});
+
+$effect(() => {
+  if (documentKey) {
+    resetSearch();
+  }
+});
+
+let _isSelected = $derived(
+  (collection: { bucket: string; scope_name: string; collection_name: string }) => {
+    return selectedCollections.some(
+      (c) =>
+        c.bucket === collection.bucket &&
+        c.scope_name === collection.scope_name &&
+        c.collection_name === collection.collection_name
+    );
+  }
+);
+
+function groupCollectionsByScope(collections: Collection[]): Record<string, Collection[]> {
+  const sortedCollections = [...collections].sort((a, b) => {
+    if (a.scope_name < b.scope_name) return -1;
+    if (a.scope_name > b.scope_name) return 1;
+    if (a.collection_name < b.collection_name) return -1;
+    if (a.collection_name > b.collection_name) return 1;
+    return 0;
+  });
+
+  return sortedCollections.reduce(
+    (acc, collection) => {
+      if (!acc[collection.scope_name]) {
+        acc[collection.scope_name] = [];
+      }
+      acc[collection.scope_name] = [...acc[collection.scope_name], collection];
+      return acc;
+    },
+    {} as Record<string, Collection[]>
+  );
+}
+
+let _groupedCollections = $derived(groupCollectionsByScope(allCollections));
+
+$effect(() => {
+  if (isSearchMode && searchResults.length > 0) {
+    _sortedResults = [...searchResults].sort((a, b) => {
+      const aHasData = a.data !== null && Object.keys(a.data).length > 0;
+      const bHasData = b.data !== null && Object.keys(b.data).length > 0;
+
+      if (aHasData && !bHasData) {
+        return -1;
+      } else if (!aHasData && bHasData) {
+        return 1;
+      } else {
+        return 0;
+      }
     });
+  } else {
+    _sortedResults = [];
+  }
+});
+
+function _handleCarouselStart() {
+  console.log("Carousel started on another page");
+}
+
+function _handleCarouselEnd() {
+  console.log("Carousel ended on another page");
+}
+
+let isOpen = false;
+
+function _toggle() {
+  isOpen = !isOpen;
+}
+
+$effect(() => {
+  if (!page.state.modalIsOpen) {
+    _currentTooltip = "";
+  }
+});
 </script>
 
 <svelte:head>
@@ -618,8 +559,8 @@
 <IdleVideoCarousel
     videos={$videos}
     idleTime={120000}
-    onCarouselStart={handleCarouselStart}
-    onCarouselEnd={handleCarouselEnd}
+    onCarouselStart={_handleCarouselStart}
+    onCarouselEnd={_handleCarouselEnd}
 />
 <div class="min-h-screen flex flex-col bg-white dark:bg-[#2C2C2C] mb-20 mt-5">
     <!-- Logo Section -->
@@ -631,7 +572,7 @@
     <div class="flex-grow flex flex-col items-center px-4 mt-4">
         <div class="w-full max-w-6xl">
             <form
-                use:enhance={handleSubmit}
+                use:enhance={_handleSubmit}
                 method="POST"
                 action={isSearchMode ? "?/searchDocuments" : "?/uploadFile"}
                 class="space-y-6"
@@ -677,9 +618,9 @@
                                     bind:value={documentKey}
                                     oninput={(e) => {
                                         documentKey = e.target.value.trim();
-                                        searchPerformed = false;
+                                        _searchPerformed = false;
                                     }}
-                                    onclick={handleInputClick}
+                                    onclick={_handleInputClick}
                                     placeholder="Search for a single Document by typing in the Key here and click the Search button below..."
                                     class="w-full py-2 pl-10 pr-4 text-sm rounded-md focus:outline-none bg-white border border-gray-300 text-gray-900 focus:ring-2 focus:ring-tommy-red focus:border-tommy-red transition duration-150 ease-in-out"
                                 />
@@ -726,18 +667,17 @@
                                                 class="sr-only"
                                                 aria-describedby="validFileFormats"
                                                 accept=".csv"
-                                                onchange={handleFileChange}
+                                                onchange={_handleFileChange}
                                                 bind:files={fileInputFiles}
                                             />
                                         </label>
                                         <span class="mt-1 flex items-center">
                                             a file with multiple Document keys to check in bulk here
                                             <button
-                                                onclick={preventDefault(() =>
-                                                    openTooltipModal(
-                                                        fileUploadTooltipContent,
-                                                    ),
-                                                )}
+                                                onclick={(e) => {
+                                                    e.preventDefault();
+                                                    _openTooltipModal(_fileUploadTooltipContent);
+                                                }}
                                                 class="ml-2 text-gray-500 hover:text-gray-700 p-2 rounded-full focus:outline-none focus:ring focus:ring-tommy-red/50 hover:ring hover:ring-tommy-red/50 transition-all duration-300"
                                                 aria-label="Show file upload information"
                                                 data-transaction-name="Show File Upload Information"
@@ -792,7 +732,7 @@
                         <div class="inline-flex bg-gray-100 rounded-full p-1 shadow-sm border border-gray-200 hover:ring-2 hover:ring-red-500 hover:ring-offset-2 transition-all duration-300">
                             <button
                                 type="button"
-                                onclick={() => { if (!isSearchMode) toggleMode(); }}
+                                onclick={() => { if (!isSearchMode) _toggleMode(); }}
                                 data-transaction-name="Switch to Single Mode"
                                 class="px-5 py-2 rounded-full font-medium text-sm transition-all duration-200 {isSearchMode ? 'bg-gradient-to-r from-cyan-400 to-blue-500 text-white shadow-md' : 'text-gray-600 hover:text-gray-900'}"
                                 title="Search for a single document"
@@ -802,7 +742,7 @@
                             </button>
                             <button
                                 type="button"
-                                onclick={() => { if (isSearchMode) toggleMode(); }}
+                                onclick={() => { if (isSearchMode) _toggleMode(); }}
                                 data-transaction-name="Switch to Multi Mode"
                                 class="px-5 py-2 rounded-full font-medium text-sm transition-all duration-200 {!isSearchMode ? 'bg-gradient-to-r from-cyan-400 to-blue-500 text-white shadow-md' : 'text-gray-600 hover:text-gray-900'}"
                                 title="Upload CSV for bulk search"
@@ -826,9 +766,9 @@
                                     type="button"
                                     onclick={() => {
                                         if (selectedCollections.length === allCollections.length) {
-                                            deselectAllCollections();
+                                            _deselectAllCollections();
                                         } else {
-                                            selectAllCollections();
+                                            _selectAllCollections();
                                         }
                                     }}
                                     data-transaction-name={selectedCollections.length === allCollections.length 
@@ -845,7 +785,7 @@
                         <div
                             class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"
                         >
-                            {#each Object.entries(groupedCollections) as [scope, collections]}
+                            {#each Object.entries(_groupedCollections) as [scope, collections]}
                                 <div class="border rounded p-3">
                                     <h4 class="font-semibold text-[#551a8b] mb-2">{scope}</h4>
                                     {#each collections as collection}
@@ -891,11 +831,11 @@
                                                     data-transaction-name={`Toggle Collection: ${collection.collection_name}`}
                                                     class="peer sr-only"
                                                     role="switch"
-                                                    checked={isSelected(
+                                                    checked={_isSelected(
                                                         collection,
                                                     )}
                                                     onchange={() =>
-                                                        toggleCollection(
+                                                        _toggleCollection(
                                                             collection,
                                                         )}
                                                 />
@@ -931,7 +871,7 @@
                               buttonState === "results" ||
                               !file ||
                               !isFileValid}
-                        class="{buttonClass} w-full sm:w-auto px-6 py-2 min-w-[150px] bg-[#00174f] text-white rounded-md transition duration-150 ease-in-out {(buttonState ===
+                        class="{_buttonClass} w-full sm:w-auto px-6 py-2 min-w-[150px] bg-[#00174f] text-white rounded-md transition duration-150 ease-in-out {(buttonState ===
                             'results' &&
                             isSearchMode) ||
                         (!isSearchMode &&
@@ -941,7 +881,7 @@
                             ? 'opacity-50'
                             : ''} flex items-center justify-center"
                     >
-                        {#if isLoading}
+                        {#if _isLoading}
                             <svg
                                 xmlns="http://www.w3.org/2000/svg"
                                 viewBox="0 0 24 24"
@@ -957,13 +897,13 @@
                                 />
                             </svg>
                         {/if}
-                        {buttonText}
+                        {_buttonText}
                     </button>
                 </div>
             </form>
 
             <!-- Example Modal -->
-            {#if showExampleModal}
+            {#if _showExampleModal}
                 <div
                     class="fixed inset-0 z-30 flex items-center justify-center bg-black/50 backdrop-blur-sm"
                     role="dialog"
@@ -979,7 +919,7 @@
                                 CSV File Examples
                             </h3>
                             <button
-                                onclick={closeExampleModal}
+                                onclick={_closeExampleModal}
                                 data-transaction-name="Close Example Modal"
                                 class="text-white hover:text-gray-200 focus:outline-none"
                                 aria-label="close modal"
@@ -1066,7 +1006,7 @@ IMAGE_70_C51_LV04F1003GPDE</pre>
                         </div>
                         <div class="flex justify-end bg-gray-100 px-6 py-4">
                             <button
-                                onclick={closeExampleModal}
+                                onclick={_closeExampleModal}
                                 data-transaction-name="Close Example Modal"
                                 type="button"
                                 class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
@@ -1080,12 +1020,12 @@ IMAGE_70_C51_LV04F1003GPDE</pre>
             {/if}
 
             <!-- Search Results and Error Messages -->
-            {#if errorMessage}
-                <p class="text-red-600 mt-4">{errorMessage}</p>
+            {#if _errorMessage}
+                <p class="text-red-600 mt-4">{_errorMessage}</p>
             {/if}
 
             {#if isSearchMode && searchResults.length > 0}
-                {#each sortedResults as result}
+                {#each _sortedResults as result}
                     <DocumentDisplay
                         bucket={result.bucket}
                         scope={result.scope}
@@ -1095,17 +1035,17 @@ IMAGE_70_C51_LV04F1003GPDE</pre>
                         {documentKey}
                     />
                 {/each}
-            {:else if !isSearchMode && fileUploadResults.length > 0}
-                <FileUploadResults results={fileUploadResults} />
+            {:else if !isSearchMode && _fileUploadResults.length > 0}
+                <FileUploadResults results={_fileUploadResults} />
             {/if}
 
-            {#if showDebugInfo}
+            {#if _showDebugInfo}
                 <div class="mt-4">
                     <h3>Debug Information:</h3>
                     <pre>{JSON.stringify(
                             {
-                                processing,
-                                errorMessage,
+                                processing: _processing,
+                                errorMessage: _errorMessage,
                                 searchResults,
                                 allCollections,
                                 selectedCollections,
@@ -1133,11 +1073,11 @@ IMAGE_70_C51_LV04F1003GPDE</pre>
                 </h3>
             </div>
             <div class="px-4 py-8">
-                <p>{currentTooltip}</p>
+                <p>{_currentTooltip}</p>
             </div>
             <div class="flex justify-end border-t border-slate-300 bg-slate-100/60 p-4 dark:border-slate-700 dark:bg-slate-900/20">
                 <button
-                    onclick={closeModal}
+                    onclick={_closeModal}
                     type="button"
                     data-transaction-name="Tooltip Modal"
                     class="cursor-pointer whitespace-nowrap rounded-xl bg-blue-700 px-4 py-2 text-center text-sm font-medium tracking-wide text-slate-100 transition hover:text-red-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-700 active:opacity-100 active:outline-offset-0 dark:bg-blue-600 dark:text-slate-100 dark:focus-visible:outline-blue-600"

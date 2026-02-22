@@ -4,22 +4,13 @@ import { initializeBackendConfig } from "$backendConfig";
 
 const backendConfig = initializeBackendConfig();
 
-import {
-  ApolloClient,
-  InMemoryCache,
-  createHttpLink,
-  gql,
-} from "@apollo/client/core";
-import fetch from "cross-fetch";
-import type { Actions, PageServerLoad } from "./$types";
+import { ApolloClient, createHttpLink, gql, InMemoryCache } from "@apollo/client/core";
 import { error } from "@sveltejs/kit";
-import {
-  getFormattedCollections,
-  initializeDatabase,
-} from "$lib/db/dbOperations";
-import { log, err, debug } from "../utils/serverLogger";
-
+import fetch from "cross-fetch";
+import { getFormattedCollections, initializeDatabase } from "$lib/db/dbOperations";
 import type { Collection, SearchResult } from "../models";
+import { debug, err, log } from "../utils/serverLogger";
+import type { Actions, PageServerLoad } from "./$types";
 
 const GRAPHQL_ENDPOINT = backendConfig.application.GRAPHQL_ENDPOINT;
 const client = new ApolloClient({
@@ -32,7 +23,9 @@ initializeDatabase();
 export const load: PageServerLoad = async () => {
   log("Calling function - getFormattedCollections()");
   const fetchedCollections = getFormattedCollections();
-  log(`Retrieved collections: ${fetchedCollections.length} collections found`, { count: fetchedCollections.length });
+  log(`Retrieved collections: ${fetchedCollections.length} collections found`, {
+    count: fetchedCollections.length,
+  });
 
   const mappedCollections: Collection[] = fetchedCollections.map((c) => ({
     bucket: c.bucket,
@@ -47,14 +40,12 @@ export const actions: Actions = {
   searchDocuments: async ({ request }) => {
     const MAX_RETRIES = 3;
     let retries = 0;
-    const startTime = performance.now();
+    const _startTime = performance.now();
 
     while (retries < MAX_RETRIES) {
       try {
         const data = await request.formData();
-        const selectedCollections = JSON.parse(
-          data.get("collections") as string,
-        ) as Collection[];
+        const selectedCollections = JSON.parse(data.get("collections") as string) as Collection[];
         const documentKey = data.get("documentKey") as string;
         const keys = [documentKey];
 
@@ -65,7 +56,7 @@ export const actions: Actions = {
             bucket,
             scope: scope_name,
             collection: collection_name,
-          }),
+          })
         );
 
         const query = gql`
@@ -97,24 +88,23 @@ export const actions: Actions = {
           (result) => result.data !== null && result.data !== undefined
         ).length;
 
-        debug(
-          "Search results:",
-          { meta: { 
+        debug("Search results:", {
+          meta: {
             results: searchResults,
-            foundCount: foundCollectionsCount 
-          }}
-        );
+            foundCount: foundCollectionsCount,
+          },
+        });
 
         return {
           type: "success",
           data: response.data,
           foundCollectionsCount,
           headers: {
-            'Access-Control-Allow-Origin': '*',
-            'Access-Control-Allow-Methods': 'POST, OPTIONS',
-            'Access-Control-Allow-Headers': 'Content-Type',
-            'Access-Control-Allow-Credentials': 'true',
-          }
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Methods": "POST, OPTIONS",
+            "Access-Control-Allow-Headers": "Content-Type",
+            "Access-Control-Allow-Credentials": "true",
+          },
         };
       } catch (error: unknown) {
         retries++;
@@ -123,14 +113,12 @@ export const actions: Actions = {
         if (error instanceof Error) {
           if (
             (error as any).networkError?.message.includes(
-              "socket connection was closed unexpectedly",
+              "socket connection was closed unexpectedly"
             )
           ) {
             if (retries < MAX_RETRIES) {
               log(`Retrying search (attempt ${retries + 1})...`);
-              await new Promise((resolve) =>
-                setTimeout(resolve, 1000 * retries),
-              ); // Exponential backoff
+              await new Promise((resolve) => setTimeout(resolve, 1000 * retries)); // Exponential backoff
               continue;
             } else {
               return {
@@ -147,9 +135,7 @@ export const actions: Actions = {
             return {
               type: "error",
               error: "An error occurred while processing your request.",
-              details: (error as any).graphQLErrors
-                .map((e: any) => e.message)
-                .join(", "),
+              details: (error as any).graphQLErrors.map((e: any) => e.message).join(", "),
             };
           }
 
@@ -158,9 +144,7 @@ export const actions: Actions = {
             return {
               type: "error",
               error: "A network error occurred.",
-              details:
-                (error as any).networkError.message ||
-                "Unable to connect to the server.",
+              details: (error as any).networkError.message || "Unable to connect to the server.",
             };
           }
         }
@@ -176,8 +160,7 @@ export const actions: Actions = {
     return {
       type: "error",
       error: "Failed to complete the search after multiple attempts",
-      details:
-        "Please try again later or contact support if the issue persists.",
+      details: "Please try again later or contact support if the issue persists.",
     };
   },
   uploadFile: async ({ request }) => {
@@ -191,7 +174,11 @@ export const actions: Actions = {
         throw error(400, "No file uploaded");
       }
 
-      log(`File received: ${file.name} (${file.size} bytes)`, { fileName: file.name, fileSize: file.size, fileType: file.type });
+      log(`File received: ${file.name} (${file.size} bytes)`, {
+        fileName: file.name,
+        fileSize: file.size,
+        fileType: file.type,
+      });
 
       const content = await file.text();
       const documentKeys = content
@@ -203,7 +190,7 @@ export const actions: Actions = {
       const DOCUMENT_KEY_LIMIT = 50;
       if (documentKeys.length > DOCUMENT_KEY_LIMIT) {
         log(
-          `Document key limit exceeded: ${documentKeys.length} keys found, limit is ${DOCUMENT_KEY_LIMIT}`,
+          `Document key limit exceeded: ${documentKeys.length} keys found, limit is ${DOCUMENT_KEY_LIMIT}`
         );
         return {
           error: `Too many document keys. The limit is ${DOCUMENT_KEY_LIMIT}. Found ${documentKeys.length} keys.`,
@@ -241,12 +228,8 @@ export const actions: Actions = {
 
           const searchResults = response.data.searchDocuments;
 
-          const foundCollections = searchResults.filter(
-            (result: any) => result.data !== null,
-          );
-          const notFoundCollections = searchResults.filter(
-            (result: any) => result.data === null,
-          );
+          const foundCollections = searchResults.filter((result: any) => result.data !== null);
+          const notFoundCollections = searchResults.filter((result: any) => result.data === null);
 
           return {
             documentKey: key,
@@ -267,7 +250,7 @@ export const actions: Actions = {
                 scope,
                 collection,
                 timeTaken,
-              }),
+              })
             ),
             notFoundIn: notFoundCollections.map(
               ({
@@ -282,11 +265,11 @@ export const actions: Actions = {
                 bucket,
                 scope,
                 collection,
-              }),
+              })
             ),
             totalCollectionsSearched: searchResults.length,
           };
-        }),
+        })
       );
 
       return {
@@ -295,10 +278,7 @@ export const actions: Actions = {
       };
     } catch (e) {
       err("Error in uploadFile action:", e);
-      throw error(
-        500,
-        e instanceof Error ? e.message : "An unknown error occurred",
-      );
+      throw error(500, e instanceof Error ? e.message : "An unknown error occurred");
     }
   },
 };

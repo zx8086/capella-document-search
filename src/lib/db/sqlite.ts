@@ -1,9 +1,9 @@
 /* src/lib/db/sqlite.ts */
 
 export const createDatabase = () => {
-  if (typeof process !== 'undefined' && process.versions && process.versions.bun) {
+  if (typeof process !== "undefined" && process.versions && process.versions.bun) {
     // Bun environment
-    return import('bun:sqlite').then(({ Database }) => new Database('your-database.sqlite'));
+    return import("bun:sqlite").then(({ Database }) => new Database("your-database.sqlite"));
   } else {
     // Node.js environment (during build)
     return {
@@ -13,4 +13,4 @@ export const createDatabase = () => {
       // Add other methods you use
     };
   }
-}; 
+};

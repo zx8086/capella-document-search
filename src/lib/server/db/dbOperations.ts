@@ -1,7 +1,7 @@
 /* src/lib/server/db/dbOperations.ts */
 
 import { Database, type Statement } from "bun:sqlite";
-import { log, err } from "$utils/unifiedLogger";
+import { log } from "$utils/unifiedLogger";
 
 // Create a singleton instance at the module level
 let dbInstance: Database | null = null;
@@ -51,16 +51,16 @@ export function initializeDatabase() {
   if (!statementsInitialized) {
     log("Initializing prepared statements");
     insertScopeStmt = dbInstance.prepare(
-      "INSERT OR REPLACE INTO scopes (bucket, scope_name) VALUES (?, ?)",
+      "INSERT OR REPLACE INTO scopes (bucket, scope_name) VALUES (?, ?)"
     );
     insertCollectionStmt = dbInstance.prepare(
-      "INSERT OR REPLACE INTO collections (bucket, scope_name, collection_name) VALUES (?, ?, ?)",
+      "INSERT OR REPLACE INTO collections (bucket, scope_name, collection_name) VALUES (?, ?, ?)"
     );
     insertTooltipStmt = dbInstance.prepare(
-      "INSERT OR REPLACE INTO tooltips (bucket, scope_name, collection_name, tooltip_content) VALUES (?, ?, ?, ?)",
+      "INSERT OR REPLACE INTO tooltips (bucket, scope_name, collection_name, tooltip_content) VALUES (?, ?, ?, ?)"
     );
     getTooltipStmt = dbInstance.prepare(
-      "SELECT tooltip_content FROM tooltips WHERE bucket = ? AND scope_name = ? AND collection_name = ?",
+      "SELECT tooltip_content FROM tooltips WHERE bucket = ? AND scope_name = ? AND collection_name = ?"
     );
     getAllCollectionsStmt = dbInstance.prepare(`
             SELECT c.bucket, c.scope_name, c.collection_name
@@ -98,22 +98,21 @@ export function insertScope(bucket: string, scopeName: string) {
     throw new Error("Database not initialized");
   }
   const result = insertScopeStmt.run(bucket, scopeName);
-  log(`Inserted scope: ${bucket}.${scopeName}, changes: ${result.changes}, rowid: ${result.lastInsertRowid}`, { result, bucket, scopeName });
+  log(
+    `Inserted scope: ${bucket}.${scopeName}, changes: ${result.changes}, rowid: ${result.lastInsertRowid}`,
+    { result, bucket, scopeName }
+  );
   return result;
 }
 
-export function insertCollection(
-  bucket: string,
-  scopeName: string,
-  collectionName: string,
-) {
+export function insertCollection(bucket: string, scopeName: string, collectionName: string) {
   if (!insertCollectionStmt) {
     throw new Error("Database not initialized");
   }
   const result = insertCollectionStmt.run(bucket, scopeName, collectionName);
   log(
     `Inserted collection: ${bucket}.${scopeName}.${collectionName}, changes: ${result.changes}, rowid: ${result.lastInsertRowid}`,
-    { result, bucket, scopeName, collectionName },
+    { result, bucket, scopeName, collectionName }
   );
   return result;
 }
@@ -124,7 +123,8 @@ export function getAllCollections() {
   }
   const results = getAllCollectionsStmt.all();
   log(`Retrieved collections - function getAllCollections: ${results.length} items`, {
-    count: results.length, results,
+    count: results.length,
+    results,
   });
   return results;
 }
@@ -138,7 +138,10 @@ export function getFormattedCollections() {
     scope: string;
     collection: string;
   }>;
-  log(`Retrieved formatted collections - function getFormattedCollections: ${results.length} items`, { count: results.length });
+  log(
+    `Retrieved formatted collections - function getFormattedCollections: ${results.length} items`,
+    { count: results.length }
+  );
   return results;
 }
 
@@ -146,29 +149,20 @@ export function insertTooltip(
   bucket: string,
   scopeName: string,
   collectionName: string,
-  tooltipContent: string,
+  tooltipContent: string
 ) {
   if (!insertTooltipStmt) {
     throw new Error("Database not initialized");
   }
-  const result = insertTooltipStmt.run(
-    bucket,
-    scopeName,
-    collectionName,
-    tooltipContent,
-  );
+  const result = insertTooltipStmt.run(bucket, scopeName, collectionName, tooltipContent);
   log(
     `Inserted tooltip for: ${bucket}.${scopeName}.${collectionName}, changes: ${result.changes}, rowid: ${result.lastInsertRowid}`,
-    { result, bucket, scopeName, collectionName },
+    { result, bucket, scopeName, collectionName }
   );
   return result;
 }
 
-export function getTooltip(
-  bucket: string,
-  scopeName: string,
-  collectionName: string,
-) {
+export function getTooltip(bucket: string, scopeName: string, collectionName: string) {
   if (!getTooltipStmt) {
     throw new Error("Database not initialized");
   }

@@ -1,6 +1,6 @@
 {
   "name": "capella-document-search",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -10,7 +10,7 @@
     "build:docker": "bun run svelte-kit sync && bun --bun vite build",
     "preview": "bun --bun vite preview --host",
     "build:no-telemetry": "LANG=C.UTF-8 LC_ALL=C.UTF-8 LC_CTYPE=C.UTF-8 VITE_BUILD_LEGACY=true VITE_BUILD_SSR=true VITE_BUILD_CJS=true NODE_ENV=production bun --bun vite build",
-    "start": "NODE_DEBUG=http BUN_CONFIG_VERBOSE_FETCH=true bun run --preload ./src/instrumentation.ts ./build/index.js",
+    "start": "NODE_DEBUG=http BUN_CONFIG_VERBOSE_FETCH=true bun run ./build/index.js",
     "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
     "check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
     "prepublish": "bun run snyk-protect",
@@ -175,8 +175,6 @@
     "sdp": "npm:@goatlab/sdp@^4.0.0"
   },
   "overrides": {
-    "cookie": "^0.7.0",
-    "golang.org/x/net": "0.33.0",
-    "golang.org/x/sys": "0.1.0"
+    "cookie": "^0.7.0"
   }
 }

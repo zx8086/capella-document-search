@@ -1,10 +1,10 @@
 /* svelte.config.js */
 
-import adapter from "svelte-adapter-bun";
+import path from "node:path";
 import { vitePreprocess } from "@sveltejs/vite-plugin-svelte";
-import path from "path";
+import adapter from "svelte-adapter-bun";
 
-const dev = process.env.NODE_ENV === 'development';
+const dev = process.env.NODE_ENV === "development";
 
 /** @type {import('@sveltejs/kit').Config} */
 const config = {
@@ -13,30 +13,33 @@ const config = {
     adapter: adapter({
       dynamic_origin: true,
       precompress: false,
-      runtime: 'bun',
+      runtime: "bun",
       serverBunOptions: {
-        target: 'bun',
-        platform: 'bun'
-      }
+        target: "bun",
+        platform: "bun",
+      },
     }),
-    files: {
-      assets: 'static',
+    // SvelteKit native OpenTelemetry tracing (SIO-358)
+    experimental: {
+      tracing: { server: true },
+      instrumentation: { server: true },
     },
     paths: {
-      assets: '',
+      assets: "",
     },
     alias: {
       $lib: path.resolve("./src/lib"),
       $utils: path.resolve("./src/utils"),
       $models: path.resolve("./src/models"),
+      $ai: path.resolve("./src/ai"),
       $frontendConfig: path.resolve("./src/frontend-config.ts"),
       $backendConfig: path.resolve("./src/backend-config.ts"),
       "$env/static/private": path.resolve("./src/env/static/private.ts"),
       "$env/static/public": path.resolve("./src/env/static/public.ts"),
-      '$app': path.resolve('./.svelte-kit/runtime/app'),
-      '$app/environment': path.resolve('./.svelte-kit/runtime/app/environment'),
-      '$app/navigation': path.resolve('./.svelte-kit/runtime/app/navigation'),
-      '$app/stores': path.resolve('./.svelte-kit/runtime/app/stores')
+      $app: path.resolve("./.svelte-kit/runtime/app"),
+      "$app/environment": path.resolve("./.svelte-kit/runtime/app/environment"),
+      "$app/navigation": path.resolve("./.svelte-kit/runtime/app/navigation"),
+      "$app/stores": path.resolve("./.svelte-kit/runtime/app/stores"),
     },
     env: {
       dir: process.cwd(),
@@ -45,8 +48,8 @@ const config = {
     csp: {
       mode: "auto",
       directives: {
-        'default-src': ["'self'"],
-        'connect-src': [
+        "default-src": ["'self'"],
+        "connect-src": [
           "'self'",
           "blob:",
           "wss://api.openreplay.com",
@@ -84,49 +87,52 @@ const config = {
           "https://*.siobytes.com",
           "https://eu-b2b.apm.eu-central-1.aws.cloud.es.io",
           // Development endpoints
-          ...(dev ? ["ws://localhost:*", "http://localhost:*"] : [])
+          ...(dev ? ["ws://localhost:*", "http://localhost:*"] : []),
         ],
-        'media-src': ["'self'", "https://*.cloudfront.net"],
-        'script-src': [
+        "media-src": ["'self'", "https://*.cloudfront.net"],
+        "script-src": [
           "'self'",
           "'unsafe-eval'",
           "https://api.openreplay.com",
           "https://openreplay.prd.shared-services.eu.pvh.cloud",
-          "https://capella-document-search.prd.shared-services.eu.pvh.cloud"
+          "https://capella-document-search.prd.shared-services.eu.pvh.cloud",
         ],
-        'style-src': [
+        "style-src": [
           "'self'",
           "'unsafe-inline'",
           "https://capella-document-search.prd.shared-services.eu.pvh.cloud",
-          "https://openreplay.prd.shared-services.eu.pvh.cloud"
+          "https://openreplay.prd.shared-services.eu.pvh.cloud",
         ],
-        'img-src': [
-          "'self'", 
-          "data:", 
+        "img-src": [
+          "'self'",
+          "data:",
           "blob:",
           "https://capella-document-search.prd.shared-services.eu.pvh.cloud",
-          "https://openreplay.prd.shared-services.eu.pvh.cloud"
+          "https://openreplay.prd.shared-services.eu.pvh.cloud",
         ],
-        'font-src': [
-          "'self'", 
+        "font-src": [
+          "'self'",
           "data:",
-          "https://capella-document-search.prd.shared-services.eu.pvh.cloud"
+          "https://capella-document-search.prd.shared-services.eu.pvh.cloud",
         ],
-        'frame-src': [
+        "frame-src": [
           "'self'",
           "https://login.microsoftonline.com",
-          "https://*.microsoftonline.com"
+          "https://*.microsoftonline.com",
         ],
-        'worker-src': ["'self'", "blob:"],
-        'child-src': ["'self'", "blob:"]
-      }
+        "worker-src": ["'self'", "blob:"],
+        "child-src": ["'self'", "blob:"],
+      },
     },
     csrf: {
-      checkOrigin: false
-    }
+      trustedOrigins: [
+        "http://localhost:5173",
+        "https://capella-document-search.prd.shared-services.eu.pvh.cloud",
+      ],
+    },
   },
   vitePlugin: {
-    inspector: true
+    inspector: true,
   },
 };
 

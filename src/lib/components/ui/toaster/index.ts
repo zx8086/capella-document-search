@@ -1,1 +1,1 @@
-export { default as Toaster } from "./toaster.svelte"; 
+export { default as Toaster } from "./toaster.svelte";

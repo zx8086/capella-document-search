@@ -1,201 +1,214 @@
 <!-- src/routes/login/+page.svelte -->
 
 <script lang="ts">
-    import { auth, isLoading, isAuthenticated, trackerLoading, userAccount } from '$lib/stores/authStore';
-    import { onMount } from 'svelte';
-    import { goto } from '$app/navigation';
-    import { initTracker, initTrackerWithUser } from '$lib/context/tracker';
+import { onMount } from "svelte";
+import { goto } from "$app/navigation";
+import { initTrackerWithUser } from "$lib/context/tracker";
+import { auth, authStore } from "$lib/stores/auth.svelte";
 
-    let loginAttempts = 0;
+let loginAttempts = 0;
+let trackerLoading = $state(false);
 
-    async function handleLogin() {
-        if ($isLoading) return;
-        
-        $isLoading = true;
-        try {
-            loginAttempts++;
-            if (loginAttempts > 1) {
-                await auth.logout();
-            }
-            await auth.login();
-            
-            // Only initialize tracker after successful login
-            if ($isAuthenticated && $userAccount) {
-                await initTrackerWithUser($userAccount);
-            }
-        } catch (error) {
-            const errorMessage = error instanceof Error ? error.message : String(error);
-            console.error('Login failed:', errorMessage);
-        } finally {
-            $isLoading = false;
-        }
+async function handleLogin() {
+  if (authStore.isLoading) return;
+
+  authStore.setLoading(true);
+  try {
+    loginAttempts++;
+    if (loginAttempts > 1) {
+      await auth.logout();
     }
+    await auth.login();
 
-    // Modify the onMount to remove tracker initialization
-    onMount(async () => {
+    // Only initialize tracker after successful login
+    if (authStore.isAuthenticated && authStore.userAccount) {
+      await initTrackerWithUser(authStore.userAccount);
+    }
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    console.error("Login failed:", errorMessage);
+  } finally {
+    authStore.setLoading(false);
+  }
+}
+
+// Modify the onMount to remove tracker initialization
+onMount(async () => {
+  try {
+    trackerLoading = true;
+    await auth.initialize();
+
+    // If user is already authenticated
+    if (authStore.isAuthenticated && authStore.userAccount) {
+      await initTrackerWithUser(authStore.userAccount);
+      await goto("/", { replaceState: true });
+    }
+  } catch (error) {
+    console.error("Initialization error:", error);
+  } finally {
+    trackerLoading = false;
+  }
+});
+
+onMount(() => {
+  // Debug CSS locations
+  const styleSheets = Array.from(document.styleSheets);
+  console.log(
+    "[CSS] CSS Files:",
+    styleSheets.map((sheet) => ({
+      href: sheet.href,
+      ownerNode: sheet.ownerNode?.nodeName,
+      rules: sheet.cssRules?.length,
+    }))
+  );
+
+  // Debug JS files that might contain CSS
+  const scripts = Array.from(document.scripts);
+  console.log(
+    "[SCRIPT] Script Files:",
+    scripts.map((script) => ({
+      src: script.src,
+      type: script.type,
+      module: script.type === "module",
+    }))
+  );
+
+  // Log all asset URLs from /_app/immutable
+  const immutableAssets = Array.from(
+    document.querySelectorAll('link[href*="/_app/immutable"], script[src*="/_app/immutable"]')
+  );
+  console.log(
+    "[ASSETS] Immutable Assets:",
+    immutableAssets.map((el) => ({
+      type: el.nodeName,
+      url: el.getAttribute("href") || el.getAttribute("src"),
+    }))
+  );
+
+  // Debug all <link> and <style> tags
+  console.log(
+    "[Log] Style Elements:",
+    Array.from(document.querySelectorAll('link[rel="stylesheet"], style')).map((el) => ({
+      type: el.nodeName,
+      href: el.getAttribute("href"),
+      textLength: el.textContent?.length || 0,
+      firstRules: `${el.textContent?.slice(0, 100)}...`,
+    }))
+  );
+
+  // More comprehensive CSS loading checks
+  const checkStyles = () => {
+    // 1. Check all stylesheets
+    const styleSheets = Array.from(document.styleSheets).map((sheet) => ({
+      href: sheet.href,
+      rules: sheet.cssRules?.length,
+      loaded: !!sheet.cssRules?.length,
+      type: sheet.ownerNode?.nodeName,
+      media: sheet.media.mediaText,
+    }));
+
+    // 2. Check critical Tailwind classes
+    const criticalClasses = ["bg-[#00174f]", "text-white", "container", "rounded-lg"];
+
+    const computedStyles = criticalClasses.map((className) => {
+      const testDiv = document.createElement("div");
+      testDiv.className = className;
+      document.body.appendChild(testDiv);
+      const styles = window.getComputedStyle(testDiv);
+      const computed = {
+        className,
+        backgroundColor: styles.backgroundColor,
+        color: styles.color,
+        display: styles.display,
+      };
+      document.body.removeChild(testDiv);
+      return computed;
+    });
+
+    // 3. Check if styles are actually applying
+    const styleCheck = {
+      totalStylesheets: styleSheets.length,
+      loadedStylesheets: styleSheets.filter((s) => s.loaded).length,
+      tailwindLoaded: styleSheets.some((s) => {
+        if (!s.rules || typeof s.rules === "number") return false;
         try {
-            $trackerLoading = true;
-            await auth.initialize();
-            
-            // If user is already authenticated
-            if ($isAuthenticated && $userAccount) {
-                await initTrackerWithUser($userAccount);
-                await goto('/', { replaceState: true });
-            }
-        } catch (error) {
-            console.error('Initialization error:', error);
-        } finally {
-            $trackerLoading = false;
+          return Array.from(s.rules as any).some(
+            (rule: any) =>
+              rule?.cssText?.includes("@tailwind") ||
+              rule?.cssText?.includes("--tw-") ||
+              rule?.cssText?.includes("container") ||
+              rule?.cssText?.includes("text-white") ||
+              rule?.cssText?.includes("bg-[#00174f]")
+          );
+        } catch {
+          return false;
         }
-    });
+      }),
+      criticalStylesApplied: computedStyles.every(
+        (style) =>
+          style.backgroundColor !== "rgba(0, 0, 0, 0)" ||
+          style.color !== "rgb(0, 0, 0)" ||
+          style.className === "container"
+      ),
+      styleValues: computedStyles.reduce(
+        (acc, style) => ({
+          ...acc,
+          [style.className]: {
+            backgroundColor: style.backgroundColor,
+            color: style.color,
+            display: style.display,
+          },
+        }),
+        {}
+      ),
+      details: {
+        styleSheets,
+        computedStyles,
+      },
+    };
 
-    onMount(() => {
-        // Debug CSS locations
-        const styleSheets = Array.from(document.styleSheets);
-        console.log('🎨 CSS Files:', styleSheets.map(sheet => ({
-            href: sheet.href,
-            ownerNode: sheet.ownerNode?.nodeName,
-            rules: sheet.cssRules?.length
-        })));
+    console.log("[STYLE] OpenReplay Style Check:", styleCheck);
 
-        // Debug JS files that might contain CSS
-        const scripts = Array.from(document.scripts);
-        console.log('📜 Script Files:', scripts.map(script => ({
-            src: script.src,
-            type: script.type,
-            module: script.type === 'module'
-        })));
+    // 4. Alert if there are issues
+    if (!styleCheck.criticalStylesApplied) {
+      console.error("[WARNING] Critical styles not applying:", styleCheck.styleValues);
+    }
+  };
 
-        // Log all asset URLs from /_app/immutable
-        const immutableAssets = Array.from(document.querySelectorAll('link[href*="/_app/immutable"], script[src*="/_app/immutable"]'));
-        console.log('🔒 Immutable Assets:', immutableAssets.map(el => ({
-            type: el.nodeName,
-            url: el.getAttribute('href') || el.getAttribute('src')
-        })));
+  // Check immediately and after a delay to catch any async loading
+  checkStyles();
+  setTimeout(checkStyles, 2000);
 
-        // Debug all <link> and <style> tags
-        console.log('📝 Style Elements:', Array.from(document.querySelectorAll('link[rel="stylesheet"], style')).map(el => ({
-            type: el.nodeName,
-            href: el.getAttribute('href'),
-            textLength: el.textContent?.length || 0,
-            firstRules: el.textContent?.slice(0, 100) + '...'
-        })));
+  // Also check when window loads
+  window.addEventListener("load", checkStyles);
 
-        // More comprehensive CSS loading checks
-        const checkStyles = () => {
-            // 1. Check all stylesheets
-            const styleSheets = Array.from(document.styleSheets).map(sheet => ({
-                href: sheet.href,
-                rules: sheet.cssRules?.length,
-                loaded: !!sheet.cssRules?.length,
-                type: sheet.ownerNode?.nodeName,
-                media: sheet.media.mediaText
-            }));
+  // Check if styles change
+  const observer = new MutationObserver((mutations) => {
+    const hasStyleChanges = mutations.some(
+      (mutation) => mutation.target.nodeName === "STYLE" || mutation.target.nodeName === "LINK"
+    );
+    if (hasStyleChanges) {
+      console.log("[CHANGE] Style changes detected, rechecking...");
+      checkStyles();
+    }
+  });
 
-            // 2. Check critical Tailwind classes
-            const criticalClasses = [
-                'bg-[#00174f]',
-                'text-white',
-                'container',
-                'rounded-lg'
-            ];
+  observer.observe(document.head, {
+    childList: true,
+    subtree: true,
+  });
 
-            const computedStyles = criticalClasses.map(className => {
-                const testDiv = document.createElement('div');
-                testDiv.className = className;
-                document.body.appendChild(testDiv);
-                const styles = window.getComputedStyle(testDiv);
-                const computed = {
-                    className,
-                    backgroundColor: styles.backgroundColor,
-                    color: styles.color,
-                    display: styles.display
-                };
-                document.body.removeChild(testDiv);
-                return computed;
-            });
-
-            // 3. Check if styles are actually applying
-            const styleCheck = {
-                totalStylesheets: styleSheets.length,
-                loadedStylesheets: styleSheets.filter(s => s.loaded).length,
-                tailwindLoaded: styleSheets.some(s => {
-                    if (!s.rules || typeof s.rules === 'number') return false;
-                    try {
-                        return Array.from(s.rules as any).some((rule: any) => 
-                            rule?.cssText?.includes('@tailwind') || 
-                            rule?.cssText?.includes('--tw-') ||
-                            rule?.cssText?.includes('container') ||
-                            rule?.cssText?.includes('text-white') ||
-                            rule?.cssText?.includes('bg-[#00174f]')
-                        );
-                    } catch {
-                        return false;
-                    }
-                }),
-                criticalStylesApplied: computedStyles.every(style => 
-                    style.backgroundColor !== 'rgba(0, 0, 0, 0)' || 
-                    style.color !== 'rgb(0, 0, 0)' ||
-                    style.className === 'container'
-                ),
-                styleValues: computedStyles.reduce((acc, style) => ({
-                    ...acc,
-                    [style.className]: {
-                        backgroundColor: style.backgroundColor,
-                        color: style.color,
-                        display: style.display
-                    }
-                }), {}),
-                details: {
-                    styleSheets,
-                    computedStyles
-                }
-            };
-
-            console.log('🎨 OpenReplay Style Check:', styleCheck);
-
-            // 4. Alert if there are issues
-            if (!styleCheck.criticalStylesApplied) {
-                console.error('⚠️ Critical styles not applying:', styleCheck.styleValues);
-            }
-        };
-
-        // Check immediately and after a delay to catch any async loading
-        checkStyles();
-        setTimeout(checkStyles, 2000);
-        
-        // Also check when window loads
-        window.addEventListener('load', checkStyles);
-        
-        // Check if styles change
-        const observer = new MutationObserver((mutations) => {
-            const hasStyleChanges = mutations.some(mutation => 
-                mutation.target.nodeName === 'STYLE' || 
-                mutation.target.nodeName === 'LINK'
-            );
-            if (hasStyleChanges) {
-                console.log('🔄 Style changes detected, rechecking...');
-                checkStyles();
-            }
-        });
-
-        observer.observe(document.head, {
-            childList: true,
-            subtree: true
-        });
-
-        return () => {
-            observer.disconnect();
-            window.removeEventListener('load', checkStyles);
-        };
-    });
-
+  return () => {
+    observer.disconnect();
+    window.removeEventListener("load", checkStyles);
+  };
+});
 </script>
 <svelte:head>
     <title>Capella Document Search</title>
     <meta name="Capella Document Search" content="Capella Document Search" />
 </svelte:head>
-{#if !$isLoading && !$trackerLoading}
+{#if !authStore.isLoading && !trackerLoading}
     <div class="flex min-h-screen items-center justify-center bg-gray-50">
         <div class="w-full max-w-md space-y-8 rounded-lg bg-white p-6 shadow-lg">
             <div class="text-center">
@@ -211,12 +224,12 @@
                 <button
                     type="button"
                     onclick={handleLogin}
-                    disabled={$isLoading}
-                    class="group relative flex w-full justify-center rounded-md bg-[#00174f] px-3 py-2 text-sm font-semibold text-white hover:bg-[#001140] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#00174f] disabled:opacity-50 disabled:cursor-not-allowed"
+                    disabled={authStore.isLoading}
                     data-transaction-name="Sign In button"
                     name="login-button"
+                    class="group relative flex w-full justify-center rounded-md bg-[#00174f] px-3 py-2 text-sm font-semibold text-white hover:bg-[#001140] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#00174f] disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                    {#if $isLoading}
+                    {#if authStore.isLoading}
                         <span class="absolute inset-y-0 left-0 flex items-center pl-3">
                             <!-- Loading spinner -->
                             <svg
@@ -266,7 +279,7 @@
         <div class="flex flex-col items-center">
             <div class="animate-spin rounded-full h-12 w-12 border-2 border-[#00174f] border-t-transparent"></div>
             <p class="mt-4 text-gray-600">
-                {$trackerLoading ? 'Initializing tracking...' : 'Loading...'}
+                {trackerLoading ? 'Initializing tracking...' : 'Loading...'}
             </p>
         </div>
     </div>

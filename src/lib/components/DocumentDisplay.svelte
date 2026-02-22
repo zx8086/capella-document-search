@@ -1,52 +1,50 @@
 <!-- src/lib/components/DocumentDisplay.svelte -->
 
 <script lang="ts">
-    interface DocumentDisplayProps {
-        bucket: string | null;
-        scope: string | null;
-        collection: string | null;
-        data: any;
-        timeTaken: number | null;
-        documentKey: string;
-    }
-    interface Props {
-        bucket?: DocumentDisplayProps["bucket"];
-        scope?: DocumentDisplayProps["scope"];
-        collection?: DocumentDisplayProps["collection"];
-        data?: DocumentDisplayProps["data"];
-        timeTaken?: DocumentDisplayProps["timeTaken"];
-        documentKey?: DocumentDisplayProps["documentKey"];
-    }
+interface DocumentDisplayProps {
+  bucket: string | null;
+  scope: string | null;
+  collection: string | null;
+  data: any;
+  timeTaken: number | null;
+  documentKey: string;
+}
+interface Props {
+  bucket?: DocumentDisplayProps["bucket"];
+  scope?: DocumentDisplayProps["scope"];
+  collection?: DocumentDisplayProps["collection"];
+  data?: DocumentDisplayProps["data"];
+  timeTaken?: DocumentDisplayProps["timeTaken"];
+  documentKey?: DocumentDisplayProps["documentKey"];
+}
 
-    let {
-        bucket = null,
-        scope = null,
-        collection = null,
-        data = null,
-        timeTaken = null,
-        documentKey = ""
-    }: Props = $props();
-    let isExpanded = $state(false);
-    function toggleExpand() {
-        isExpanded = !isExpanded;
-    }
-    function downloadJson() {
-        if (hasData) {
-            const jsonString = JSON.stringify(data, null, 2);
-            const blob = new Blob([jsonString], { type: "application/json" });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement("a");
-            a.href = url;
-            a.download = documentKey
-                ? `${documentKey}.json`
-                : `${bucket}_${scope}_${collection}.json`;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
-        }
-    }
-    let hasData = $derived(data !== null && Object.keys(data).length > 0);
+let {
+  bucket = null,
+  scope = null,
+  collection = null,
+  data = null,
+  timeTaken = null,
+  documentKey = "",
+}: Props = $props();
+let isExpanded = $state(false);
+function _toggleExpand() {
+  isExpanded = !isExpanded;
+}
+function _downloadJson() {
+  if (hasData) {
+    const jsonString = JSON.stringify(data, null, 2);
+    const blob = new Blob([jsonString], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = documentKey ? `${documentKey}.json` : `${bucket}_${scope}_${collection}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+}
+let hasData = $derived(data !== null && Object.keys(data).length > 0);
 </script>
 
 <div
@@ -64,7 +62,7 @@
     <div class="flex justify-between items-center">
         <div class="flex items-center space-x-2">
             <button
-                onclick={toggleExpand}
+                onclick={_toggleExpand}
                 class="p-1 text-gray-500 hover:text-gray-700 focus:ring-2 focus:ring-offset-2 focus:ring-tommy-red rounded"
                 aria-expanded={isExpanded}
                 aria-controls={`content-${bucket}-${scope}-${collection}`}
@@ -129,7 +127,7 @@
         </div>
         {#if hasData}
             <button
-                onclick={downloadJson}
+                onclick={_downloadJson}
                 class="p-2 rounded-full bg-green-100 hover:bg-green-200 transition-colors duration-200 focus:ring-2 focus:ring-offset-2 focus:ring-tommy-red"
                 aria-label="Download document data as JSON"
                 data-transaction-name="Download Document JSON"

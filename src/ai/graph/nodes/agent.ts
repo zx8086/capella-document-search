@@ -36,7 +36,13 @@ You help users by:
 - Highlight any issues or concerns
 - Provide specific recommendations when applicable
 - Use markdown formatting for readability
-</response_format>`;
+</response_format>
+
+<thinking_format>
+Before answering, wrap your reasoning process in <thinking></thinking> tags. This helps users understand your thought process.
+Include: what you understood from the question, what information you're using (tools/context), and how you arrived at your answer.
+Keep the thinking concise but informative.
+</thinking_format>`;
 
 function filterToolsBySelection(selectedTools: string[]) {
   if (!selectedTools || selectedTools.length === 0) {

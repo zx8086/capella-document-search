@@ -1,267 +1,280 @@
 <!-- src/routes/+layout.svelte -->
 
 <script lang="ts">
-    import { run } from 'svelte/legacy';
-    import { page } from '$app/stores';
-    import { goto } from '$app/navigation';
-    import { getMsalInstance } from '$lib/config/authConfig';
-    import ChatbotPopup from "$lib/components/ChatbotPopup.svelte";
+import { goto } from "$app/navigation";
+import { page } from "$app/state";
 
-    import "../app.css";
-    import "../apm-config";
-    import * as Drawer from "$lib/components/ui/drawer";
-    import { Button } from "$lib/components/ui/button";
-    import { Toaster } from "$lib/components/ui/sonner";
-    import { onMount, setContext, onDestroy } from "svelte";
-    import { browser } from "$app/environment";
-    import { key, initTracker, debugTrackerStatus, identifyUser, getSessionId, debugElasticIntegration, debugAssetAccess } from "$lib/context/tracker";
-    import { frontendConfig } from "$frontendConfig";
-    import { writable } from "svelte/store";
-    import { collections } from "../stores/collectionsStore";
-    import { auth, isAuthenticated, userAccount, isLoading } from '$lib/stores/authStore';
-    import { quotes } from '../stores/quotesStore';
-    import { featureFlags } from '$lib/stores/featureFlagStore';
+import "../app.css";
+import "../apm-config";
+import { onDestroy, onMount, setContext } from "svelte";
+import { writable, get } from "svelte/store";
+import { browser } from "$app/environment";
+import {
+  debugAssetAccess,
+  debugTrackerStatus,
+  identifyUser,
+  initTracker,
+  key,
+} from "$lib/context/tracker";
+import { auth, authStore } from "$lib/stores/auth.svelte";
+import { featureFlags } from "$lib/stores/featureFlags.svelte";
+import { collections } from "$lib/stores/collections.svelte";
+import type { Collection } from "../models/collections";
+import { quotes } from "../stores/quotesStore";
+import { videos } from "../stores/videoStore";
+import ChatbotPopup from "$lib/components/ChatbotPopup.svelte";
+import { Toaster } from "$lib/components/ui/sonner";
+import * as Drawer from "$lib/components/ui/drawer";
+import { Button } from "$lib/components/ui/button";
 
-    interface Props {
-        children?: import('svelte').Snippet;
+interface Props {
+  children?: import("svelte").Snippet;
+}
+
+let { children }: Props = $props();
+
+let pollInterval: ReturnType<typeof setInterval>;
+
+let tracker: any | null = null;
+let isTrackerInitialized = false;
+
+const darkMode = writable(false);
+
+function applyDarkMode(isDark: boolean) {
+  if (browser) {
+    if (isDark) {
+      document.documentElement.classList.add("dark");
+    } else {
+      document.documentElement.classList.remove("dark");
     }
+  }
+}
 
-    let { children }: Props = $props();
+$effect(() => {
+  if (browser) {
+    const isDark = get(darkMode);
+    applyDarkMode(isDark);
+  }
+});
 
-    let pollInterval: ReturnType<typeof setInterval>;
+async function _initializeTracker() {
+  if (isTrackerInitialized) {
+    console.log("[TRACKER] Tracker already initialized");
+    return;
+  }
 
-    let tracker: any | null = null;
-    let isTrackerInitialized = false;
-
-    const darkMode = writable(false);
-
-    function applyDarkMode(isDark: boolean) {
-        if (browser) {
-            if (isDark) {
-                document.documentElement.classList.add("dark");
-            } else {
-                document.documentElement.classList.remove("dark");
-            }
-        }
+  try {
+    const tracker = await initTracker();
+    if (tracker) {
+      isTrackerInitialized = true;
+      debugTrackerStatus();
     }
-
-    run(() => {
-        if (browser) {
-            applyDarkMode($darkMode);
-        }
-    });
-
-    async function initializeTracker() {
-        if (isTrackerInitialized) {
-            console.log("🔄 Tracker already initialized");
-            return;
-        }
-
-        try {
-            const tracker = await initTracker();
-            if (tracker) {
-                isTrackerInitialized = true;
-                debugTrackerStatus();
-            }
-        } catch (error) {
-            console.warn(
-                "Failed to start OpenReplay:",
-                error instanceof Error ? error.message : String(error)
-            );
-        }
-    }
-
-    function getTracker() {
-        return tracker;
-    }
-
-    setContext(key, { getTracker });
-
-    let currentQuoteIndex = $state(0);
-    let isPaused = $state(false);
-    let autoplayIntervalTime = 4000;
-    let autoplayInterval: ReturnType<typeof setInterval> | null = null;
-
-    const quotesArray = $derived($quotes);
-
-    function nextQuote() {
-        currentQuoteIndex = (currentQuoteIndex + 1) % $quotes.length;
-    }
-
-    function togglePause() {
-        isPaused = !isPaused;
-    }
-
-    function startAutoplay() {
-        if (autoplayInterval) clearInterval(autoplayInterval);
-        autoplayInterval = setInterval(() => {
-            if (!isPaused) {
-                nextQuote();
-            }
-        }, autoplayIntervalTime);
-    }
-
-    let currentUser = $state({
-        id: '',
-        email: '',
-        name: ''
-    });
-
-    let initializationAttempted = false;
-
-    let trackerInitialized = false;
-
-    let assistWidget: HTMLDivElement;
-
-    let chatIsOpen = $state(false);
-
-    $effect(() => {
-        if (browser) {
-            if (chatIsOpen) {
-                document.body.classList.add('chat-open');
-            } else {
-                document.body.classList.remove('chat-open');
-            }
-        }
-    });
-
-    onMount(async () => {
-        if (browser) {
-            try {
-                // Initialize tracker first
-                const tracker = await initTracker();
-                if (tracker) {
-                    debugTrackerStatus();
-                    debugAssetAccess();
-                }
-
-                // Then initialize auth
-                await auth.initialize();
-                
-                // Initialize feature flags last
-                await featureFlags.initialize();
-            } catch (error) {
-                console.warn(
-                    "Failed to initialize:",
-                    error instanceof Error ? error.message : String(error),
-                );
-            }
-        }
-
-        startAutoplay();
-
-        // Add subscription to userAccount store
-        const unsubscribeUser = userAccount.subscribe((account) => {
-            if (account) {
-                currentUser = {
-                    id: account.localAccountId || account.homeAccountId || '',
-                    email: account.username || '',
-                    name: account.name || ''
-                };
-            }
-        });
-
-        collections.fetchCollections();
-        
-        pollInterval = setInterval(
-            () => {
-                collections.fetchCollections();
-            },
-            60 * 60 * 1000,
-        );
-
-        return () => {
-            if (pollInterval) clearInterval(pollInterval);
-            unsubscribeUser();
-        };
-    });
-
-    onDestroy(() => {
-        if (autoplayInterval) clearInterval(autoplayInterval);
-
-        if (pollInterval) clearInterval(pollInterval);
-
-        // Clean up the widget
-        if (assistWidget && browser) {
-            assistWidget.remove();
-        }
-
-        if (browser) {
-            // Ensure body overflow is restored when layout is destroyed
-            document.body.style.overflow = '';
-        }
-
-        if (browser) {
-            document.body.classList.remove('chat-open');
-        }
-    });
-
-    function groupCollectionsByScope(collections: Collection[]): Record<string, Collection[]> {
-        const sortedCollections = [...collections].sort((a, b) => {
-            if (a.scope_name < b.scope_name) return -1;
-            if (a.scope_name > b.scope_name) return 1;
-            if (a.collection_name < b.collection_name) return -1;
-            if (a.collection_name > b.collection_name) return 1;
-            return 0;
-        });
-
-        return sortedCollections.reduce((acc, collection) => {
-            if (!acc[collection.scope_name]) {
-                acc[collection.scope_name] = [];
-            }
-            acc[collection.scope_name] = [...acc[collection.scope_name], collection];
-            return acc;
-        }, {} as Record<string, Collection[]>);
-    }
-
-    const groupedCollections = $derived(() => groupCollectionsByScope(allCollections));
-
-    async function signOut() {
-        console.log('Starting signOut process...');
-        try {
-            const logoutButton = document.querySelector('[data-logout-button]');
-            if (logoutButton) {
-                logoutButton.setAttribute('disabled', 'true');
-            }
-
-            await auth.logout();
-        } catch (error) {
-            console.error('Sign out error:', error);
-            window.location.href = '/login';
-        }
-    }
-
-    // Use $derived instead of $:
-    const shouldShowContent = $derived(
-        !$isLoading || 
-        $page.url.pathname === '/login' ||
-        $page.url.pathname.startsWith('/_app')
+  } catch (error) {
+    console.warn(
+      "Failed to start OpenReplay:",
+      error instanceof Error ? error.message : String(error)
     );
+  }
+}
 
-    $effect(() => {
-        if (trackerInitialized && $userAccount) {
-            identifyUser(
-                $userAccount.localAccountId || $userAccount.homeAccountId || '',
-                {
-                    email: $userAccount.username || '',
-                    name: $userAccount.name || ''
-                }
-            );
-        }
-    });
+function getTracker() {
+  return tracker;
+}
 
-    $effect(() => {
-        if (!shouldShowContent) {
-            console.log("Loading overlay shown", { 
-                path: $page.url.pathname,
-                isLoading: $isLoading
-            });
-        }
-    });
+setContext(key, { getTracker });
 
-    async function handleNavigation(path: string) {
-        await goto(path);
+let currentQuoteIndex = $state(0);
+let isPaused = $state(false);
+let autoplayIntervalTime = 4000;
+let autoplayInterval: ReturnType<typeof setInterval> | null = null;
+
+const quotesArray = $derived(get(quotes));
+
+function nextQuote() {
+  currentQuoteIndex = (currentQuoteIndex + 1) % get(quotes).length;
+}
+
+function _togglePause() {
+  isPaused = !isPaused;
+}
+
+function startAutoplay() {
+  if (autoplayInterval) clearInterval(autoplayInterval);
+  autoplayInterval = setInterval(() => {
+    if (!isPaused) {
+      nextQuote();
     }
+  }, autoplayIntervalTime);
+}
+
+let _currentUser = $state({
+  id: "",
+  email: "",
+  name: "",
+});
+
+let _initializationAttempted = false;
+
+let trackerInitialized = false;
+
+let assistWidget: HTMLDivElement;
+
+let chatIsOpen = $state(false);
+
+$effect(() => {
+  if (browser) {
+    if (chatIsOpen) {
+      document.body.classList.add("chat-open");
+    } else {
+      document.body.classList.remove("chat-open");
+    }
+  }
+});
+
+onMount(async () => {
+  if (browser) {
+    try {
+      // Initialize tracker first
+      const tracker = await initTracker();
+      if (tracker) {
+        debugTrackerStatus();
+        debugAssetAccess();
+      }
+
+      // Then initialize auth
+      await auth.initialize();
+
+      // Initialize feature flags last
+      await featureFlags.initialize();
+    } catch (error) {
+      console.warn("Failed to initialize:", error instanceof Error ? error.message : String(error));
+    }
+  }
+
+  startAutoplay();
+
+  // Reactive effect to sync userAccount from auth store
+  // Note: We'll handle this reactively in $effect instead
+
+  collections.fetchCollections();
+
+  pollInterval = setInterval(
+    () => {
+      collections.fetchCollections();
+    },
+    60 * 60 * 1000
+  );
+
+  return () => {
+    if (pollInterval) clearInterval(pollInterval);
+  };
+});
+
+// Sync userAccount from auth store - use $effect.pre to avoid loops
+$effect.pre(() => {
+  const account = authStore.userAccount;
+  if (account) {
+    const newUser = {
+      id: account.localAccountId || account.homeAccountId || "",
+      email: account.username || "",
+      name: account.name || "",
+    };
+    // Only update if values actually changed
+    if (
+      _currentUser.id !== newUser.id ||
+      _currentUser.email !== newUser.email ||
+      _currentUser.name !== newUser.name
+    ) {
+      _currentUser = newUser;
+    }
+  }
+});
+
+onDestroy(() => {
+  if (autoplayInterval) clearInterval(autoplayInterval);
+
+  if (pollInterval) clearInterval(pollInterval);
+
+  // Clean up the widget
+  if (assistWidget && browser) {
+    assistWidget.remove();
+  }
+
+  if (browser) {
+    // Ensure body overflow is restored when layout is destroyed
+    document.body.style.overflow = "";
+  }
+
+  if (browser) {
+    document.body.classList.remove("chat-open");
+  }
+});
+
+function groupCollectionsByScope(collections: Collection[]): Record<string, Collection[]> {
+  const sortedCollections = [...collections].sort((a, b) => {
+    if (a.scope_name < b.scope_name) return -1;
+    if (a.scope_name > b.scope_name) return 1;
+    if (a.collection_name < b.collection_name) return -1;
+    if (a.collection_name > b.collection_name) return 1;
+    return 0;
+  });
+
+  return sortedCollections.reduce(
+    (acc, collection) => {
+      if (!acc[collection.scope_name]) {
+        acc[collection.scope_name] = [];
+      }
+      acc[collection.scope_name] = [...acc[collection.scope_name], collection];
+      return acc;
+    },
+    {} as Record<string, Collection[]>
+  );
+}
+
+const _groupedCollections = $derived(() => groupCollectionsByScope(collections.items));
+
+async function _signOut() {
+  console.log("Starting signOut process...");
+  try {
+    const logoutButton = document.querySelector("[data-logout-button]");
+    if (logoutButton) {
+      logoutButton.setAttribute("disabled", "true");
+    }
+
+    await auth.logout();
+  } catch (error) {
+    console.error("Sign out error:", error);
+    window.location.href = "/login";
+  }
+}
+
+// Use $derived instead of $:
+const shouldShowContent = $derived(
+  !authStore.isLoading || page.url.pathname === "/login" || page.url.pathname.startsWith("/_app")
+);
+
+$effect(() => {
+  const account = authStore.userAccount;
+  if (trackerInitialized && account) {
+    identifyUser(account.localAccountId || account.homeAccountId || "", {
+      email: account.username || "",
+      name: account.name || "",
+    });
+  }
+});
+
+$effect(() => {
+  if (!shouldShowContent) {
+    console.log("Loading overlay shown", {
+      path: page.url.pathname,
+      isLoading: authStore.isLoading,
+    });
+  }
+});
+
+async function _handleNavigation(path: string) {
+  await goto(path);
+}
 </script>
 
 {#if !shouldShowContent}
@@ -284,10 +297,10 @@
 
             <!-- Right column (sign out button) -->
             <div class="w-1/4 flex justify-end items-center space-x-2">
-                {#if $page.url.pathname !== '/login'}
+                {#if page.url.pathname !== '/login'}
                     <button
                         type="button"
-                        onclick={() => signOut()}
+                        onclick={() => _signOut()}
                         class="flex items-center space-x-2 px-4 py-2 text-sm text-white hover:text-red-500 transition-colors group"
                         data-transaction-name="Sign Out button"
                     >
@@ -321,18 +334,18 @@
         </main>
 
         <!-- Chatbot Popup -->
-        {#if $page.url.pathname !== '/login' && $isAuthenticated}
-            <ChatbotPopup 
-                isOpen={chatIsOpen} 
-                on:toggle={() => {
+        {#if page.url.pathname !== '/login' && authStore.isAuthenticated}
+            <ChatbotPopup
+                isOpen={chatIsOpen}
+                ontoggle={() => {
                     chatIsOpen = !chatIsOpen;
-                    console.debug('🤖 Chat Toggle:', {
+                    console.debug('[AI] Chat Toggle:', {
                         newState: !chatIsOpen,
-                        pathname: $page.url.pathname,
-                        isAuthenticated: $isAuthenticated,
+                        pathname: page.url.pathname,
+                        isAuthenticated: authStore.isAuthenticated,
                         timestamp: new Date().toISOString()
                     });
-                }} 
+                }}
             />
         {/if}
 
@@ -392,7 +405,7 @@
                                                 type="button"
                                                 data-transaction-name="Toggle Pause button"
                                                 class="absolute bottom-4 right-4 z-20 rounded-full text-white opacity-50 hover:opacity-80 focus:opacity-80"
-                                                onclick={togglePause}
+                                                onclick={_togglePause}
                                                 aria-label={isPaused
                                                     ? "Play carousel"
                                                     : "Pause carousel"}
@@ -482,7 +495,7 @@
                         <!-- API Health Check -->
                         <button
                             type="button"
-                            onclick={() => handleNavigation('/api/health-check')}
+                            onclick={() => _handleNavigation('/api/health-check')}
                             class="flex items-center hover:opacity-80 transition-opacity"
                             aria-label="API Health Check"
                             data-transaction-name="API Health Check"

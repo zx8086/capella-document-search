@@ -5,7 +5,7 @@ export function log(message: string, meta?: any): void {
 }
 
 export function error(message: string, meta?: any): void {
-  const style = 'color: red; font-weight: bold';
+  const style = "color: red; font-weight: bold";
   if (meta !== undefined) {
     console.error(`%c${message}`, style, meta);
   } else {
@@ -14,7 +14,7 @@ export function error(message: string, meta?: any): void {
 }
 
 export function err(message: string, meta?: any): void {
-  const style = 'color: red; font-weight: bold';
+  const style = "color: red; font-weight: bold";
   if (meta !== undefined) {
     console.error(`%c${message}`, style, meta);
   } else {
@@ -23,7 +23,7 @@ export function err(message: string, meta?: any): void {
 }
 
 export function warn(message: string, meta?: any): void {
-  const style = 'color: orange; font-weight: bold';
+  const style = "color: orange; font-weight: bold";
   if (meta !== undefined) {
     console.warn(`%c${message}`, style, meta);
   } else {
@@ -32,7 +32,7 @@ export function warn(message: string, meta?: any): void {
 }
 
 export function debug(message: string, meta?: any): void {
-  const style = 'color: cyan';
+  const style = "color: cyan";
   if (meta !== undefined) {
     console.debug(`%c${message}`, style, meta);
   } else {

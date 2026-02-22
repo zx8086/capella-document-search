@@ -276,36 +276,41 @@ export async function* streamAgent(request: ChatRequest): AsyncGenerator<string,
           progressMessage = "Determining best approach...";
         } else if (nodeName === "agent") {
           progressMessage = "Reasoning about your question...";
+        } else if (nodeName === "tools") {
+          progressMessage = "Running tools...";
         } else if (nodeName === "responder") {
           progressMessage = "Generating response...";
         }
 
         yield `${JSON.stringify({
-          type: "progress",
+          type: "node_start",
           message: progressMessage,
-          details: `Running ${nodeName}`,
           nodeName,
         })}\n`;
       }
 
-      // Emit tool execution events as progress updates
+      // Emit node completion events
+      if (event.event === "on_chain_end" && event.name && event.name !== "LangGraph") {
+        yield `${JSON.stringify({
+          type: "node_end",
+          nodeName: event.name,
+        })}\n`;
+      }
+
+      // Emit tool execution events
       if (event.event === "on_tool_start") {
         yield `${JSON.stringify({
-          type: "progress",
+          type: "tool_start",
+          toolName: event.name,
           message: `Executing ${event.name}...`,
-          details: "Running tool",
-          activeToolName: event.name,
-          isExecutingTools: true,
         })}\n`;
       }
 
       if (event.event === "on_tool_end") {
         yield `${JSON.stringify({
-          type: "progress",
+          type: "tool_end",
+          toolName: event.name,
           message: `Completed ${event.name}`,
-          details: "Tool finished",
-          activeToolName: null,
-          isExecutingTools: false,
         })}\n`;
       }
 

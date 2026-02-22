@@ -5,9 +5,17 @@ import { err, log } from "$utils/unifiedLogger";
 import { createBedrockChatModel } from "../../clients/bedrock-bearer-client";
 import type { AgentStateType } from "../state";
 
+const THINKING_INSTRUCTIONS = `<thinking_format>
+Before answering, wrap your reasoning process in <thinking></thinking> tags. This helps users understand your thought process.
+Include: what you understood from the question, what information you're using, and how you arrived at your answer.
+Keep the thinking concise but informative.
+</thinking_format>`;
+
 const SIMPLE_SYSTEM_PROMPT = `You are a friendly Couchbase database assistant. You help users with questions about Couchbase, database concepts, and can perform diagnostic analysis when needed.
 
-For general questions, provide helpful and concise answers. If the user is asking about something that requires database analysis, let them know you can help with that and suggest what information you would need.`;
+For general questions, provide helpful and concise answers. If the user is asking about something that requires database analysis, let them know you can help with that and suggest what information you would need.
+
+${THINKING_INSTRUCTIONS}`;
 
 const KNOWLEDGE_SYSTEM_PROMPT = `You are an intelligent assistant with access to retrieved document context. Answer the user's question using the provided document context.
 
@@ -17,7 +25,9 @@ const KNOWLEDGE_SYSTEM_PROMPT = `You are an intelligent assistant with access to
 3. If the context doesn't fully answer the question, acknowledge what you found and what's missing
 4. Be concise but thorough
 5. Use markdown formatting for readability
-</response_guidelines>`;
+</response_guidelines>
+
+${THINKING_INSTRUCTIONS}`;
 
 const ANALYSIS_SYSTEM_PROMPT = `You are a Couchbase database analyst. Based on the tool results and context provided, synthesize a clear and actionable response for the user.
 
@@ -28,7 +38,9 @@ const ANALYSIS_SYSTEM_PROMPT = `You are a Couchbase database analyst. Based on t
 4. Use clear markdown formatting for readability
 5. If multiple tools were used, organize findings logically
 6. Include relevant metrics and statistics
-</response_guidelines>`;
+</response_guidelines>
+
+${THINKING_INSTRUCTIONS}`;
 
 function buildContextFromState(state: AgentStateType): string {
   const contextParts: string[] = [];

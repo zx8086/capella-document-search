@@ -1,25 +1,25 @@
 /* src/lib/couchbaseConnector.ts */
 
-import { backendConfig } from "../backend-config";
-import { log, err } from "$utils/unifiedLogger";
 import {
-  Cluster,
-  Bucket,
-  Scope,
-  Collection,
+  type Bucket,
+  type Cluster,
+  type Collection,
+  type CouchbaseError,
   connect,
+  type DocumentNotFoundError,
+  type QueryMetaData,
   type QueryOptions,
-  QueryResult,
-  StreamableRowPromise,
-  QueryMetaData,
-  DocumentNotFoundError,
-  CouchbaseError,
+  type QueryResult,
+  type Scope,
+  type StreamableRowPromise,
 } from "couchbase";
+import { err, log } from "$utils/unifiedLogger";
+import { backendConfig } from "../backend-config";
 
 interface QueryableCluster extends Cluster {
   query<TRow = any>(
     statement: string,
-    options?: QueryOptions,
+    options?: QueryOptions
   ): StreamableRowPromise<QueryResult<TRow>, TRow, QueryMetaData>;
 }
 
@@ -44,45 +44,47 @@ let globalPromise: Promise<Cluster> | null = null;
 
 // Initialize connection when module loads
 async function initializeConnection() {
-    if (!globalPromise) {
-        log("🔄 [CouchbaseConnector] Initializing global connection");
-        globalPromise = connect(backendConfig.capella.URL, {
-            username: backendConfig.capella.USERNAME,
-            password: backendConfig.capella.PASSWORD
-        }).then(cluster => {
-            globalCluster = cluster;
-            log("✅ [CouchbaseConnector] Global connection established");
-            return cluster;
-        }).catch(error => {
-            err("❌ [CouchbaseConnector] Global connection failed:", error);
-            globalPromise = null;
-            throw error;
-        });
-    }
-    return globalPromise;
+  if (!globalPromise) {
+    log("[Init] [CouchbaseConnector] Initializing global connection");
+    globalPromise = connect(backendConfig.capella.URL, {
+      username: backendConfig.capella.USERNAME,
+      password: backendConfig.capella.PASSWORD,
+    })
+      .then((cluster) => {
+        globalCluster = cluster;
+        log("[OK] [CouchbaseConnector] Global connection established");
+        return cluster;
+      })
+      .catch((error) => {
+        err("[ERROR] [CouchbaseConnector] Global connection failed:", error);
+        globalPromise = null;
+        throw error;
+      });
+  }
+  return globalPromise;
 }
 
 // Start connection immediately
-initializeConnection().catch(err => {
-    console.error("Initial connection failed:", err);
+initializeConnection().catch((err) => {
+  console.error("Initial connection failed:", err);
 });
 
 export async function clusterConn() {
-    if (globalCluster) {
-        return globalCluster;
-    }
-    
-    if (globalPromise) {
-        return globalPromise;
-    }
-    
-    return initializeConnection();
+  if (globalCluster) {
+    return globalCluster;
+  }
+
+  if (globalPromise) {
+    return globalPromise;
+  }
+
+  return initializeConnection();
 }
 
 export async function closeConnection() {
-    if (globalCluster) {
-        await globalCluster.close();
-        globalCluster = null;
-    }
-    globalPromise = null;
+  if (globalCluster) {
+    await globalCluster.close();
+    globalCluster = null;
+  }
+  globalPromise = null;
 }

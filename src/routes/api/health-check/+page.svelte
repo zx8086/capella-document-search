@@ -1,101 +1,100 @@
 <!-- src/routes/api/health-check/+page.svelte -->
 
 <script lang="ts">
-    import { client } from '$lib/featureFlags';
-    import { onMount } from "svelte";
-    import type { PageData } from './$types';
-    import { goto } from '$app/navigation';
-    import { navigating } from '$app/stores';
-    import { writable } from 'svelte/store';
-    
-    const { data } = $props<{ data: PageData }>();
-    
-    let healthStatus = $state(data.healthStatus);
-    let error = $state("");
-    let isSimpleMode = $state(true); // Start with Simple mode by default
-    let loading = $state(false);
-    let showBuildInfo = $state(false);
+import { onMount } from "svelte";
+import { goto } from "$app/navigation";
+import { navigating } from "$app/state";
+import { client } from "$lib/featureFlags";
+import type { PageData } from "./$types";
 
-    onMount(async () => {
-        // Initialize state based on current data without triggering effects
-        isSimpleMode = data.checkType === "Simple";
-        try {
-            showBuildInfo = await client.getBooleanValue('build-information', false);
-        } catch (e) {
-            // Handle extension conflicts or feature flag errors silently
-            console.warn('Feature flag check failed:', e);
-            showBuildInfo = false;
-        }
-    });
+const { data } = $props<{ data: PageData }>();
 
-    function toggleHealthMode(): void {
-        console.log('BEFORE toggle - isSimpleMode:', isSimpleMode);
-        loading = true;
-        error = "";
-        
-        const newType = isSimpleMode ? "Detailed" : "Simple";
-        console.log('Navigating to:', newType);
-        
-        goto(`/api/health-check?type=${newType}`, {
-            replaceState: true,
-            noScroll: true
-        }).catch((e) => {
-            error = e instanceof Error ? e.message : String(e);
-            loading = false;
-        });
+let _healthStatus = $state(data.healthStatus);
+let _error = $state("");
+let isSimpleMode = $state(true); // Start with Simple mode by default
+let _loading = $state(false);
+let _showBuildInfo = $state(false);
+
+onMount(async () => {
+  // Initialize state based on current data without triggering effects
+  isSimpleMode = data.checkType === "Simple";
+  try {
+    _showBuildInfo = await client.getBooleanValue("build-information", false);
+  } catch (e) {
+    // Handle extension conflicts or feature flag errors silently
+    console.warn("Feature flag check failed:", e);
+    _showBuildInfo = false;
+  }
+});
+
+function _toggleHealthMode(): void {
+  console.log("BEFORE toggle - isSimpleMode:", isSimpleMode);
+  _loading = true;
+  _error = "";
+
+  const newType = isSimpleMode ? "Detailed" : "Simple";
+  console.log("Navigating to:", newType);
+
+  goto(`/api/health-check?type=${newType}`, {
+    replaceState: true,
+    noScroll: true,
+  }).catch((e) => {
+    _error = e instanceof Error ? e.message : String(e);
+    _loading = false;
+  });
+}
+
+$effect(() => {
+  if (data.healthStatus) {
+    _healthStatus = data.healthStatus;
+    // Always sync with server data - this is the source of truth
+    isSimpleMode = data.checkType === "Simple";
+    if (data.healthStatus.failedChecks?.length > 0) {
+      _error = `Some check failed: ${data.healthStatus.failedChecks.join(", ")}`;
     }
+  }
+});
 
-    $effect(() => {
-        if (data.healthStatus) {
-            healthStatus = data.healthStatus;
-            // Always sync with server data - this is the source of truth
-            isSimpleMode = data.checkType === "Simple";
-            if (data.healthStatus.failedChecks?.length > 0) {
-                error = `Some check failed: ${data.healthStatus.failedChecks.join(", ")}`;
-            }
-        }
-    });
+$effect(() => {
+  _loading = Boolean(navigating.to);
+});
 
-    $effect(() => {
-        loading = Boolean($navigating);
-    });
+let _transactionName = $derived(
+  `API Health Check Page - ${isSimpleMode ? "Simple" : "Detailed"} Check`
+);
 
-    let transactionName = $derived(
-        `API Health Check Page - ${isSimpleMode ? "Simple" : "Detailed"} Check`
-    );
+// Add helper function to get status color
+function _getStatusColor(status: string): string {
+  switch (status) {
+    case "OK":
+      return "text-green-600";
+    case "WARNING":
+      return "text-yellow-600";
+    case "ERROR":
+      return "text-red-600";
+    default:
+      return "text-gray-600";
+  }
+}
 
-    // Add helper function to get status color
-    function getStatusColor(status: string): string {
-        switch (status) {
-            case 'OK':
-                return 'text-green-600';
-            case 'WARNING':
-                return 'text-yellow-600';
-            case 'ERROR':
-                return 'text-red-600';
-            default:
-                return 'text-gray-600';
-        }
-    }
-
-    // Add helper function to get status background
-    function getStatusBackground(status: string): string {
-        switch (status) {
-            case 'OK':
-                return 'bg-green-50';
-            case 'WARNING':
-                return 'bg-yellow-50';
-            case 'ERROR':
-                return 'bg-red-50';
-            default:
-                return 'bg-gray-50';
-        }
-    }
+// Add helper function to get status background
+function _getStatusBackground(status: string): string {
+  switch (status) {
+    case "OK":
+      return "bg-green-50";
+    case "WARNING":
+      return "bg-yellow-50";
+    case "ERROR":
+      return "bg-red-50";
+    default:
+      return "bg-gray-50";
+  }
+}
 </script>
 
 <svelte:head>
     <title>Capella Document Search - {isSimpleMode ? "Simple" : "Detailed"} Status</title>
-    <meta name="transaction-name" content={transactionName} />
+    <meta name="transaction-name" content={_transactionName} />
 </svelte:head>
 
 <div class="container mx-auto px-4 py-8">
@@ -106,17 +105,17 @@
             {isSimpleMode
                 ? "Simple check tests the SQL Database, Internal API & GraphQL endpoint."
                 : "Detailed check covering all dependencies."}
-            {#if loading}
+            {#if _loading}
                 <span class="ml-2 text-blue-600">Loading...</span>
             {/if}
         </p>
         <div class="inline-flex bg-gray-100 rounded-full p-1 shadow-sm border border-gray-200 hover:ring-2 hover:ring-red-500 hover:ring-offset-2 transition-all duration-300">
             <button
-                onclick={() => { 
+                onclick={() => {
                     console.log('Simple clicked - isSimpleMode:', isSimpleMode);
                     if (!isSimpleMode) {
                         console.log('Calling toggleHealthMode from Simple');
-                        toggleHealthMode(); 
+                        _toggleHealthMode();
                     } else {
                         console.log('Simple already active, not toggling');
                     }
@@ -129,11 +128,11 @@
                 Simple
             </button>
             <button
-                onclick={() => { 
+                onclick={() => {
                     console.log('Detailed clicked - isSimpleMode:', isSimpleMode);
                     if (isSimpleMode) {
                         console.log('Calling toggleHealthMode from Detailed');
-                        toggleHealthMode(); 
+                        _toggleHealthMode();
                     } else {
                         console.log('Detailed already active, not toggling');
                     }
@@ -148,7 +147,7 @@
         </div>
     </div>
 
-    {#if loading}
+    {#if _loading}
         <div class="flex flex-col items-center justify-center gap-4">
             <p class="text-gray-600">
                 Loading {isSimpleMode ? "Detailed" : "Simple"} health check...
@@ -157,52 +156,52 @@
                 <span class="sr-only">Loading health check status...</span>
             </div>
         </div>
-    {:else if healthStatus}
+    {:else if _healthStatus}
         <div class="bg-white shadow-md rounded px-8 pt-6 pb-8 mb-4">
             <!-- Overall Status -->
-            <div class={`mb-6 p-4 rounded-lg ${getStatusBackground(healthStatus.status)}`}>
+            <div class={`mb-6 p-4 rounded-lg ${_getStatusBackground(_healthStatus.status)}`}>
                 <h2 class="text-xl font-semibold mb-2">
                     Overall Status:
-                    <span class={getStatusColor(healthStatus.status)}>
-                        {healthStatus.status}
+                    <span class={_getStatusColor(_healthStatus.status)}>
+                        {_healthStatus.status}
                     </span>
                 </h2>
-                {#if healthStatus.failedChecks?.length > 0}
+                {#if _healthStatus.failedChecks?.length > 0}
                     <p class="text-red-600 text-sm">
-                        Failed checks: {healthStatus.failedChecks.join(', ')}
+                        Failed checks: {_healthStatus.failedChecks.join(', ')}
                     </p>
                 {/if}
             </div>
 
             <!-- Version Information -->
-            {#if showBuildInfo && healthStatus.version}
+            {#if _showBuildInfo && _healthStatus.version}
                 <div class="bg-gray-100 p-4 rounded-lg mb-4">
                     <h3 class="text-lg font-semibold mb-2">Version Information</h3>
                     <div class="grid grid-cols-2 gap-2 text-sm">
                         <div class="text-gray-600">Build:</div>
-                        <div>{healthStatus.version.build}</div>
-                        
+                        <div>{_healthStatus.version.build}</div>
+
                         <div class="text-gray-600">Commit:</div>
-                        <div class="font-mono">{healthStatus.version.commit}</div>
-                        
+                        <div class="font-mono">{_healthStatus.version.commit}</div>
+
                         <div class="text-gray-600">Build Date:</div>
-                        <div>{new Date(healthStatus.version.buildDate).toLocaleString()}</div>
+                        <div>{new Date(_healthStatus.version.buildDate).toLocaleString()}</div>
                     </div>
                 </div>
             {/if}
 
             <!-- Check Type -->
             <p class="text-md text-gray-700 mb-4">
-                Check Type: <span class="font-semibold">{healthStatus.checkType}</span>
+                Check Type: <span class="font-semibold">{_healthStatus.checkType}</span>
             </p>
 
             <!-- Individual Checks -->
             <div class="space-y-4">
-                {#each Object.entries(healthStatus.checks).sort(([a], [b]) => a.localeCompare(b)) as [service, check]}
-                    <div class={`p-4 rounded-lg ${getStatusBackground(check.status)} border border-${check.status === 'OK' ? 'green' : check.status === 'WARNING' ? 'yellow' : 'red'}-200`}>
+                {#each Object.entries(_healthStatus.checks).sort(([a], [b]) => a.localeCompare(b)) as [service, check]}
+                    <div class={`p-4 rounded-lg ${_getStatusBackground(check.status)} border border-${check.status === 'OK' ? 'green' : check.status === 'WARNING' ? 'yellow' : 'red'}-200`}>
                         <div class="flex justify-between items-start">
                             <span class="font-medium">{service}:</span>
-                            <span class={getStatusColor(check.status)}>
+                            <span class={_getStatusColor(check.status)}>
                                 {check.status}
                             </span>
                         </div>
@@ -220,9 +219,9 @@
                 {/each}
             </div>
         </div>
-    {:else if error}
+    {:else if _error}
         <div class="bg-red-50 border border-red-200 rounded-lg p-4 mb-4">
-            <p class="text-red-600">{error}</p>
+            <p class="text-red-600">{_error}</p>
         </div>
     {:else}
         <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4">

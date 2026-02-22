@@ -1,16 +1,16 @@
 /* src/routes/api/collections/+server.ts */
 
-import { log, warn, err } from "$utils/unifiedLogger";
 import { json } from "@sveltejs/kit";
+import { getAllScopes } from "$lib/api";
 import {
-  initializeDatabase,
-  insertScope,
-  insertCollection,
-  insertTooltip,
   getAllCollectionsWithTooltips,
   getDatabase,
+  initializeDatabase,
+  insertCollection,
+  insertScope,
+  insertTooltip,
 } from "$lib/db/dbOperations";
-import { getAllScopes } from "$lib/api";
+import { err, log, warn } from "$utils/unifiedLogger";
 
 export async function POST() {
   log("POST request received for collections");
@@ -19,7 +19,9 @@ export async function POST() {
 
   try {
     const scopesAndCollections = await getAllScopes();
-    log(`Received scopes and collections: ${scopesAndCollections.length} items found`, { count: scopesAndCollections.length });
+    log(`Received scopes and collections: ${scopesAndCollections.length} items found`, {
+      count: scopesAndCollections.length,
+    });
     if (scopesAndCollections.length === 0) {
       warn("No scopes and collections returned from API");
       return json(
@@ -27,7 +29,7 @@ export async function POST() {
           success: false,
           message: "No scopes and collections available to seed",
         },
-        { status: 404 },
+        { status: 404 }
       );
     }
 
@@ -35,29 +37,57 @@ export async function POST() {
 
     db.transaction(() => {
       for (const item of scopesAndCollections) {
-        log(`Inserting item: ${item.bucket}.${item.scope}.${item.collection}`, { bucket: item.bucket, scope: item.scope, collection: item.collection });
+        log(`Inserting item: ${item.bucket}.${item.scope}.${item.collection}`, {
+          bucket: item.bucket,
+          scope: item.scope,
+          collection: item.collection,
+        });
         const scopeResult = insertScope(item.bucket, item.scope);
-        const collectionResult = insertCollection(
-          item.bucket,
-          item.scope,
-          item.collection,
-        );
+        const collectionResult = insertCollection(item.bucket, item.scope, item.collection);
         const tooltipResult = insertTooltip(
           item.bucket,
           item.scope,
           item.collection,
-          `This is a mock tooltip for ${item.bucket}.${item.scope}.${item.collection}`,
+          `This is a mock tooltip for ${item.bucket}.${item.scope}.${item.collection}`
         );
-        log(`Scope insertion completed: ${item.bucket}.${item.scope}, changes: ${scopeResult.changes}, rowid: ${scopeResult.lastInsertRowid}`, { changes: scopeResult.changes, lastInsertRowid: scopeResult.lastInsertRowid, bucket: item.bucket, scope: item.scope });
-        log(`Collection insertion completed: ${item.bucket}.${item.scope}.${item.collection}, changes: ${collectionResult.changes}, rowid: ${collectionResult.lastInsertRowid}`, { changes: collectionResult.changes, lastInsertRowid: collectionResult.lastInsertRowid, bucket: item.bucket, scope: item.scope, collection: item.collection });
-        log(`Tooltip insertion completed: ${item.bucket}.${item.scope}.${item.collection}, changes: ${tooltipResult.changes}, rowid: ${tooltipResult.lastInsertRowid}`, { changes: tooltipResult.changes, lastInsertRowid: tooltipResult.lastInsertRowid, bucket: item.bucket, scope: item.scope, collection: item.collection });
+        log(
+          `Scope insertion completed: ${item.bucket}.${item.scope}, changes: ${scopeResult.changes}, rowid: ${scopeResult.lastInsertRowid}`,
+          {
+            changes: scopeResult.changes,
+            lastInsertRowid: scopeResult.lastInsertRowid,
+            bucket: item.bucket,
+            scope: item.scope,
+          }
+        );
+        log(
+          `Collection insertion completed: ${item.bucket}.${item.scope}.${item.collection}, changes: ${collectionResult.changes}, rowid: ${collectionResult.lastInsertRowid}`,
+          {
+            changes: collectionResult.changes,
+            lastInsertRowid: collectionResult.lastInsertRowid,
+            bucket: item.bucket,
+            scope: item.scope,
+            collection: item.collection,
+          }
+        );
+        log(
+          `Tooltip insertion completed: ${item.bucket}.${item.scope}.${item.collection}, changes: ${tooltipResult.changes}, rowid: ${tooltipResult.lastInsertRowid}`,
+          {
+            changes: tooltipResult.changes,
+            lastInsertRowid: tooltipResult.lastInsertRowid,
+            bucket: item.bucket,
+            scope: item.scope,
+            collection: item.collection,
+          }
+        );
         insertedCount++;
       }
     })();
 
     log(`Database seeding completed: ${insertedCount} items inserted`, { insertedCount });
     const allCollections = getAllCollectionsWithTooltips();
-    log(`All collections with tooltips after insertion: ${JSON.stringify(allCollections)}`, { collectionsCount: allCollections.length });
+    log(`All collections with tooltips after insertion: ${JSON.stringify(allCollections)}`, {
+      collectionsCount: allCollections.length,
+    });
     return json({
       success: true,
       message: "Collections and tooltips seeded successfully",
@@ -72,7 +102,7 @@ export async function POST() {
           "Error seeding collections and tooltips: " +
           (error instanceof Error ? error.message : String(error)),
       },
-      { status: 500 },
+      { status: 500 }
     );
   }
 }
@@ -89,9 +119,6 @@ export async function GET() {
     return json(collectionsWithTooltips);
   } catch (error) {
     err("Error retrieving collections with tooltips:", error);
-    return json(
-      { error: "Failed to retrieve collections with tooltips" },
-      { status: 500 },
-    );
+    return json({ error: "Failed to retrieve collections with tooltips" }, { status: 500 });
   }
 }

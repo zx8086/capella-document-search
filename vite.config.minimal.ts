@@ -5,6 +5,6 @@ import { defineConfig } from "vite";
 
 export default defineConfig({
   plugins: [sveltekit()],
-  logLevel: 'info',
-  clearScreen: false
-}); 
+  logLevel: "info",
+  clearScreen: false,
+});

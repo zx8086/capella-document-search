@@ -8,9 +8,7 @@ const OpenReplayConfigSchema = z.object({
 });
 
 const CsvConfigSchema = z.object({
-  FILE_UPLOAD_LIMIT: z
-    .number()
-    .positive("CSV file upload limit must be positive"),
+  FILE_UPLOAD_LIMIT: z.number().positive("CSV file upload limit must be positive"),
 });
 
 const ElasticApmConfigSchema = z.object({
@@ -79,9 +77,7 @@ function loadFrontendConfig(): FrontendConfig {
     const envConfig: Partial<FrontendConfig> = {
       openreplay: {
         PROJECT_KEY: env.PUBLIC_OPENREPLAY_PROJECT_KEY || "",
-        INGEST_POINT:
-          env.PUBLIC_OPENREPLAY_INGEST_POINT ||
-          defaultConfig.openreplay.INGEST_POINT,
+        INGEST_POINT: env.PUBLIC_OPENREPLAY_INGEST_POINT || defaultConfig.openreplay.INGEST_POINT,
       },
       csv: {
         FILE_UPLOAD_LIMIT: env.PUBLIC_CSV_FILE_UPLOAD_LIMIT
@@ -89,20 +85,13 @@ function loadFrontendConfig(): FrontendConfig {
           : defaultConfig.csv.FILE_UPLOAD_LIMIT,
       },
       elasticApm: {
-        SERVICE_NAME:
-          env.PUBLIC_ELASTIC_APM_SERVICE_NAME ||
-          defaultConfig.elasticApm.SERVICE_NAME,
-        SERVER_URL:
-          env.PUBLIC_ELASTIC_APM_SERVER_URL ||
-          defaultConfig.elasticApm.SERVER_URL,
+        SERVICE_NAME: env.PUBLIC_ELASTIC_APM_SERVICE_NAME || defaultConfig.elasticApm.SERVICE_NAME,
+        SERVER_URL: env.PUBLIC_ELASTIC_APM_SERVER_URL || defaultConfig.elasticApm.SERVER_URL,
         SERVICE_VERSION:
-          env.PUBLIC_ELASTIC_APM_SERVICE_VERSION ||
-          defaultConfig.elasticApm.SERVICE_VERSION,
+          env.PUBLIC_ELASTIC_APM_SERVICE_VERSION || defaultConfig.elasticApm.SERVICE_VERSION,
         ENVIRONMENT:
-          (env.PUBLIC_ELASTIC_APM_ENVIRONMENT as
-            | "development"
-            | "staging"
-            | "production") || defaultConfig.elasticApm.ENVIRONMENT,
+          (env.PUBLIC_ELASTIC_APM_ENVIRONMENT as "development" | "staging" | "production") ||
+          defaultConfig.elasticApm.ENVIRONMENT,
       },
       azure: {
         CLIENT_ID: env.PUBLIC_AZURE_CLIENT_ID || "",
@@ -110,8 +99,7 @@ function loadFrontendConfig(): FrontendConfig {
         REDIRECT_URI: env.PUBLIC_AZURE_REDIRECT_URI || "",
       },
       growthbook: {
-        apiHost:
-          env.PUBLIC_GROWTHBOOK_API_HOST || defaultConfig.growthbook.apiHost,
+        apiHost: env.PUBLIC_GROWTHBOOK_API_HOST || defaultConfig.growthbook.apiHost,
         clientKey: env.PUBLIC_GROWTHBOOK_CLIENT_KEY || "",
         encryptionKey: env.PUBLIC_GROWTHBOOK_ENCRYPTION_KEY || "",
       },
@@ -132,7 +120,7 @@ function loadFrontendConfig(): FrontendConfig {
         })),
       });
       throw new Error(
-        `Frontend configuration validation failed: ${error.errors.map((e) => `${e.path.join(".")}: ${e.message}`).join(", ")}`,
+        `Frontend configuration validation failed: ${error.errors.map((e) => `${e.path.join(".")}: ${e.message}`).join(", ")}`
       );
     }
 

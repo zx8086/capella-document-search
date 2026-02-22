@@ -19,9 +19,7 @@ export function getEnvOrThrow(key: string): string {
   const value = privateValue !== undefined ? privateValue : publicValue;
 
   if (!isString(value)) {
-    throw new Error(
-      `Environment variable ${key} is not set or is not a string`,
-    );
+    throw new Error(`Environment variable ${key} is not set or is not a string`);
   }
   return value;
 }
@@ -38,39 +36,29 @@ export function getEnvOrDefault(key: string, defaultValue: string): string {
 export function getEnvNumberOrThrow(key: string): number {
   const value = getEnvOrThrow(key);
   const numberValue = Number(value);
-  if (isNaN(numberValue)) {
+  if (Number.isNaN(numberValue)) {
     throw new Error(`Environment variable ${key} is not a valid number`);
   }
   return numberValue;
 }
 
-export function getEnvNumberOrDefault(
-  key: string,
-  defaultValue: number,
-): number {
+export function getEnvNumberOrDefault(key: string, defaultValue: number): number {
   const value = getEnvOrDefault(key, defaultValue.toString());
   const numberValue = Number(value);
-  return isNaN(numberValue) ? defaultValue : numberValue;
+  return Number.isNaN(numberValue) ? defaultValue : numberValue;
 }
 
 export function getEnvBooleanOrThrow(key: string): boolean {
   const value = getEnvOrThrow(key);
-  console.log(
-    `Checking boolean env var ${key}, raw value: "${value}", type: ${typeof value}`,
-  );
+  console.log(`Checking boolean env var ${key}, raw value: "${value}", type: ${typeof value}`);
   const lowercaseValue = value.toLowerCase();
   if (lowercaseValue !== "true" && lowercaseValue !== "false") {
-    throw new Error(
-      `Environment variable ${key} is not a valid boolean. Got: "${value}"`,
-    );
+    throw new Error(`Environment variable ${key} is not a valid boolean. Got: "${value}"`);
   }
   return lowercaseValue === "true";
 }
 
-export function getEnvBooleanOrDefault(
-  key: string,
-  defaultValue: boolean,
-): boolean {
+export function getEnvBooleanOrDefault(key: string, defaultValue: boolean): boolean {
   const value = getEnvOrDefault(key, defaultValue.toString()).toLowerCase();
   return value === "true" ? true : value === "false" ? false : defaultValue;
 }

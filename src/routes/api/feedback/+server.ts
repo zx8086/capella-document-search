@@ -1,9 +1,9 @@
 /* src/routes/api/feedback/+server.ts */
 
 import { json } from "@sveltejs/kit";
-import type { RequestHandler } from "./$types";
 import { Client } from "langsmith";
-import { log, err } from "$utils/unifiedLogger";
+import { err, log } from "$utils/unifiedLogger";
+import type { RequestHandler } from "./$types";
 
 // Initialize Langsmith client
 const langsmithClient = new Client({
@@ -26,10 +26,13 @@ export const POST: RequestHandler = async ({ request }) => {
 
     // Validate score range (-1, 0, 1)
     if (score !== -1 && score !== 0 && score !== 1) {
-      return json({ error: "Score must be -1 (thumbs down), 0 (neutral), or 1 (thumbs up)" }, { status: 400 });
+      return json(
+        { error: "Score must be -1 (thumbs down), 0 (neutral), or 1 (thumbs up)" },
+        { status: 400 }
+      );
     }
 
-    log("📤 [Feedback] Submitting feedback to Langsmith", {
+    log("[Feedback] Submitting feedback to Langsmith", {
       runId,
       score,
       hasComment: !!comment,
@@ -49,7 +52,7 @@ export const POST: RequestHandler = async ({ request }) => {
       },
     });
 
-    log("✅ [Feedback] Successfully submitted feedback", {
+    log("[OK] [Feedback] Successfully submitted feedback", {
       runId,
       score,
       userId: userId || "anonymous",
@@ -58,15 +61,18 @@ export const POST: RequestHandler = async ({ request }) => {
     return json({ success: true });
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
-    
-    err("❌ [Feedback] Error submitting feedback:", {
+
+    err("[ERROR] [Feedback] Error submitting feedback:", {
       error: errorMessage,
       stack: error instanceof Error ? error.stack : undefined,
     });
 
     // Check for specific error types
     if (errorMessage.includes("not found")) {
-      return json({ error: "Run not found. The feedback session may have expired." }, { status: 404 });
+      return json(
+        { error: "Run not found. The feedback session may have expired." },
+        { status: 404 }
+      );
     }
 
     if (errorMessage.includes("unauthorized") || errorMessage.includes("forbidden")) {

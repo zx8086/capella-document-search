@@ -1,19 +1,23 @@
 <script lang="ts">
-	import type { HTMLAttributes } from "svelte/elements";
-	import { cn } from "$lib/utils.js";
+import type { HTMLAttributes } from "svelte/elements";
+import { cn } from "$lib/utils.js";
 
-	type $$Props = HTMLAttributes<HTMLDivElement> & {
-		el?: HTMLDivElement;
-	};
-	interface Props {
-		el?: $$Props["el"];
-		class?: $$Props["class"];
-		children?: import('svelte').Snippet;
-		[key: string]: any
-	}
+type $$Props = HTMLAttributes<HTMLDivElement> & {
+  el?: HTMLDivElement;
+};
+interface Props {
+  el?: $$Props["el"];
+  class?: $$Props["class"];
+  children?: import("svelte").Snippet;
+  [key: string]: any;
+}
 
-	let { el = $bindable(undefined), class: className = undefined, children, ...rest }: Props = $props();
-	
+let {
+  el = $bindable(undefined),
+  class: className = undefined,
+  children,
+  ...rest
+}: Props = $props();
 </script>
 
 <div

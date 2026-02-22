@@ -2,7 +2,8 @@
 
 # scripts to run before `bun run`-ing a file or script
 # register plugins by adding them to this list
-preload = ['./src/instrumentation.ts']
+# Preload disabled - SvelteKit native instrumentation now handles this via src/instrumentation.server.ts
+# preload = ['./src/instrumentation.ts']
 logLevel = "debug"
 
 [run]

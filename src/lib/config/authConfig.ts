@@ -1,12 +1,8 @@
 /* src/lib/config/authConfig.ts */
 
-import {
-  PublicClientApplication,
-  LogLevel,
-  type Configuration,
-} from "@azure/msal-browser";
-import { frontendConfig } from "$frontendConfig";
+import { LogLevel, PublicClientApplication } from "@azure/msal-browser";
 import { browser } from "$app/environment";
+import { frontendConfig } from "$frontendConfig";
 
 let msalInstance: PublicClientApplication | null = null;
 
@@ -17,7 +13,7 @@ export const isSafari = () => {
 };
 
 // Get the base URL safely
-const getBaseUrl = () => {
+const _getBaseUrl = () => {
   if (!browser) return "";
   return window.location.origin;
 };
@@ -42,7 +38,7 @@ export const msalConfig = {
     windowHashTimeout: 60000,
     iframeHashTimeout: 60000,
     loggerOptions: {
-      loggerCallback: (level, message, containsPii) => {
+      loggerCallback: (_level, _message, containsPii) => {
         if (!containsPii && browser) {
           // console.debug(`MSAL - ${level}: ${message}`);
         }

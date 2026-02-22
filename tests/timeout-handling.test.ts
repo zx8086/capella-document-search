@@ -1,11 +1,11 @@
-import { describe, it, expect, beforeAll } from "bun:test";
+import { describe, expect, it } from "bun:test";
 
 describe("Timeout Handling", () => {
   const baseUrl = "http://localhost:5173/api/chat";
-  
+
   it("should handle timeout gracefully with proper warning", async () => {
     const startTime = Date.now();
-    
+
     // Create a request that will likely timeout
     const response = await fetch(baseUrl, {
       method: "POST",
@@ -27,7 +27,7 @@ describe("Timeout Handling", () => {
 
     const reader = response.body?.getReader();
     const decoder = new TextDecoder();
-    let fullResponse = "";
+    let _fullResponse = "";
     let hasTimeoutWarning = false;
     let hasJSONCleanup = false;
 
@@ -37,7 +37,7 @@ describe("Timeout Handling", () => {
         if (done) break;
 
         const chunk = decoder.decode(value);
-        fullResponse += chunk;
+        _fullResponse += chunk;
 
         // Check for timeout warning
         if (chunk.includes("RESPONSE TIMEOUT") || chunk.includes("timeout")) {
@@ -45,7 +45,10 @@ describe("Timeout Handling", () => {
         }
 
         // Check for JSON cleanup
-        if (chunk.includes("JSON output truncated") || chunk.includes("Tool output was truncated")) {
+        if (
+          chunk.includes("JSON output truncated") ||
+          chunk.includes("Tool output was truncated")
+        ) {
           hasJSONCleanup = true;
         }
       }
@@ -88,7 +91,7 @@ describe("Timeout Handling", () => {
         if (done) break;
 
         const chunk = decoder.decode(value);
-        const lines = chunk.split('\n');
+        const lines = chunk.split("\n");
 
         for (const line of lines) {
           if (line.trim()) {
@@ -98,7 +101,7 @@ describe("Timeout Handling", () => {
                 progressUpdateCount++;
                 console.log(`Progress update ${progressUpdateCount}: ${data.message}`);
               }
-            } catch (e) {
+            } catch (_e) {
               // Not JSON, skip
             }
           }

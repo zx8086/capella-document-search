@@ -1,107 +1,103 @@
 <!-- src/lib/components/FileUploadResults.svelte -->
 
 <script lang="ts">
-    import { onMount } from "svelte";
+import { onMount } from "svelte";
 
-    type DetailedResult = {
-        documentKey: string;
-        found: boolean;
-        foundIn: {
-            bucket: string;
-            scope: string;
-            collection: string;
-            timeTaken: number;
-        }[];
-        notFoundIn: {
-            bucket: string;
-            scope: string;
-            collection: string;
-        }[];
-        totalCollectionsSearched: number;
-    };
-    type SimpleResult = {
-        message: string;
-    };
-    interface Props {
-        results: (DetailedResult | SimpleResult)[];
-    }
+type DetailedResult = {
+  documentKey: string;
+  found: boolean;
+  foundIn: {
+    bucket: string;
+    scope: string;
+    collection: string;
+    timeTaken: number;
+  }[];
+  notFoundIn: {
+    bucket: string;
+    scope: string;
+    collection: string;
+  }[];
+  totalCollectionsSearched: number;
+};
+type SimpleResult = {
+  message: string;
+};
+interface Props {
+  results: (DetailedResult | SimpleResult)[];
+}
 
-    let { results } = $props();
+let { results } = $props();
 
-    let foundCount = $state(0);
-    let notFoundCount = $state(0);
-    let sortedResults = $state<DetailedResult[]>([]);
+let _foundCount = $state(0);
+let _notFoundCount = $state(0);
+let sortedResults = $state<DetailedResult[]>([]);
 
-    let expandedStates = $state<Record<string, boolean>>({});
+let expandedStates = $state<Record<string, boolean>>({});
 
-    $effect(() => {
-        if (results.length > 0 && isDetailedResult(results[0])) {
-            sortedResults = [...results].sort((a, b) => {
-                if (a.found && !b.found) return -1;
-                if (!a.found && b.found) return 1;
-                return 0;
-            });
-            foundCount = results.filter(r => isDetailedResult(r) && r.found).length;
-            notFoundCount = results.filter(r => isDetailedResult(r) && !r.found).length;
-        } else {
-            sortedResults = [];
-            foundCount = 0;
-            notFoundCount = 0;
-        }
+$effect(() => {
+  if (results.length > 0 && isDetailedResult(results[0])) {
+    sortedResults = [...results].sort((a, b) => {
+      if (a.found && !b.found) return -1;
+      if (!a.found && b.found) return 1;
+      return 0;
     });
+    _foundCount = results.filter((r) => isDetailedResult(r) && r.found).length;
+    _notFoundCount = results.filter((r) => isDetailedResult(r) && !r.found).length;
+  } else {
+    sortedResults = [];
+    _foundCount = 0;
+    _notFoundCount = 0;
+  }
+});
 
-    function isDetailedResult(
-        result: DetailedResult | SimpleResult,
-    ): result is DetailedResult {
-        return "documentKey" in result;
-    }
+function isDetailedResult(result: DetailedResult | SimpleResult): result is DetailedResult {
+  return "documentKey" in result;
+}
 
-    function downloadCSV(type: "found" | "notFound") {
-        const filteredResults = sortedResults.filter(
-            (r) => r.found === (type === "found"),
-        );
-        const csv = filteredResults.map((r) => r.documentKey).join(",\n");
-        const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-        const link = document.createElement("a");
-        if (link.download !== undefined) {
-            const url = URL.createObjectURL(blob);
-            link.setAttribute("href", url);
-            link.setAttribute("download", `${type}_document_keys.csv`);
-            link.style.visibility = "hidden";
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-        }
-    }
+function _downloadCSV(type: "found" | "notFound") {
+  const filteredResults = sortedResults.filter((r) => r.found === (type === "found"));
+  const csv = filteredResults.map((r) => r.documentKey).join(",\n");
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+  const link = document.createElement("a");
+  if (link.download !== undefined) {
+    const url = URL.createObjectURL(blob);
+    link.setAttribute("href", url);
+    link.setAttribute("download", `${type}_document_keys.csv`);
+    link.style.visibility = "hidden";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  }
+}
 
-    function toggleExpand(documentKey: string) {
-        expandedStates[documentKey] = !expandedStates[documentKey];
-    }
+function _toggleExpand(documentKey: string) {
+  expandedStates[documentKey] = !expandedStates[documentKey];
+}
 
-    onMount(() => {
-        const detailsElements = document.querySelectorAll("details");
-        detailsElements.forEach((details) => {
-            details.addEventListener("toggle", handleToggle);
-        });
+onMount(() => {
+  const detailsElements = document.querySelectorAll("details");
+  detailsElements.forEach((details) => {
+    details.addEventListener("toggle", handleToggle);
+  });
 
-        return () => {
-            detailsElements.forEach((details) => {
-                details.removeEventListener("toggle", handleToggle);
-            });
-        };
+  return () => {
+    detailsElements.forEach((details) => {
+      details.removeEventListener("toggle", handleToggle);
     });
+  };
+});
 
-    function handleToggle(event: Event) {
-        const details = event.target as HTMLDetailsElement;
-        const icon = details.querySelector("svg path");
-        if (icon) {
-            if (details.open) {
-                icon.setAttribute('d', 'M19.5 8.25l-7.5 7.5-7.5-7.5m15 6l-7.5 7.5-7.5-7.5');
-            } else {
-                icon.setAttribute('d', 'M8.25 4.5l7.5 7.5-7.5 7.5M3 4.5l7.5 7.5-7.5 7.5');
-            }
-        }
+function handleToggle(event: Event) {
+  const details = event.target as HTMLDetailsElement;
+  const icon = details.querySelector("svg path");
+  if (icon) {
+    if (details.open) {
+      icon.setAttribute("d", "M19.5 8.25l-7.5 7.5-7.5-7.5m15 6l-7.5 7.5-7.5-7.5");
+    } else {
+      icon.setAttribute("d", "M8.25 4.5l7.5 7.5-7.5 7.5M3 4.5l7.5 7.5-7.5 7.5");
     }
+  }
+}
 </script>
 
 <div class="mt-8">
@@ -144,8 +140,8 @@
                             <td class="w-1/3 px-6 py-4 text-sm text-gray-500">
                                 {#if result.foundIn.length > 0}
                                     <div>
-                                        <button 
-                                            onclick={() => toggleExpand(result.documentKey)}
+                                        <button
+                                            onclick={() => _toggleExpand(result.documentKey)}
                                             class="cursor-pointer text-blue-600 hover:text-blue-800 flex items-center space-x-2"
                                             aria-expanded={!!expandedStates[result.documentKey]}
                                         >
@@ -211,9 +207,9 @@
 
         <div class="mt-4 flex justify-between items-center">
             <div class="flex items-center space-x-2">
-                <span class="font-bold">Total Found: {foundCount}</span>
+                <span class="font-bold">Total Found: {_foundCount}</span>
                 <button
-                    onclick={() => downloadCSV('found')}
+                    onclick={() => _downloadCSV('found')}
                     class="p-2 rounded-full bg-green-100 hover:bg-green-200 transition-colors duration-200 focus:ring-2 focus:ring-offset-2 focus:ring-tommy-red"
                     aria-label="Download Found Document Keys"
                     data-transaction-name="Download Found Document Keys"
@@ -238,9 +234,9 @@
                 </button>
             </div>
             <div class="flex items-center space-x-2">
-                <span class="font-bold">Total Not Found: {notFoundCount}</span>
+                <span class="font-bold">Total Not Found: {_notFoundCount}</span>
                 <button
-                    onclick={() => downloadCSV('notFound')}
+                    onclick={() => _downloadCSV('notFound')}
                     class="p-2 rounded-full bg-red-100 hover:bg-red-200 transition-colors duration-200 focus:ring-2 focus:ring-offset-2 focus:ring-tommy-red"
                     aria-label="Download Not Found Document Keys"
                     data-transaction-name="Download Not Found Document Keys"

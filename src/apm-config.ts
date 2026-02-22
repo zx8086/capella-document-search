@@ -1,7 +1,6 @@
 /* src/apm-config.ts */
 
 import { init as initApm } from "@elastic/apm-rum";
-import { envSchema } from "./env/schema";
 
 const env = import.meta.env;
 
@@ -30,7 +29,7 @@ console.log("APM RUM Config:", {
 });
 
 if (import.meta.env.DEV) {
-  console.group("🔍 APM RUM Initialization Check");
+  console.group("[DEBUG] APM RUM Initialization Check");
   console.log("APM Instance:", !!apm);
   console.log("APM Active:", apm.isActive());
   console.log("Service Name:", env.PUBLIC_ELASTIC_APM_SERVICE_NAME);
