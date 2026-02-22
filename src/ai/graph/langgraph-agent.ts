@@ -106,9 +106,11 @@ export const runAgent = traceable(
       const graph = getGraph();
 
       // Build initial messages
-      const initialMessages = [];
+      // Only include user messages to avoid tool_use/tool_result pairing issues.
+      // Assistant messages with tool_calls require corresponding ToolMessage responses,
+      // but our chat store only saves simple text content, losing the tool call IDs.
+      const initialMessages: HumanMessage[] = [];
 
-      // Add conversation history if provided
       if (request.messages && request.messages.length > 0) {
         for (const msg of request.messages) {
           if (msg.role === "user") {
@@ -117,8 +119,18 @@ export const runAgent = traceable(
         }
       }
 
-      // Add current message
-      initialMessages.push(new HumanMessage(request.message));
+      // Only add request.message if it's not already the last user message
+      // This prevents duplication when the frontend sends both messages array and message field
+      const lastUserMsg = initialMessages[initialMessages.length - 1];
+      const currentMsgContent = request.message?.trim();
+      if (currentMsgContent && (!lastUserMsg || lastUserMsg.content !== currentMsgContent)) {
+        initialMessages.push(new HumanMessage(currentMsgContent));
+      }
+
+      // Ensure we have at least one message
+      if (initialMessages.length === 0 && request.message) {
+        initialMessages.push(new HumanMessage(request.message));
+      }
 
       // Initialize state
       const initialState: Partial<AgentStateType> = {
@@ -212,7 +224,8 @@ export async function* streamAgent(request: ChatRequest): AsyncGenerator<string,
     const graph = getGraph();
 
     // Build initial messages
-    const initialMessages = [];
+    // Only include user messages to avoid tool_use/tool_result pairing issues
+    const initialMessages: HumanMessage[] = [];
 
     if (request.messages && request.messages.length > 0) {
       for (const msg of request.messages) {
@@ -222,7 +235,18 @@ export async function* streamAgent(request: ChatRequest): AsyncGenerator<string,
       }
     }
 
-    initialMessages.push(new HumanMessage(request.message));
+    // Only add request.message if it's not already the last user message
+    // This prevents duplication when the frontend sends both messages array and message field
+    const lastUserMsg = initialMessages[initialMessages.length - 1];
+    const currentMsgContent = request.message?.trim();
+    if (currentMsgContent && (!lastUserMsg || lastUserMsg.content !== currentMsgContent)) {
+      initialMessages.push(new HumanMessage(currentMsgContent));
+    }
+
+    // Ensure we have at least one message
+    if (initialMessages.length === 0 && request.message) {
+      initialMessages.push(new HumanMessage(request.message));
+    }
 
     const initialState: Partial<AgentStateType> = {
       messages: initialMessages,
@@ -234,7 +258,36 @@ export async function* streamAgent(request: ChatRequest): AsyncGenerator<string,
       version: "v2",
     });
 
+    let streamedContent = "";
+    let hasStreamedContent = false;
+    let finalResponseText = ""; // Track the final response for fallback
+
     for await (const event of stream) {
+      // Emit node execution events as progress updates
+      if (event.event === "on_chain_start" && event.name && event.name !== "LangGraph") {
+        const nodeName = event.name;
+        let progressMessage = "Processing...";
+
+        if (nodeName === "classify") {
+          progressMessage = "Analyzing your question...";
+        } else if (nodeName === "retriever") {
+          progressMessage = "Searching knowledge base...";
+        } else if (nodeName === "toolRouter") {
+          progressMessage = "Determining best approach...";
+        } else if (nodeName === "agent") {
+          progressMessage = "Reasoning about your question...";
+        } else if (nodeName === "responder") {
+          progressMessage = "Generating response...";
+        }
+
+        yield `${JSON.stringify({
+          type: "progress",
+          message: progressMessage,
+          details: `Running ${nodeName}`,
+          nodeName,
+        })}\n`;
+      }
+
       // Emit tool execution events as progress updates
       if (event.event === "on_tool_start") {
         yield `${JSON.stringify({
@@ -275,18 +328,113 @@ export async function* streamAgent(request: ChatRequest): AsyncGenerator<string,
         }
 
         if (textContent) {
+          streamedContent += textContent;
+          hasStreamedContent = true;
           yield `${JSON.stringify({
             content: textContent,
           })}\n`;
         }
       }
+
+      // Log all on_chain_end events to understand the event flow
+      if (event.event === "on_chain_end") {
+        log("[LangGraph] on_chain_end event received", {
+          name: event.name,
+          hasData: !!event.data,
+          hasOutput: !!event.data?.output,
+          isLangGraph: event.name === "LangGraph",
+        });
+      }
+
+      // Capture final state from graph completion to handle non-streamed responses
+      if (event.event === "on_chain_end" && event.name === "LangGraph") {
+        const output = event.data?.output;
+        log("[LangGraph] Processing LangGraph on_chain_end", {
+          hasOutput: !!output,
+          hasStreamedContent,
+          streamedContentLength: streamedContent.length,
+          outputKeys: output ? Object.keys(output) : [],
+          streamedResponseValue: output?.streamedResponse?.substring?.(0, 100) || "N/A",
+        });
+
+        if (output) {
+          // Try multiple sources for the response
+          let finalText = "";
+          let source = "none";
+
+          // First, check streamedResponse from state (set by responder)
+          if (output.streamedResponse && typeof output.streamedResponse === "string") {
+            finalText = output.streamedResponse;
+            source = "streamedResponse";
+          }
+
+          // Fallback to last message content if streamedResponse is empty
+          if (!finalText) {
+            const messages = output.messages || [];
+            const lastMessage = messages[messages.length - 1];
+            log("[LangGraph] Checking last message for content", {
+              messageCount: messages.length,
+              hasLastMessage: !!lastMessage,
+              lastMessageType: lastMessage?.constructor?.name,
+            });
+
+            if (lastMessage && "content" in lastMessage) {
+              const content = lastMessage.content;
+              if (typeof content === "string") {
+                finalText = content;
+                source = "lastMessage-string";
+              } else if (Array.isArray(content)) {
+                finalText = content
+                  .map((block: { type?: string; text?: string } | string) => {
+                    if (typeof block === "string") return block;
+                    if (block.type === "text" && block.text) return block.text;
+                    return "";
+                  })
+                  .filter(Boolean)
+                  .join("");
+                source = "lastMessage-array";
+              }
+            }
+          }
+
+          log("[LangGraph] Final text extraction result", {
+            finalTextLength: finalText.length,
+            source,
+            willEmit: finalText && finalText !== streamedContent && !hasStreamedContent,
+          });
+
+          // Only emit if we have content that wasn't already streamed
+          if (finalText && finalText !== streamedContent && !hasStreamedContent) {
+            log("[LangGraph] Emitting non-streamed response from final state", {
+              responseLength: finalText.length,
+              source,
+            });
+            finalResponseText = finalText; // Track for done event fallback
+            yield `${JSON.stringify({
+              content: finalText,
+            })}\n`;
+          }
+
+          // Always track the final response text for the done event
+          if (finalText && !finalResponseText) {
+            finalResponseText = finalText;
+          }
+        }
+      }
     }
 
-    // Final completion event (frontend expects { done: true, runId: "..." })
+    // Track streamed content as final response if it wasn't captured from on_chain_end
+    if (streamedContent && !finalResponseText) {
+      finalResponseText = streamedContent;
+    }
+
+    // Final completion event with fallback response
+    // Include finalResponse as a fallback in case content events weren't processed
     yield `${JSON.stringify({
       done: true,
       runId,
       executionTimeMs: Date.now() - startTime,
+      finalResponse: finalResponseText || undefined,
     })}\n`;
   } catch (e) {
     const errorMessage = e instanceof Error ? e.message : String(e);

@@ -1,81 +1,36 @@
 // src/ai/graph/nodes/tool-router.ts
 
+import { HumanMessage } from "@langchain/core/messages";
 import { log } from "$utils/unifiedLogger";
+import { createBedrockChatModel } from "../../clients/bedrock-bearer-client";
+import { toolsByName } from "../../tools";
 import type { AgentStateType } from "../state";
 
-// Tool selection patterns based on query keywords
-const TOOL_PATTERNS: { pattern: RegExp; tools: string[] }[] = [
-  // Cluster monitoring
-  {
-    pattern: /\b(vital|cpu|memory|disk|health|status)\b/i,
-    tools: ["get_system_vitals"],
-  },
-  {
-    pattern: /\b(node|cluster|topology|service)\b/i,
-    tools: ["get_system_nodes"],
-  },
+const TOOL_ROUTING_PROMPT = `You are a routing classifier for a Couchbase database assistant. Analyze the user's question and determine if it requires real-time diagnostic tools or can be answered from document context alone.
 
-  // Query analysis
-  {
-    pattern: /\b(fatal|error|fail|timeout)\b/i,
-    tools: ["get_fatal_requests"],
-  },
-  {
-    pattern: /\b(expensive|cost|resource)\b/i,
-    tools: ["get_most_expensive_queries"],
-  },
-  {
-    pattern: /\b(slow|long.?running|duration)\b/i,
-    tools: ["get_longest_running_queries"],
-  },
-  {
-    pattern: /\b(frequent|common|popular|hot)\b/i,
-    tools: ["get_most_frequent_queries"],
-  },
-  {
-    pattern: /\b(large.?result|big.?result|result.?size)\b/i,
-    tools: ["get_largest_result_size_queries"],
-  },
-  {
-    pattern: /\b(result.?count|many.?results|document.?count)\b/i,
-    tools: ["get_largest_result_count_queries"],
-  },
-  {
-    pattern: /\b(primary.?index|full.?scan)\b/i,
-    tools: ["get_primary_index_queries"],
-  },
-  {
-    pattern: /\b(completed|history|recent)\b/i,
-    tools: ["get_completed_requests"],
-  },
+REQUIRES TOOLS (respond "tools"):
+- Questions about current cluster state, health, or status
+- Questions about running queries, performance metrics, or system resources
+- Questions asking to execute queries or check indexes
+- Questions about what's happening right now in the database
+- Any request that needs live data from the database cluster
 
-  // Index analysis
-  {
-    pattern: /\b(index|indexes)\b/i,
-    tools: ["get_system_indexes", "get_detailed_indexes"],
-  },
-  {
-    pattern: /\b(prepared|statement)\b/i,
-    tools: ["get_prepared_statements", "get_detailed_prepared_statements"],
-  },
-  {
-    pattern: /\b(unused|drop|remove|cleanup)\b/i,
-    tools: ["get_indexes_to_drop"],
-  },
+NO TOOLS NEEDED (respond "knowledge"):
+- Questions about concepts, best practices, or documentation
+- Questions about how something works in general
+- Questions that can be answered from retrieved document context
+- Questions about company usage, case studies, or implementations
+- Historical or explanatory questions
 
-  // Schema tools
-  {
-    pattern: /\b(schema|structure|field|document.?type)\b/i,
-    tools: ["get_schema_for_collection"],
-  },
-  {
-    pattern: /\b(query|select|sql\+\+|n1ql)\b/i,
-    tools: ["run_sql_plus_plus_query"],
-  },
-];
+Examples:
+- "Are my nodes healthy?" → tools
+- "Show me slow queries" → tools
+- "What indexes exist?" → tools
+- "How does Tommy Hilfiger use Couchbase?" → knowledge
+- "What is N1QL?" → knowledge
+- "Explain query optimization" → knowledge
 
-// Tools that don't require specific context
-const GENERAL_DIAGNOSTIC_TOOLS = ["get_system_vitals", "get_system_nodes", "get_system_indexes"];
+Respond with ONLY the word "tools" or "knowledge".`;
 
 function extractQueryFromMessages(messages: AgentStateType["messages"]): string {
   const lastMessage = messages[messages.length - 1];
@@ -95,46 +50,67 @@ export async function toolRouterNode(state: AgentStateType): Promise<Partial<Age
   const query = extractQueryFromMessages(state.messages);
 
   if (!query) {
-    log("[ToolRouter] No query found, selecting general diagnostics");
-    return { selectedTools: GENERAL_DIAGNOSTIC_TOOLS };
+    log("[ToolRouter] No query found");
+    return { selectedTools: [] };
   }
 
-  const selectedTools = new Set<string>();
+  const hasRagContext = !!(state.ragContext && state.ragContext.length > 0);
 
-  // Match patterns to select tools
-  for (const { pattern, tools } of TOOL_PATTERNS) {
-    if (pattern.test(query)) {
-      for (const tool of tools) {
-        selectedTools.add(tool);
-      }
+  try {
+    // Use LLM to classify whether tools are needed
+    const model = createBedrockChatModel({ temperature: 0, maxTokens: 10 });
+
+    const response = await model.invoke([
+      new HumanMessage(TOOL_ROUTING_PROMPT),
+      new HumanMessage(`Query: "${query}"\nHas document context: ${hasRagContext}`),
+    ]);
+
+    const classification = (response.content as string).toLowerCase().trim();
+    const needsTools = classification.includes("tools");
+
+    log("[ToolRouter] LLM classification result", {
+      query: query.substring(0, 50),
+      classification,
+      needsTools,
+      hasRagContext,
+    });
+
+    if (!needsTools && hasRagContext) {
+      // Knowledge question with RAG context - skip tools
+      return { selectedTools: [] };
     }
+
+    // Diagnostic question - provide all tools, let agent decide which to use
+    const allToolNames = Object.keys(toolsByName);
+
+    log("[ToolRouter] Providing tools to agent", {
+      toolCount: allToolNames.length,
+    });
+
+    return { selectedTools: allToolNames };
+  } catch (e) {
+    const errorMessage = e instanceof Error ? e.message : String(e);
+    log("[ToolRouter] LLM classification failed, defaulting to tools", {
+      error: errorMessage,
+    });
+
+    // On error, default to providing tools (safer option)
+    return { selectedTools: Object.keys(toolsByName) };
   }
-
-  // If no specific tools matched, select general diagnostics
-  if (selectedTools.size === 0) {
-    log("[ToolRouter] No specific tools matched, using general diagnostics");
-    for (const tool of GENERAL_DIAGNOSTIC_TOOLS) {
-      selectedTools.add(tool);
-    }
-  }
-
-  const toolList = Array.from(selectedTools);
-
-  log("[ToolRouter] Tools selected", {
-    query: query.substring(0, 50),
-    selectedTools: toolList,
-    toolCount: toolList.length,
-  });
-
-  return { selectedTools: toolList };
 }
 
 export function shouldUseTool(state: AgentStateType): "agent" | "responder" {
-  // If we have selected tools and classification is complex, route to agent
-  if (state.queryClassification === "complex" && state.selectedTools.length > 0) {
+  // Only route to agent if we have specific tools selected that need execution
+  // If no tools are selected, go directly to responder (uses RAG context if available)
+  if (state.selectedTools.length > 0) {
+    log("[ToolRouter] Routing to agent for tool execution", {
+      selectedTools: state.selectedTools,
+    });
     return "agent";
   }
 
-  // Otherwise go directly to responder
+  log("[ToolRouter] No tools selected, routing to responder", {
+    hasRagContext: !!(state.ragContext && state.ragContext.length > 0),
+  });
   return "responder";
 }

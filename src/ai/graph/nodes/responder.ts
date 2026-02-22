@@ -9,6 +9,16 @@ const SIMPLE_SYSTEM_PROMPT = `You are a friendly Couchbase database assistant. Y
 
 For general questions, provide helpful and concise answers. If the user is asking about something that requires database analysis, let them know you can help with that and suggest what information you would need.`;
 
+const KNOWLEDGE_SYSTEM_PROMPT = `You are an intelligent assistant with access to retrieved document context. Answer the user's question using the provided document context.
+
+<response_guidelines>
+1. Use the <document_context> to answer the user's question directly
+2. Cite sources when referencing specific information (e.g., "According to [filename]...")
+3. If the context doesn't fully answer the question, acknowledge what you found and what's missing
+4. Be concise but thorough
+5. Use markdown formatting for readability
+</response_guidelines>`;
+
 const ANALYSIS_SYSTEM_PROMPT = `You are a Couchbase database analyst. Based on the tool results and context provided, synthesize a clear and actionable response for the user.
 
 <response_guidelines>
@@ -60,12 +70,109 @@ Executed ${state.toolResults.length} tool(s): ${successfulTools.length} successf
 
 export async function responderNode(state: AgentStateType): Promise<Partial<AgentStateType>> {
   try {
+    // Check if the agent already produced a valid AI response (no tool calls)
+    // If so, skip re-invoking the model to avoid duplicate/empty responses
+    // IMPORTANT: Only use existing response if it's from the AI (not a HumanMessage)
+    const lastMessage = state.messages[state.messages.length - 1];
+    const isAIMessage =
+      lastMessage &&
+      // Check if it's an AI message by looking for the _getType method or checking class name
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      ((lastMessage as any)._getType?.() === "ai" ||
+        lastMessage.constructor?.name === "AIMessage" ||
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (lastMessage as any).type === "ai");
+
+    if (isAIMessage && lastMessage && "content" in lastMessage) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const toolCalls = (lastMessage as any)?.tool_calls;
+      const hasToolCalls = toolCalls && Array.isArray(toolCalls) && toolCalls.length > 0;
+
+      if (hasToolCalls) {
+        // SAFETY CHECK: If we're in the responder but the last message has tool_calls,
+        // this means tools were requested but not executed (shouldn't happen normally).
+        // Extract any text content from the AI message, or return an error.
+        log("[Responder] WARNING: Received AIMessage with tool_calls - tools were not executed", {
+          toolCallCount: toolCalls.length,
+        });
+
+        const content = lastMessage.content;
+        let textContent = "";
+
+        if (typeof content === "string") {
+          textContent = content;
+        } else if (Array.isArray(content)) {
+          textContent = content
+            .map((block) => {
+              if (typeof block === "string") return block;
+              if (block.type === "text" && block.text) return block.text;
+              return "";
+            })
+            .filter(Boolean)
+            .join("");
+        }
+
+        // If there's text content alongside tool_calls, use it
+        if (textContent.trim()) {
+          return {
+            streamedResponse: textContent,
+          };
+        }
+
+        // No text content - return error message about tools not being executed
+        return {
+          streamedResponse:
+            "I attempted to use diagnostic tools to answer your question, but encountered an issue. Please try your question again.",
+          error: "Tools were requested but not executed",
+        };
+      }
+
+      // No tool calls - agent already generated a final response
+      const content = lastMessage.content;
+      let textContent = "";
+
+      if (typeof content === "string") {
+        textContent = content;
+      } else if (Array.isArray(content)) {
+        textContent = content
+          .map((block) => {
+            if (typeof block === "string") return block;
+            if (block.type === "text" && block.text) return block.text;
+            return "";
+          })
+          .filter(Boolean)
+          .join("");
+      }
+
+      if (textContent.trim()) {
+        log("[Responder] Using agent's existing response, skipping redundant LLM call", {
+          responseLength: textContent.length,
+        });
+        return {
+          streamedResponse: textContent,
+        };
+      }
+    }
+
     const isSimpleQuery = state.queryClassification === "simple";
     const hasToolResults = state.toolResults && state.toolResults.length > 0;
+    const hasRagContext = state.ragContext && state.ragContext.length > 0;
 
-    // For simple queries without tool results, use simple prompt
-    const systemPrompt =
-      isSimpleQuery && !hasToolResults ? SIMPLE_SYSTEM_PROMPT : ANALYSIS_SYSTEM_PROMPT;
+    // Select appropriate system prompt based on query type and available context
+    let systemPrompt: string;
+    if (isSimpleQuery && !hasToolResults && !hasRagContext) {
+      // Simple greeting or general question
+      systemPrompt = SIMPLE_SYSTEM_PROMPT;
+    } else if (hasToolResults) {
+      // Diagnostic analysis with tool results
+      systemPrompt = ANALYSIS_SYSTEM_PROMPT;
+    } else if (hasRagContext) {
+      // Knowledge question with document context
+      systemPrompt = KNOWLEDGE_SYSTEM_PROMPT;
+    } else {
+      // Default to analysis prompt
+      systemPrompt = ANALYSIS_SYSTEM_PROMPT;
+    }
 
     const contextInfo = buildContextFromState(state);
     const fullSystemPrompt = contextInfo ? `${systemPrompt}\n\n${contextInfo}` : systemPrompt;
@@ -74,38 +181,49 @@ export async function responderNode(state: AgentStateType): Promise<Partial<Agen
 
     const messages = [new SystemMessage(fullSystemPrompt), ...state.messages];
 
-    log("[Responder] Generating final response", {
+    log("[Responder] Generating final response with streaming", {
       isSimpleQuery,
       hasToolResults,
+      hasRagContext,
       toolResultCount: state.toolResults?.length || 0,
+      ragContextCount: state.ragContext?.length || 0,
+      promptType: hasToolResults ? "analysis" : hasRagContext ? "knowledge" : "simple",
       messageCount: messages.length,
     });
 
-    const response = await model.invoke(messages);
+    // Use streaming to emit on_llm_stream events for LangGraph streamEvents
+    const stream = await model.stream(messages);
 
-    // Extract text content from various response formats
+    // Accumulate the streamed response
     let textContent = "";
-    if (typeof response.content === "string") {
-      textContent = response.content;
-    } else if (Array.isArray(response.content)) {
-      textContent = response.content
-        .map((block) => {
-          if (typeof block === "string") return block;
-          if (block.type === "text" && block.text) return block.text;
-          return "";
-        })
-        .filter(Boolean)
-        .join("");
+    let finalResponse: AIMessage | null = null;
+
+    for await (const chunk of stream) {
+      // Extract text from chunk content
+      if (typeof chunk.content === "string") {
+        textContent += chunk.content;
+      } else if (Array.isArray(chunk.content)) {
+        for (const block of chunk.content) {
+          if (typeof block === "string") {
+            textContent += block;
+          } else if (block.type === "text" && block.text) {
+            textContent += block.text;
+          }
+        }
+      }
+      // Keep track of the last chunk for metadata
+      finalResponse = chunk;
     }
 
-    log("[Responder] Response generated", {
+    log("[Responder] Response generated via streaming", {
       responseLength: textContent.length,
-      contentType: typeof response.content,
-      isArray: Array.isArray(response.content),
     });
 
+    // Create a complete AIMessage with the full response
+    const completeResponse = new AIMessage(textContent);
+
     return {
-      messages: [response],
+      messages: [completeResponse],
       streamedResponse: textContent,
     };
   } catch (e) {

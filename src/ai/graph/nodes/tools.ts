@@ -1,6 +1,6 @@
 // src/ai/graph/nodes/tools.ts
 
-import { AIMessage, ToolMessage } from "@langchain/core/messages";
+import { ToolMessage } from "@langchain/core/messages";
 import { err, log } from "$utils/unifiedLogger";
 import { toolsByName } from "../../tools";
 import type { AgentStateType, ToolResult } from "../state";
@@ -14,15 +14,16 @@ interface ToolCall {
 export async function toolsNode(state: AgentStateType): Promise<Partial<AgentStateType>> {
   const lastMessage = state.messages[state.messages.length - 1];
 
-  if (!lastMessage || !(lastMessage instanceof AIMessage)) {
-    log("[Tools] No AI message found");
-    return {};
-  }
-
-  const toolCalls = lastMessage.tool_calls as ToolCall[] | undefined;
+  // Check for tool_calls property directly instead of instanceof
+  // LangGraph may return messages that don't pass instanceof checks
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const toolCalls = (lastMessage as any)?.tool_calls as ToolCall[] | undefined;
 
   if (!toolCalls || toolCalls.length === 0) {
-    log("[Tools] No tool calls found in last message");
+    log("[Tools] No tool calls found in last message", {
+      hasMessage: !!lastMessage,
+      messageType: lastMessage?.constructor?.name,
+    });
     return {};
   }
 

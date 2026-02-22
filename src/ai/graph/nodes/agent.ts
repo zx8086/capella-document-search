@@ -6,22 +6,33 @@ import { createBedrockChatModel, getMaxRecursionDepth } from "../../clients/bedr
 import { allTools } from "../../tools";
 import type { AgentStateType } from "../state";
 
-const SYSTEM_PROMPT = `You are a Couchbase database analyst with access to real-time diagnostic tools.
+const SYSTEM_PROMPT = `You are an intelligent assistant with access to real-time Couchbase diagnostic tools and retrieved document context.
 
 <role>
-You help users understand and optimize their Couchbase clusters by executing diagnostic tools and analyzing the results.
+You help users by:
+1. Answering questions using retrieved document context when available
+2. Executing diagnostic tools to analyze Couchbase clusters
+3. Providing insights based on both documents and tool results
 </role>
 
+<context_usage_rules>
+1. When <retrieved_context> is provided, USE IT to answer the user's question
+2. Cite sources from the retrieved context (e.g., "According to [filename]...")
+3. If the retrieved context answers the question, you do NOT need to call tools
+4. Only use tools when the question requires real-time cluster diagnostics
+</context_usage_rules>
+
 <tool_execution_rules>
-1. ALWAYS use tools to retrieve actual data - NEVER simulate or fabricate results
-2. When a user asks about cluster health, queries, or performance, you MUST execute the appropriate tool
+1. Use tools for real-time data like cluster health, query performance, and system metrics
+2. NEVER simulate or fabricate tool results
 3. After executing a tool, analyze the results and provide actionable insights
-4. If a tool returns no data, explain what that means and suggest alternatives
-5. You may call multiple tools if needed to fully answer the question
+4. You may call multiple tools if needed to fully answer the question
 </tool_execution_rules>
 
 <response_format>
+- Answer the question directly using available context first
 - Summarize findings clearly and concisely
+- Cite document sources when using retrieved context
 - Highlight any issues or concerns
 - Provide specific recommendations when applicable
 - Use markdown formatting for readability
@@ -94,6 +105,8 @@ export async function agentNode(state: AgentStateType): Promise<Partial<AgentSta
       toolCount: availableTools.length,
       messageCount: messages.length,
       recursionDepth: state.recursionDepth,
+      hasRagContext: !!(state.ragContext && state.ragContext.length > 0),
+      ragContextCount: state.ragContext?.length || 0,
     });
 
     const response = await modelWithTools.invoke(messages);
@@ -117,21 +130,24 @@ export async function agentNode(state: AgentStateType): Promise<Partial<AgentSta
 }
 
 export function shouldContinue(state: AgentStateType): "tools" | "responder" {
-  // Check for errors
-  if (state.error) {
-    return "responder";
-  }
-
-  // Check the last message for tool calls
+  // Check the last message for tool calls FIRST - tool calls take priority
+  // Even if there was an earlier error (e.g., retrieval failed), we should still
+  // execute tools if the agent requested them
   const lastMessage = state.messages[state.messages.length - 1];
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const toolCalls = (lastMessage as any)?.tool_calls;
   if (lastMessage && toolCalls && Array.isArray(toolCalls) && toolCalls.length > 0) {
-    log("[Agent] Tool calls detected, routing to tools node");
+    log("[Agent] Tool calls detected, routing to tools node", {
+      toolCallCount: toolCalls.length,
+      hasError: !!state.error,
+    });
     return "tools";
   }
 
-  log("[Agent] No tool calls, routing to responder");
+  // No tool calls - route to responder
+  log("[Agent] No tool calls, routing to responder", {
+    hasError: !!state.error,
+  });
   return "responder";
 }

@@ -1,13 +1,22 @@
 // src/ai/graph/nodes/retriever.ts
 
+import { AmazonKnowledgeBaseRetriever } from "@langchain/aws";
 import { PineconeStore } from "@langchain/pinecone";
 import { Pinecone } from "@pinecone-database/pinecone";
+import { backendConfig } from "$backendConfig";
 import type { RAGContext } from "$lib/rag/types";
 import { err, log } from "$utils/unifiedLogger";
 import { createBedrockEmbeddings } from "../../clients/bedrock-bearer-client";
 import type { AgentStateType } from "../state";
 
+type RAGPipeline = "PINECONE" | "AWS_KNOWLEDGE_BASE" | "CAPELLA" | "VECTORIZE";
+
 let pineconeStore: PineconeStore | null = null;
+let awsKBRetriever: AmazonKnowledgeBaseRetriever | null = null;
+
+function getRAGPipeline(): RAGPipeline {
+  return backendConfig.rag.RAG_PIPELINE;
+}
 
 async function initializePineconeStore(): Promise<PineconeStore> {
   if (pineconeStore) {
@@ -17,20 +26,50 @@ async function initializePineconeStore(): Promise<PineconeStore> {
   log("[Retriever] Initializing Pinecone store with LangChain");
 
   const pinecone = new Pinecone({
-    apiKey: Bun.env.PINECONE_API_KEY as string,
+    apiKey: backendConfig.rag.PINECONE_API_KEY,
   });
 
-  const pineconeIndex = pinecone.index(Bun.env.PINECONE_INDEX_NAME as string);
+  const pineconeIndex = pinecone.index(backendConfig.rag.PINECONE_INDEX_NAME);
 
   const embeddings = createBedrockEmbeddings();
 
   pineconeStore = await PineconeStore.fromExistingIndex(embeddings, {
     pineconeIndex,
-    namespace: Bun.env.PINECONE_NAMESPACE as string,
+    namespace: backendConfig.rag.PINECONE_NAMESPACE,
   });
 
   log("[Retriever] Pinecone store initialized");
   return pineconeStore;
+}
+
+function initializeAWSKnowledgeBaseRetriever(topK: number = 3): AmazonKnowledgeBaseRetriever {
+  if (awsKBRetriever) {
+    return awsKBRetriever;
+  }
+
+  log("[Retriever] Initializing AWS Knowledge Base retriever");
+
+  // Use only accessKeyId and secretAccessKey (matching original implementation)
+  // Session token is NOT needed for IAM user credentials
+  awsKBRetriever = new AmazonKnowledgeBaseRetriever({
+    knowledgeBaseId: backendConfig.rag.KNOWLEDGE_BASE_ID,
+    region: backendConfig.rag.AWS_REGION,
+    topK,
+    clientOptions: {
+      credentials: {
+        accessKeyId: backendConfig.rag.AWS_ACCESS_KEY_ID,
+        secretAccessKey: backendConfig.rag.AWS_SECRET_ACCESS_KEY,
+      },
+    },
+  });
+
+  log("[Retriever] AWS Knowledge Base retriever initialized", {
+    knowledgeBaseId: backendConfig.rag.KNOWLEDGE_BASE_ID,
+    region: backendConfig.rag.AWS_REGION,
+    topK,
+  });
+
+  return awsKBRetriever;
 }
 
 function extractQueryFromMessages(messages: AgentStateType["messages"]): string {
@@ -61,6 +100,7 @@ function documentsToRAGContext(
 
 export async function retrieverNode(state: AgentStateType): Promise<Partial<AgentStateType>> {
   const startTime = Date.now();
+  const pipeline = getRAGPipeline();
 
   try {
     const query = extractQueryFromMessages(state.messages);
@@ -75,18 +115,33 @@ export async function retrieverNode(state: AgentStateType): Promise<Partial<Agen
     log("[Retriever] Processing query", {
       queryLength: query.length,
       queryPreview: query.substring(0, 100),
+      pipeline,
     });
 
-    const store = await initializePineconeStore();
-
     const topK = 3;
-    const docs = await store.similaritySearch(query, topK);
+    let docs: { pageContent: string; metadata: Record<string, unknown> }[] = [];
+
+    switch (pipeline) {
+      case "AWS_KNOWLEDGE_BASE": {
+        const retriever = initializeAWSKnowledgeBaseRetriever(topK);
+        const retrievedDocs = await retriever.invoke(query);
+        docs = retrievedDocs;
+        break;
+      }
+      case "PINECONE":
+      default: {
+        const store = await initializePineconeStore();
+        docs = await store.similaritySearch(query, topK);
+        break;
+      }
+    }
 
     const executionTime = Date.now() - startTime;
 
     log("[Retriever] Documents retrieved", {
       documentCount: docs.length,
       executionTimeMs: executionTime,
+      pipeline,
     });
 
     const ragContext = documentsToRAGContext(docs);
@@ -100,6 +155,7 @@ export async function retrieverNode(state: AgentStateType): Promise<Partial<Agen
     err("[Retriever] Retrieval failed", {
       error: errorMessage,
       executionTimeMs: executionTime,
+      pipeline,
     });
 
     return {
