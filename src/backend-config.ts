@@ -497,6 +497,13 @@ try {
           BEDROCK_EMBEDDING_MODEL: backendConfig.rag.BEDROCK_EMBEDDING_MODEL,
           BEDROCK_CHAT_MODEL: backendConfig.rag.BEDROCK_CHAT_MODEL,
           BEDROCK_MAX_TOKENS: backendConfig.rag.BEDROCK_MAX_TOKENS,
+          // Auth method display
+          BEDROCK_AUTH: backendConfig.rag.AWS_BEARER_TOKEN_BEDROCK?.startsWith("ABSK")
+            ? "BEDROCK_API_KEY"
+            : "IAM_CREDENTIALS",
+          HAS_IAM_CREDENTIALS: !!(
+            backendConfig.rag.AWS_ACCESS_KEY_ID && backendConfig.rag.AWS_SECRET_ACCESS_KEY
+          ),
         },
       },
       null,

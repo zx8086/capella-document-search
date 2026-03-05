@@ -6,7 +6,7 @@ import { Pinecone } from "@pinecone-database/pinecone";
 import { backendConfig } from "$backendConfig";
 import type { RAGContext } from "$lib/rag/types";
 import { err, log } from "$utils/unifiedLogger";
-import { createBedrockEmbeddings } from "../../clients/bedrock-bearer-client";
+import { createBedrockEmbeddings, getAuthMethod, getIAMCredentials } from "../../clients/bedrock-bearer-client";
 import type { AgentStateType } from "../state";
 
 type RAGPipeline = "PINECONE" | "AWS_KNOWLEDGE_BASE" | "CAPELLA" | "VECTORIZE";
@@ -49,17 +49,29 @@ function initializeAWSKnowledgeBaseRetriever(topK: number = 3): AmazonKnowledgeB
 
   log("[Retriever] Initializing AWS Knowledge Base retriever");
 
-  // Use only accessKeyId and secretAccessKey (matching original implementation)
-  // Session token is NOT needed for IAM user credentials
+  // AWS Knowledge Base requires IAM credentials (does NOT support Bedrock API keys)
+  const iamCredentials = getIAMCredentials();
+  const bedrockAuthMethod = getAuthMethod();
+
+  log("[Retriever] AWS auth configuration", {
+    bedrockAuthMethod,
+    hasIAMCredentials: !!iamCredentials,
+    knowledgeBaseNote: "Knowledge Base requires IAM credentials, not Bedrock API key",
+  });
+
+  if (!iamCredentials) {
+    throw new Error(
+      "AWS Knowledge Base requires IAM credentials (AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY). " +
+      "Bedrock API keys only work for Bedrock models, not Knowledge Base."
+    );
+  }
+
   awsKBRetriever = new AmazonKnowledgeBaseRetriever({
     knowledgeBaseId: backendConfig.rag.KNOWLEDGE_BASE_ID,
     region: backendConfig.rag.AWS_REGION,
     topK,
     clientOptions: {
-      credentials: {
-        accessKeyId: backendConfig.rag.AWS_ACCESS_KEY_ID,
-        secretAccessKey: backendConfig.rag.AWS_SECRET_ACCESS_KEY,
-      },
+      credentials: iamCredentials,
     },
   });
 
@@ -67,6 +79,7 @@ function initializeAWSKnowledgeBaseRetriever(topK: number = 3): AmazonKnowledgeB
     knowledgeBaseId: backendConfig.rag.KNOWLEDGE_BASE_ID,
     region: backendConfig.rag.AWS_REGION,
     topK,
+    authMethod: "IAM_CREDENTIALS",
   });
 
   return awsKBRetriever;

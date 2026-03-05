@@ -43,9 +43,12 @@ const RagConfigSchema = z.object({
   PINECONE_INDEX_NAME: z.string().default('platform-engineering-rag'),
   PINECONE_NAMESPACE: z.string().default('capella-document-search'),
   AWS_REGION: z.string().default('eu-central-1'),
-  AWS_ACCESS_KEY_ID: z.string().default('DUMMY'),
-  AWS_SECRET_ACCESS_KEY: z.string().default('DUMMY'),
-  AWS_BEARER_TOKEN_BEDROCK: z.string().default('ABSKQmVkcm9ja0FQSUtleS16ZWF1LWF0LTM1Mjg5Njg3NzI4MTpERHVXOFovZHVQTG5FWDlvM0VKUDcvQkEvZVhnOTMyZWpXRk1iQzlodlhBOFBkc0hrYlJBaTFXV3FpMD0='),
+  // IAM credentials (only needed if NOT using Bedrock API key)
+  AWS_ACCESS_KEY_ID: z.string().default(''),
+  AWS_SECRET_ACCESS_KEY: z.string().default(''),
+  // Bedrock API key (starts with "ABSK") - preferred for long-lived auth
+  // When set, IAM credentials above are ignored
+  AWS_BEARER_TOKEN_BEDROCK: z.string().default(''),
   BEDROCK_EMBEDDING_MODEL: z.string().default('amazon.titan-embed-text-v1'),
   BEDROCK_CHAT_MODEL: z.string().default('anthropic.claude-3-5-sonnet-20240620-v1:0'),
 });
@@ -101,9 +104,9 @@ const defaultConfig: Config = {
     PINECONE_INDEX_NAME: 'platform-engineering-rag',
     PINECONE_NAMESPACE: 'capella-document-search',
     AWS_REGION: 'eu-central-1',
-    AWS_ACCESS_KEY_ID: 'DUMMY',
-    AWS_SECRET_ACCESS_KEY: 'DUMMY',
-    AWS_BEARER_TOKEN_BEDROCK: 'ABSKQmVkcm9ja0FQSUtleS16ZWF1LWF0LTM1Mjg5Njg3NzI4MTpERHVXOFovZHVQTG5FWDlvM0VKUDcvQkEvZVhnOTMyZWpXRk1iQzlodlhBOFBkc0hrYlJBaTFXV3FpMD0=',
+    AWS_ACCESS_KEY_ID: '',
+    AWS_SECRET_ACCESS_KEY: '',
+    AWS_BEARER_TOKEN_BEDROCK: '',
     BEDROCK_EMBEDDING_MODEL: 'amazon.titan-embed-text-v1',
     BEDROCK_CHAT_MODEL: 'anthropic.claude-3-5-sonnet-20241022-v2:0',
   },

@@ -187,7 +187,7 @@ function validateCSVFile(file: File): void {
         });
 
         const isValidFormat = documentKeys.every((key) => {
-          return /^[A-Z]+_\d+_.+$/.test(key) && !/^["']|["']$/.test(key);
+          return /^[A-Z]+_[A-Z0-9]+_.+$/.test(key) && !/^["']|["']$/.test(key);
         });
 
         if (!isValidFormat) {
