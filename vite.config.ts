@@ -176,7 +176,6 @@ export default defineConfig(({ mode }): UserConfig => {
           "node:events",
           // Add problematic packages to exclude from pre-bundling
           "@openreplay/tracker-assist",
-          "@openreplay/tracker-graphql",
           "webrtc-adapter",
           ...(enableOpenTelemetry ? ["src/utils/serverLogger"] : []),
         ],

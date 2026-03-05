@@ -213,7 +213,7 @@ export const runAgent = traceable(
 // Streaming version for SSE - format matches frontend ChatbotPopup expectations
 export async function* streamAgent(request: ChatRequest): AsyncGenerator<string, void, unknown> {
   const startTime = Date.now();
-  const runId = `run-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+  const runId = crypto.randomUUID();
 
   log("[LangGraph] Starting streaming agent run", {
     messageLength: request.message.length,
@@ -253,9 +253,10 @@ export async function* streamAgent(request: ChatRequest): AsyncGenerator<string,
       metadata: request.metadata || null,
     };
 
-    // Stream events from the graph
+    // Stream events from the graph, passing runId so LangSmith uses it as the trace ID
     const stream = await graph.streamEvents(initialState, {
       version: "v2",
+      runId,
     });
 
     let streamedContent = "";

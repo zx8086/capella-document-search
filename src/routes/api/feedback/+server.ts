@@ -7,7 +7,7 @@ import type { RequestHandler } from "./$types";
 
 // Initialize Langsmith client
 const langsmithClient = new Client({
-  apiKey: Bun.env.LANGCHAIN_API_KEY,
+  apiKey: Bun.env.LANGSMITH_API_KEY || Bun.env.LANGCHAIN_API_KEY,
   apiUrl: Bun.env.LANGCHAIN_ENDPOINT || "https://api.smith.langchain.com",
 });
 
