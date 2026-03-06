@@ -379,10 +379,8 @@ function loadConfigFromEnv(): Partial<BackendConfig> {
         "number"
       ) as number) || defaultConfig.openTelemetry.CB_MONITORING_INTERVAL,
     MAX_UNIQUE_LABELS:
-      (parseEnvVar(
-        getEnvVar(envVarMapping.openTelemetry.MAX_UNIQUE_LABELS),
-        "number"
-      ) as number) || defaultConfig.openTelemetry.MAX_UNIQUE_LABELS,
+      (parseEnvVar(getEnvVar(envVarMapping.openTelemetry.MAX_UNIQUE_LABELS), "number") as number) ||
+      defaultConfig.openTelemetry.MAX_UNIQUE_LABELS,
     HASH_BUCKETS:
       (parseEnvVar(getEnvVar(envVarMapping.openTelemetry.HASH_BUCKETS), "number") as number) ||
       defaultConfig.openTelemetry.HASH_BUCKETS,

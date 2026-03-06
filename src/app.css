@@ -269,3 +269,23 @@ html {
 @utility rounded-sm {
   border-radius: calc(var(--radius) - 4px);
 }
+
+/* Progress indicator animations */
+@keyframes progress-indeterminate {
+  0% { transform: translateX(-100%); }
+  50% { transform: translateX(0%); }
+  100% { transform: translateX(100%); }
+}
+
+@keyframes fade-in {
+  from { opacity: 0; transform: scale(0.95); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+@utility animate-progress-indeterminate {
+  animation: progress-indeterminate 2s ease-in-out infinite;
+}
+
+@utility animate-fade-in {
+  animation: fade-in 0.3s ease-out;
+}

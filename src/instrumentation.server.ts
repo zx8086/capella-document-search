@@ -21,6 +21,7 @@ import { ATTR_SERVICE_NAME, ATTR_SERVICE_VERSION } from "@opentelemetry/semantic
 import { backendConfig } from "./backend-config";
 import { initializeCardinalityGuard } from "./otel/cardinality-guard";
 import { initializeExportStatsTracker } from "./otel/export-stats-tracker";
+import { initializeTelemetryLifecycle } from "./otel/lifecycle";
 import { initializeOtelLogger } from "./otel/logger";
 import { initializeMetrics } from "./otel/metrics";
 import { createSampler } from "./otel/sampling";
@@ -30,7 +31,6 @@ import {
   createWrappedMetricExporter,
   createWrappedSpanExporter,
 } from "./otel/wrapped-exporters";
-import { initializeTelemetryLifecycle } from "./otel/lifecycle";
 
 const INSTRUMENTATION_ENABLED =
   (Bun.env["ENABLE_OPENTELEMETRY"] as string) === "true" &&

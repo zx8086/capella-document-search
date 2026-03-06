@@ -8,17 +8,17 @@
  * optimized for Bun runtime with 2025 best practices.
  */
 
+export * from "./cardinality-guard";
 export * from "./ecs-mapping";
+export * from "./export-stats-tracker";
+export * from "./lifecycle";
 export * from "./logger";
 export * from "./metrics";
 export * from "./propagation";
 export * from "./sampling";
-export * from "./types";
 export * from "./telemetry-circuit-breaker";
-export * from "./export-stats-tracker";
-export * from "./cardinality-guard";
+export * from "./types";
 export * from "./wrapped-exporters";
-export * from "./lifecycle";
 
 import { trace } from "@opentelemetry/api";
 import { debug, err, getTelemetryHealth, log, warn } from "./logger";

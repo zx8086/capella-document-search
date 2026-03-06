@@ -5,6 +5,7 @@ import hljs from "highlight.js/lib/core";
 import { marked } from "marked";
 import { onDestroy, onMount } from "svelte";
 import { SvelteMap, SvelteSet } from "svelte/reactivity";
+import { get } from "svelte/store";
 import { browser } from "$app/environment";
 import { page } from "$app/state";
 import { getMsalInstance } from "$lib/config/authConfig";
@@ -12,11 +13,10 @@ import { isTrackerReady, trackEvent } from "$lib/context/tracker";
 import { authStore } from "$lib/stores/auth.svelte";
 import { type Conversation, chatStore, formatMessagesForDisplay } from "$lib/stores/chat.svelte";
 import { ensureUserPhoto, photoStore } from "$lib/stores/photo.svelte";
-import { get } from "svelte/store";
 import "highlight.js/styles/github-dark.css";
 import CompletedProgress from "./CompletedProgress.svelte";
-import ThinkingSection from "./ThinkingSection.svelte";
 import SuggestedQueries from "./SuggestedQueries.svelte";
+import ThinkingSection from "./ThinkingSection.svelte";
 import { Button } from "./ui/button";
 
 // Timeout configurations (with defaults matching backend)
@@ -271,7 +271,6 @@ let _inputPlaceholder = $derived(
 
 // Derive button disabled state for better reactivity
 let _isButtonDisabled = $derived(canAbort ? false : !newMessage.trim());
-
 
 // Get first name from full name
 function _getFirstName(fullName: string = ""): string {
@@ -821,7 +820,9 @@ async function _handleSubmit() {
                   completedNodes: [],
                   completedTools: [],
                 };
-                const duration = existing.toolStartTime ? Date.now() - existing.toolStartTime : undefined;
+                const duration = existing.toolStartTime
+                  ? Date.now() - existing.toolStartTime
+                  : undefined;
                 messageProgress.set(loadingMessageId, {
                   ...existing,
                   completedTools: [...existing.completedTools, { name: data.toolName, duration }],

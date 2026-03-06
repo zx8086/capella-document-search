@@ -70,17 +70,13 @@ export class WrappedMetricExporter {
   constructor(private readonly delegate: any) {}
 
   export(metrics: any, callback: ExporterCallback): void {
-    const itemCount = metrics.scopeMetrics?.reduce(
-      (sum: number, scope: any) => sum + (scope.metrics?.length || 0),
-      0
-    ) || 0;
+    const itemCount =
+      metrics.scopeMetrics?.reduce(
+        (sum: number, scope: any) => sum + (scope.metrics?.length || 0),
+        0
+      ) || 0;
 
-    wrapExport(
-      "metrics",
-      [metrics],
-      (items, cb) => this.delegate.export(items[0], cb),
-      callback
-    );
+    wrapExport("metrics", [metrics], (items, cb) => this.delegate.export(items[0], cb), callback);
   }
 
   shutdown(): Promise<void> {

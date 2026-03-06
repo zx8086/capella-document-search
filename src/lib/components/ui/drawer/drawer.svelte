@@ -1,5 +1,5 @@
 <script lang="ts">
-import { Drawer as DrawerPrimitive } from "vaul-svelte";
+import type { Drawer as DrawerPrimitive } from "vaul-svelte";
 
 type $$Props = DrawerPrimitive.Props;
 interface Props {

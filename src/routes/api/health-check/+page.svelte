@@ -1,6 +1,7 @@
 <!-- src/routes/api/health-check/+page.svelte -->
 
 <script lang="ts">
+import { Shimmer } from "@shimmer-from-structure/svelte";
 import { onMount } from "svelte";
 import { goto } from "$app/navigation";
 import { navigating } from "$app/state";
@@ -148,14 +149,28 @@ function _getStatusBackground(status: string): string {
     </div>
 
     {#if _loading}
-        <div class="flex flex-col items-center justify-center gap-4">
-            <p class="text-gray-600">
-                Loading {isSimpleMode ? "Detailed" : "Simple"} health check...
-            </p>
-            <div class="animate-spin rounded-full h-12 w-12 border-2 border-gray-200 border-b-gray-900">
-                <span class="sr-only">Loading health check status...</span>
+        <Shimmer loading={true}>
+            <div class="bg-white shadow-md rounded px-8 pt-6 pb-8 mb-4">
+                <div class="mb-6 p-4 rounded-lg bg-gray-50">
+                    <div class="flex items-center gap-3 mb-2">
+                        <div class="h-6 w-32 bg-gray-200 rounded"></div>
+                        <div class="h-6 w-16 bg-gray-200 rounded"></div>
+                    </div>
+                </div>
+                <div class="h-5 w-48 bg-gray-200 rounded mb-4"></div>
+                <div class="space-y-4">
+                    {#each [1, 2, 3, 4, 5] as _}
+                        <div class="p-4 rounded-lg bg-gray-50 border border-gray-200">
+                            <div class="flex justify-between items-start">
+                                <div class="h-5 w-36 bg-gray-200 rounded"></div>
+                                <div class="h-5 w-12 bg-gray-200 rounded"></div>
+                            </div>
+                            <div class="h-4 w-28 bg-gray-200 rounded mt-2"></div>
+                        </div>
+                    {/each}
+                </div>
             </div>
-        </div>
+        </Shimmer>
     {:else if _healthStatus}
         <div class="bg-white shadow-md rounded px-8 pt-6 pb-8 mb-4">
             <!-- Overall Status -->

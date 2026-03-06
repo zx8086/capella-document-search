@@ -6,7 +6,11 @@ import { Pinecone } from "@pinecone-database/pinecone";
 import { backendConfig } from "$backendConfig";
 import type { RAGContext } from "$lib/rag/types";
 import { err, log } from "$utils/unifiedLogger";
-import { createBedrockEmbeddings, getAuthMethod, getIAMCredentials } from "../../clients/bedrock-bearer-client";
+import {
+  createBedrockEmbeddings,
+  getAuthMethod,
+  getIAMCredentials,
+} from "../../clients/bedrock-bearer-client";
 import type { AgentStateType } from "../state";
 
 type RAGPipeline = "PINECONE" | "AWS_KNOWLEDGE_BASE" | "CAPELLA" | "VECTORIZE";
@@ -62,7 +66,7 @@ function initializeAWSKnowledgeBaseRetriever(topK: number = 3): AmazonKnowledgeB
   if (!iamCredentials) {
     throw new Error(
       "AWS Knowledge Base requires IAM credentials (AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY). " +
-      "Bedrock API keys only work for Bedrock models, not Knowledge Base."
+        "Bedrock API keys only work for Bedrock models, not Knowledge Base."
     );
   }
 

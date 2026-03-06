@@ -75,7 +75,7 @@ onDestroy(() => {
 
 {#if isActive}
   <!-- Progress indicator overlay -->
-  <div class="absolute inset-0 flex items-center justify-center z-50 pointer-events-none animate-in fade-in duration-300">
+  <div class="absolute inset-0 flex items-center justify-center z-50 pointer-events-none animate-fade-in">
     <!-- Semi-transparent backdrop -->
     <div class="absolute inset-0 bg-black/10 dark:bg-black/20 rounded-lg pointer-events-auto"></div>
     
@@ -139,7 +139,7 @@ onDestroy(() => {
         
         <!-- Progress bar -->
         <div class="mt-2 h-1 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
-          <div class="h-full bg-blue-600 dark:bg-blue-400 animate-progress-indeterminate"></div>
+          <div class="h-full bg-blue-600 dark:bg-blue-400 animate-progress-indeterminate w-full"></div>
         </div>
       </div>
     </div>
@@ -147,40 +147,3 @@ onDestroy(() => {
   </div>
 {/if}
 
-<style>
-  @keyframes progress-indeterminate {
-    0% {
-      transform: translateX(-100%);
-    }
-    50% {
-      transform: translateX(0%);
-    }
-    100% {
-      transform: translateX(100%);
-    }
-  }
-  
-  .animate-progress-indeterminate {
-    animation: progress-indeterminate 2s ease-in-out infinite;
-  }
-  
-  /* Animate in/out */
-  .animate-in {
-    animation: fadeIn 0.3s ease-out;
-  }
-  
-  @keyframes fadeIn {
-    from {
-      opacity: 0;
-      transform: scale(0.95);
-    }
-    to {
-      opacity: 1;
-      transform: scale(1);
-    }
-  }
-  
-  .fade-in {
-    animation: fadeIn 0.3s ease-out;
-  }
-</style>

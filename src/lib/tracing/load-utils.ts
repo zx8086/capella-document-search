@@ -1,8 +1,8 @@
 // src/lib/tracing/load-utils.ts
 // Tracing utilities for SvelteKit load functions (SIO-367)
 
-import type { RequestEvent } from "@sveltejs/kit";
 import type { Attributes } from "@opentelemetry/api";
+import type { RequestEvent } from "@sveltejs/kit";
 
 const ENABLE_TRACING =
   (typeof process !== "undefined" && process.env?.ENABLE_OPENTELEMETRY === "true") ||

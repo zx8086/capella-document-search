@@ -1,23 +1,24 @@
 <!-- src/routes/+page.svelte-->
 
 <script lang="ts">
+import { Shimmer } from "@shimmer-from-structure/svelte";
 import Papa from "papaparse";
 import { getContext, onMount } from "svelte";
 import { toast } from "svelte-sonner";
 import { browser } from "$app/environment";
+import { enhance } from "$app/forms";
 import { pushState, replaceState } from "$app/navigation";
 import { page } from "$app/state";
 import { frontendConfig } from "$frontendConfig";
-import { debugTrackerStatus, key, trackEvent } from "$lib/context/tracker";
-import { authStore } from "$lib/stores/auth.svelte";
-import type { Collection } from "../models";
-import { collections } from "$lib/stores/collections.svelte";
-import { videos } from "../stores/videoStore";
-import { enhance } from "$app/forms";
 import DocumentDisplay from "$lib/components/DocumentDisplay.svelte";
+import FeatureFlagDebug from "$lib/components/FeatureFlagDebug.svelte";
 import FileUploadResults from "$lib/components/FileUploadResults.svelte";
 import IdleVideoCarousel from "$lib/components/IdleVideoCarousel.svelte";
-import FeatureFlagDebug from "$lib/components/FeatureFlagDebug.svelte";
+import { debugTrackerStatus, key, trackEvent } from "$lib/context/tracker";
+import { authStore } from "$lib/stores/auth.svelte";
+import { collections } from "$lib/stores/collections.svelte";
+import type { Collection } from "../models";
+import { videos } from "../stores/videoStore";
 
 interface SearchResult {
   collection: string;
@@ -101,7 +102,6 @@ $effect.pre(() => {
 });
 
 onMount(() => {
-
   if (browser) {
     const tracker = getTracker();
     if (tracker) {
@@ -782,13 +782,30 @@ $effect(() => {
                                 </button>
                             </div>
                         </div>
+                        {#if collections.isLoading && Object.keys(_groupedCollections).length === 0}
+                        <Shimmer loading={true}>
+                            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                {#each [1, 2, 3] as _}
+                                    <div class="border rounded p-3">
+                                        <div class="h-5 w-24 bg-gray-200 rounded mb-2"></div>
+                                        {#each [1, 2] as __}
+                                            <div class="flex items-center justify-between mb-2">
+                                                <div class="h-4 w-32 bg-gray-200 rounded"></div>
+                                                <div class="w-11 h-6 bg-gray-200 rounded-full"></div>
+                                            </div>
+                                        {/each}
+                                    </div>
+                                {/each}
+                            </div>
+                        </Shimmer>
+                        {:else}
                         <div
                             class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"
                         >
-                            {#each Object.entries(_groupedCollections) as [scope, collections]}
+                            {#each Object.entries(_groupedCollections) as [scope, scopeCollections]}
                                 <div class="border rounded p-3">
                                     <h4 class="font-semibold text-[#551a8b] mb-2">{scope}</h4>
-                                    {#each collections as collection}
+                                    {#each scopeCollections as collection}
                                         <label
                                             for={`toggle-${collection.bucket}-${collection.scope_name}-${collection.collection_name}`}
                                             class="flex items-center justify-between cursor-pointer mb-2"
@@ -848,6 +865,7 @@ $effect(() => {
                                 </div>
                             {/each}
                         </div>
+                        {/if}
                     </div>
 
                     <input
@@ -1017,6 +1035,53 @@ IMAGE_70_C51_LV04F1003GPDE</pre>
                         </div>
                     </div>
                 </div>
+            {/if}
+
+            <!-- Search Results Shimmer -->
+            {#if buttonState === "searching"}
+                <Shimmer loading={true}>
+                    {#if isSearchMode}
+                        <div class="border rounded-md p-4 mt-6 mb-4 w-full drop-shadow-lg bg-white">
+                            <div class="flex justify-between items-center">
+                                <div class="flex items-center space-x-2">
+                                    <div class="w-6 h-6 bg-gray-200 rounded"></div>
+                                    <div class="flex items-center gap-2">
+                                        <div class="h-4 w-16 bg-gray-200 rounded"></div>
+                                        <div class="h-4 w-24 bg-gray-200 rounded"></div>
+                                        <div class="h-4 w-16 bg-gray-200 rounded"></div>
+                                        <div class="h-4 w-20 bg-gray-200 rounded"></div>
+                                        <div class="h-4 w-20 bg-gray-200 rounded"></div>
+                                        <div class="h-4 w-24 bg-gray-200 rounded"></div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="h-4 w-32 bg-gray-200 rounded mt-2"></div>
+                        </div>
+                    {:else}
+                        <div class="mt-8">
+                            <table class="min-w-full divide-y divide-gray-200">
+                                <thead class="bg-gray-50">
+                                    <tr>
+                                        <th class="w-1/4 px-6 py-3"><div class="h-3 w-20 bg-gray-200 rounded"></div></th>
+                                        <th class="w-1/6 px-6 py-3"><div class="h-3 w-12 bg-gray-200 rounded"></div></th>
+                                        <th class="w-1/3 px-6 py-3"><div class="h-3 w-16 bg-gray-200 rounded"></div></th>
+                                        <th class="w-1/4 px-6 py-3"><div class="h-3 w-24 bg-gray-200 rounded"></div></th>
+                                    </tr>
+                                </thead>
+                                <tbody class="bg-white divide-y divide-gray-200">
+                                    {#each [1, 2, 3] as _}
+                                        <tr>
+                                            <td class="px-6 py-4"><div class="h-4 w-40 bg-gray-200 rounded"></div></td>
+                                            <td class="px-6 py-4"><div class="h-5 w-14 bg-gray-200 rounded-full"></div></td>
+                                            <td class="px-6 py-4"><div class="h-4 w-32 bg-gray-200 rounded"></div></td>
+                                            <td class="px-6 py-4"><div class="h-4 w-48 bg-gray-200 rounded"></div></td>
+                                        </tr>
+                                    {/each}
+                                </tbody>
+                            </table>
+                        </div>
+                    {/if}
+                </Shimmer>
             {/if}
 
             <!-- Search Results and Error Messages -->

@@ -1,7 +1,7 @@
 // src/lib/tracing/api-utils.ts
 // API route tracing wrapper (SIO-368)
 
-import { trace, type Span, type Attributes, SpanStatusCode } from "@opentelemetry/api";
+import { type Attributes, type Span, SpanStatusCode, trace } from "@opentelemetry/api";
 import type { RequestEvent, RequestHandler } from "@sveltejs/kit";
 
 const ENABLE_TRACING =

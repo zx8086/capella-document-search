@@ -2,70 +2,76 @@
 
 <script lang="ts">
 interface Props {
-	completedNodes: string[];
-	completedTools: { name: string; duration?: number }[];
-	activeNode?: string;
-	activeTool?: string;
-	isProcessing?: boolean;
-	responseTime?: number;
+  completedNodes: string[];
+  completedTools: { name: string; duration?: number }[];
+  activeNode?: string;
+  activeTool?: string;
+  isProcessing?: boolean;
+  responseTime?: number;
 }
 
-let { completedNodes, completedTools, activeNode, activeTool, isProcessing = false, responseTime }: Props = $props();
+let {
+  completedNodes,
+  completedTools,
+  activeNode,
+  activeTool,
+  isProcessing = false,
+  responseTime,
+}: Props = $props();
 
 let isExpanded = $state(true);
 
 // Node configuration with display names (matching langgraph-agent.ts node order)
 const nodeConfig: Record<string, { label: string; activeLabel: string }> = {
-	classify: { label: "Analyzed", activeLabel: "Analyzing..." },
-	retriever: { label: "Fetched", activeLabel: "Fetching..." },
-	toolRouter: { label: "Routed", activeLabel: "Routing..." },
-	tools: { label: "Tools", activeLabel: "Running Tools..." },
-	responder: { label: "Generated", activeLabel: "Generating..." },
+  classify: { label: "Analyzed", activeLabel: "Analyzing..." },
+  retriever: { label: "Fetched", activeLabel: "Fetching..." },
+  toolRouter: { label: "Routed", activeLabel: "Routing..." },
+  tools: { label: "Tools", activeLabel: "Running Tools..." },
+  responder: { label: "Generated", activeLabel: "Generating..." },
 };
 
 function getToolDisplayName(toolName: string): string {
-	return toolName
-		.replace(/_tool$/, "")
-		.split("_")
-		.map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-		.join(" ");
+  return toolName
+    .replace(/_tool$/, "")
+    .split("_")
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ");
 }
 
 function formatDuration(ms: number): string {
-	if (ms < 1000) {
-		return "<1s";
-	}
+  if (ms < 1000) {
+    return "<1s";
+  }
 
-	const totalSeconds = Math.floor(ms / 1000);
-	const hours = Math.floor(totalSeconds / 3600);
-	const minutes = Math.floor((totalSeconds % 3600) / 60);
-	const seconds = totalSeconds % 60;
+  const totalSeconds = Math.floor(ms / 1000);
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
 
-	if (hours > 0) {
-		return minutes > 0 ? `${hours}h ${minutes}m` : `${hours}h`;
-	}
-	if (minutes > 0) {
-		return seconds > 0 ? `${minutes}m ${seconds}s` : `${minutes}m`;
-	}
-	return `${seconds}s`;
+  if (hours > 0) {
+    return minutes > 0 ? `${hours}h ${minutes}m` : `${hours}h`;
+  }
+  if (minutes > 0) {
+    return seconds > 0 ? `${minutes}m ${seconds}s` : `${minutes}m`;
+  }
+  return `${seconds}s`;
 }
 
 // Order nodes for display (matching langgraph-agent.ts workflow)
-const orderedNodes = [
-	"classify",
-	"retriever",
-	"toolRouter",
-	"tools",
-	"responder",
-];
+const orderedNodes = ["classify", "retriever", "toolRouter", "tools", "responder"];
 
 // Count only the completed nodes that are visible (match our nodeConfig)
 const visibleCompletedCount = $derived(
-	orderedNodes.filter((nodeId) => completedNodes.includes(nodeId)).length
+  orderedNodes.filter((nodeId) => completedNodes.includes(nodeId)).length
 );
 
 // Check if tools were used (tools node completed or currently active)
-const toolsUsed = $derived(completedNodes.includes("tools") || activeNode === "tools" || completedTools.length > 0 || activeTool);
+const toolsUsed = $derived(
+  completedNodes.includes("tools") ||
+    activeNode === "tools" ||
+    completedTools.length > 0 ||
+    activeTool
+);
 
 const hasContent = $derived(isProcessing || visibleCompletedCount > 0 || completedTools.length > 0);
 </script>

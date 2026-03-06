@@ -4,7 +4,8 @@
 import type { Handle } from "@sveltejs/kit";
 import { redirect } from "@sveltejs/kit";
 
-const ENABLE_TRACING = (process.env.ENABLE_OPENTELEMETRY ?? Bun?.env?.ENABLE_OPENTELEMETRY) === "true";
+const ENABLE_TRACING =
+  (process.env.ENABLE_OPENTELEMETRY ?? Bun?.env?.ENABLE_OPENTELEMETRY) === "true";
 
 // Define paths that should be public
 const PUBLIC_PATHS = [

@@ -6,9 +6,15 @@ import { page } from "$app/state";
 
 import "../app.css";
 import "../apm-config";
+import { Shimmer, setShimmerConfig } from "@shimmer-from-structure/svelte";
 import { onDestroy, onMount, setContext } from "svelte";
-import { writable, get } from "svelte/store";
+import { get, writable } from "svelte/store";
 import { browser } from "$app/environment";
+import ChatbotPopup from "$lib/components/ChatbotPopup.svelte";
+import { Button } from "$lib/components/ui/button";
+import * as Drawer from "$lib/components/ui/drawer";
+import { Toaster } from "$lib/components/ui/sonner";
+import { shimmerConfig } from "$lib/config/shimmer";
 import {
   debugAssetAccess,
   debugTrackerStatus,
@@ -17,15 +23,11 @@ import {
   key,
 } from "$lib/context/tracker";
 import { auth, authStore } from "$lib/stores/auth.svelte";
-import { featureFlags } from "$lib/stores/featureFlags.svelte";
 import { collections } from "$lib/stores/collections.svelte";
+import { featureFlags } from "$lib/stores/featureFlags.svelte";
 import type { Collection } from "../models/collections";
 import { quotes } from "../stores/quotesStore";
 import { videos } from "../stores/videoStore";
-import ChatbotPopup from "$lib/components/ChatbotPopup.svelte";
-import { Toaster } from "$lib/components/ui/sonner";
-import * as Drawer from "$lib/components/ui/drawer";
-import { Button } from "$lib/components/ui/button";
 
 interface Props {
   children?: import("svelte").Snippet;
@@ -132,6 +134,8 @@ $effect(() => {
 });
 
 onMount(async () => {
+  setShimmerConfig(shimmerConfig);
+
   if (browser) {
     try {
       // Initialize tracker first
@@ -278,8 +282,51 @@ async function _handleNavigation(path: string) {
 </script>
 
 {#if !shouldShowContent}
-    <div class="fixed inset-0 bg-white dark:bg-[#2C2C2C] flex items-center justify-center z-50">
-        <div class="animate-spin rounded-full h-12 w-12 border-2 border-[#00174f] border-t-transparent"></div>
+    <div class="fixed inset-0 bg-white dark:bg-[#2C2C2C] z-50">
+        <Shimmer loading={true}>
+            <div class="flex flex-col min-h-screen">
+                <header class="bg-[#00174f] py-4">
+                    <div class="container mx-auto px-4">
+                        <div class="flex justify-between items-center">
+                            <div class="w-1/4"></div>
+                            <div class="w-1/2 text-center">
+                                <div class="h-7 w-72 mx-auto bg-gray-300 rounded"></div>
+                            </div>
+                            <div class="w-1/4 flex justify-end">
+                                <div class="h-9 w-24 bg-gray-300 rounded"></div>
+                            </div>
+                        </div>
+                    </div>
+                </header>
+                <main class="flex-grow p-8">
+                    <div class="max-w-6xl mx-auto space-y-6">
+                        <div class="flex justify-between items-center">
+                            <div class="h-8 w-48 bg-gray-200 rounded"></div>
+                            <div class="flex gap-2">
+                                <div class="h-10 w-20 bg-gray-200 rounded"></div>
+                                <div class="h-10 w-20 bg-gray-200 rounded"></div>
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                            {#each [1, 2, 3] as _}
+                                <div class="border rounded p-3 space-y-3">
+                                    <div class="h-5 w-24 bg-gray-200 rounded"></div>
+                                    <div class="h-4 w-32 bg-gray-200 rounded"></div>
+                                    <div class="h-4 w-28 bg-gray-200 rounded"></div>
+                                </div>
+                            {/each}
+                        </div>
+                        <div class="h-10 w-full bg-gray-200 rounded"></div>
+                        <div class="h-12 w-40 bg-gray-200 rounded mx-auto"></div>
+                    </div>
+                </main>
+                <footer class="bg-[#00174f] py-4 mt-8">
+                    <div class="container mx-auto px-4">
+                        <div class="h-6 w-64 bg-gray-400 rounded mx-auto"></div>
+                    </div>
+                </footer>
+            </div>
+        </Shimmer>
     </div>
 {:else}
     <div class="flex flex-col min-h-screen">
