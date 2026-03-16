@@ -15,14 +15,10 @@ const CapellaConfigSchema = z.object({
   PROJECT_ID: z.string().default("1c249d82-f799-4b08-a8c0-18f7088e5049"),
   CLUSTER_ID: z.string().default("2091944c-177f-450e-9266-9761679ebc73"),
   BUCKET_ID: z.string().default("ZGVmYXVsdA=="),
-  AUTH_TOKEN: z
-    .string()
-    .default(
-      "TWQ2dGd3aU9BTW9ZcTJmRjFBeG5ISWRHdGR5bzlFdTU6eUVjUWwzelZzWERYQEc3RGhNMXROV01tanVncXMzd0NDWVVUK0lCZFNyUmhTRmZHamx1d1ZoVUNuTlVtdUxGMA=="
-    ),
-  URL: z.string().default("couchbases://cb.xalojnoucmyupbpb.cloud.couchbase.com"),
-  USERNAME: z.string().default("S_APP_AI_SERVICES"),
-  PASSWORD: z.string().default("5KzVp9vkCrc3dkt6!"),
+  AUTH_TOKEN: z.string().default(""),
+  URL: z.string().default(""),
+  USERNAME: z.string().default(""),
+  PASSWORD: z.string().default(""),
   BUCKET: z.string().default("default"),
   SCOPE: z.string().default("_default"),
   COLLECTION: z.string().default("_default"),
@@ -41,15 +37,9 @@ const OpenTelemetryConfigSchema = z.object({
 });
 
 const RagConfigSchema = z.object({
-  RAG_PIPELINE: z.enum(["PINECONE", "CAPELLA"]).default("PINECONE"),
-  OPENAI_API_KEY: z
-    .string()
-    .default(
-      "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"
-    ),
-  PINECONE_API_KEY: z
-    .string()
-    .default("pcsk_3LKJP_FNw6XFkMD7xuYToKFYSLuj6yQuncBD58njiX2F9HAZJd35FHAMHMWhUWcGxCUme"),
+  RAG_PIPELINE: z.enum(["PINECONE", "CAPELLA", "VECTORIZE", "AWS_KNOWLEDGE_BASE"]).default("PINECONE"),
+  OPENAI_API_KEY: z.string().default(""),
+  PINECONE_API_KEY: z.string().default(""),
   PINECONE_INDEX_NAME: z.string().default("platform-engineering-rag"),
   PINECONE_NAMESPACE: z.string().default("capella-document-search"),
   AWS_REGION: z.string().default("eu-central-1"),
@@ -88,11 +78,10 @@ const defaultConfig: Config = {
     PROJECT_ID: "1c249d82-f799-4b08-a8c0-18f7088e5049",
     CLUSTER_ID: "2091944c-177f-450e-9266-9761679ebc73",
     BUCKET_ID: "ZGVmYXVsdA==",
-    AUTH_TOKEN:
-      "TWQ2dGd3aU9BTW9ZcTJmRjFBeG5ISWRHdGR5bzlFdTU6eUVjUWwzelZzWERYQEc3RGhNMXROV01tanVncXMzd0NDWVVUK0lCZFNyUmhTRmZHamx1d1ZoVUNuTlVtdUxGMA==",
-    URL: "couchbases://cb.xalojnoucmyupbpb.cloud.couchbase.com",
-    USERNAME: "S_APP_AI_SERVICES",
-    PASSWORD: "5KzVp9vkCrc3dkt6!",
+    AUTH_TOKEN: "",
+    URL: "",
+    USERNAME: "",
+    PASSWORD: "",
     BUCKET: "default",
     SCOPE: "_default",
     COLLECTION: "_default",
@@ -110,9 +99,8 @@ const defaultConfig: Config = {
   },
   rag: {
     RAG_PIPELINE: "PINECONE",
-    OPENAI_API_KEY:
-      "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",
-    PINECONE_API_KEY: "pcsk_3LKJP_FNw6XFkMD7xuYToKFYSLuj6yQuncBD58njiX2F9HAZJd35FHAMHMWhUWcGxCUme",
+    OPENAI_API_KEY: "",
+    PINECONE_API_KEY: "",
     PINECONE_INDEX_NAME: "platform-engineering-rag",
     PINECONE_NAMESPACE: "capella-document-search",
     AWS_REGION: "eu-central-1",
@@ -303,7 +291,9 @@ function loadConfigFromEnv(): Partial<Config> {
     RAG_PIPELINE:
       (parseEnvVar(getEnvVar(envVarMapping.rag.RAG_PIPELINE), "string") as
         | "PINECONE"
-        | "CAPELLA") || defaultConfig.rag.RAG_PIPELINE,
+        | "CAPELLA"
+        | "VECTORIZE"
+        | "AWS_KNOWLEDGE_BASE") || defaultConfig.rag.RAG_PIPELINE,
     OPENAI_API_KEY:
       (parseEnvVar(getEnvVar(envVarMapping.rag.OPENAI_API_KEY), "string") as string) ||
       defaultConfig.rag.OPENAI_API_KEY,

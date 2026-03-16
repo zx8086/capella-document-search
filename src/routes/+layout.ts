@@ -1,6 +1,6 @@
 // src/routes/+layout.ts
 
-import { redirect } from "@sveltejs/kit";
+import { isRedirect, redirect } from "@sveltejs/kit";
 import { browser } from "$app/environment";
 import { auth, authStore } from "$lib/stores/auth.svelte";
 import { featureFlags } from "$lib/stores/featureFlags.svelte";
@@ -40,7 +40,7 @@ export const load: LayoutLoad = async ({ url }) => {
       featureFlags: !!browser, // Indicate if feature flags are available
     };
   } catch (error) {
-    if (error instanceof Error && error.message.includes("redirect")) {
+    if (isRedirect(error)) {
       throw error;
     }
     console.error("Layout load error:", error);
