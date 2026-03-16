@@ -523,5 +523,5 @@ export function initializeBackendConfig(): BackendConfig {
   return backendConfig;
 }
 
-export { backendConfig };
 export type { BackendConfig };
+export { backendConfig };

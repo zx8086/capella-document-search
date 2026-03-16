@@ -275,23 +275,23 @@ import {
 
 // Export individual functions for convenience
 export {
-  log,
-  err,
-  warn,
   debug,
-  setupRequestTracing,
+  err,
   injectTraceContext,
-  recordHttpRequest,
-  recordHttpResponseTime,
-  recordCouchbaseConnection,
-  recordRagOperation,
-  recordChatRequest,
-  // ECS mapping utilities
-  mapToECS,
-  mapHttpAttributesToECS,
+  log,
   mapDatabaseAttributesToECS,
   mapErrorAttributesToECS,
+  mapHttpAttributesToECS,
+  // ECS mapping utilities
+  mapToECS,
+  recordChatRequest,
+  recordCouchbaseConnection,
+  recordHttpRequest,
+  recordHttpResponseTime,
+  recordRagOperation,
+  setupRequestTracing,
   validateECSFields,
+  warn,
 };
 
 /**

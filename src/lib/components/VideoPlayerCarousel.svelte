@@ -98,7 +98,6 @@ async function loadAndPlayVideo() {
       videoElement.setAttribute("loop", "");
       videoElement.play().catch(() => {});
     }
-
   } catch (error) {
     console.error("Error playing video:", error);
     isPlaying = false;

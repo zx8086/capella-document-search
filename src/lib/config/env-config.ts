@@ -357,5 +357,5 @@ try {
   );
 }
 
-export { config };
 export type { Config };
+export { config };

@@ -37,12 +37,12 @@ type Props = ButtonPrimitive.RootProps & {
 type Events = Record<string, unknown>;
 
 export {
-  Root,
-  type Props,
+  buttonVariants,
   type Events,
+  type Events as ButtonEvents,
+  type Props,
+  type Props as ButtonProps,
+  Root,
   //
   Root as Button,
-  type Props as ButtonProps,
-  type Events as ButtonEvents,
-  buttonVariants,
 };

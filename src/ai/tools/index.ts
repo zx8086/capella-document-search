@@ -26,27 +26,27 @@ import { getSchemaForCollectionTool, runSqlPlusPlusQueryTool } from "./schema";
 
 // Re-export all tools
 export {
-  // Cluster
-  getSystemVitalsTool,
-  getSystemNodesTool,
-  // Query
-  getFatalRequestsTool,
-  getMostExpensiveQueriesTool,
-  getLongestRunningQueriesTool,
-  getMostFrequentQueriesTool,
-  getLargestResultSizeQueriesTool,
-  getLargestResultCountQueriesTool,
-  getPrimaryIndexQueriesTool,
   getCompletedRequestsTool,
-  // Schema
-  getSchemaForCollectionTool,
-  runSqlPlusPlusQueryTool,
-  // Index
-  getSystemIndexesTool,
-  getPreparedStatementsTool,
-  getIndexesToDropTool,
   getDetailedIndexesTool,
   getDetailedPreparedStatementsTool,
+  // Query
+  getFatalRequestsTool,
+  getIndexesToDropTool,
+  getLargestResultCountQueriesTool,
+  getLargestResultSizeQueriesTool,
+  getLongestRunningQueriesTool,
+  getMostExpensiveQueriesTool,
+  getMostFrequentQueriesTool,
+  getPreparedStatementsTool,
+  getPrimaryIndexQueriesTool,
+  // Schema
+  getSchemaForCollectionTool,
+  // Index
+  getSystemIndexesTool,
+  getSystemNodesTool,
+  // Cluster
+  getSystemVitalsTool,
+  runSqlPlusPlusQueryTool,
 };
 
 // Convenience array of all tools for binding to the model

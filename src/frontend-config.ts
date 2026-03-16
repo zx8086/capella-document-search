@@ -132,10 +132,10 @@ function loadFrontendConfig(): FrontendConfig {
 export const frontendConfig = loadFrontendConfig();
 
 export {
-  FrontendConfigSchema,
-  OpenReplayConfigSchema,
+  AzureConfigSchema,
   CsvConfigSchema,
   ElasticApmConfigSchema,
-  AzureConfigSchema,
+  FrontendConfigSchema,
   GrowthBookConfigSchema,
+  OpenReplayConfigSchema,
 };

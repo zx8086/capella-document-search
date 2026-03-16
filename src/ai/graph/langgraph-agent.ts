@@ -456,4 +456,4 @@ export async function* streamAgent(request: ChatRequest): AsyncGenerator<string,
 }
 
 // Export graph for testing and debugging
-export { getGraph, buildGraph };
+export { buildGraph, getGraph };
