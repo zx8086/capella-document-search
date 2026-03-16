@@ -179,31 +179,6 @@ export default defineConfig(({ mode }): UserConfig => {
           "webrtc-adapter",
           ...(enableOpenTelemetry ? ["src/utils/serverLogger"] : []),
         ],
-        esbuildOptions: {
-          plugins: [
-            {
-              name: "sdp-resolver",
-              setup(build) {
-                build.onResolve({ filter: /^sdp$/ }, (_args) => {
-                  return { path: "sdp/sdp.js", namespace: "file" };
-                });
-              },
-            },
-            // Add zen-observable resolver
-            {
-              name: "zen-observable-resolver",
-              setup(build) {
-                build.onResolve({ filter: /^zen-observable$/ }, (_args) => {
-                  // Make this module work with default import
-                  return {
-                    path: path.resolve("./node_modules/zen-observable/index.js"),
-                    namespace: "file",
-                  };
-                });
-              },
-            },
-          ],
-        },
       },
       define: {
         ...publicEnvVars,
