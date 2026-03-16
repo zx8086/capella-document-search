@@ -18,7 +18,7 @@ ENV NODE_ENV=${NODE_ENV}
 WORKDIR /app
 
 # Copy package files first for better cache utilization
-COPY package.json ./
+COPY package.json bun.lock ./
 RUN --mount=type=cache,target=/root/.bun/install/cache \
     bun install --frozen-lockfile
 
@@ -27,14 +27,6 @@ COPY . .
 
 # Build the application
 COPY bunfig.build.toml bunfig.toml
-
-# Clear any potential esbuild cache conflicts for multi-arch builds
-RUN rm -rf node_modules/.esbuild 2>/dev/null || true && \
-    rm -rf ~/.cache/esbuild 2>/dev/null || true
-
-# Force reinstall esbuild for correct architecture
-RUN bun remove esbuild 2>/dev/null || true && \
-    bun add esbuild@^0.25.0 --exact
 
 RUN NODE_ENV=${NODE_ENV} \
     bun run svelte-kit sync && \
