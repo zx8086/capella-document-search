@@ -5,13 +5,21 @@ import { log } from "$utils/unifiedLogger";
 import { createBedrockChatModel } from "../../clients/bedrock-bearer-client";
 import type { AgentStateType } from "../state";
 
-const CLASSIFICATION_PROMPT = `You are a query classifier for a Couchbase database assistant. Analyze the user's question and determine if it's:
+const CLASSIFICATION_PROMPT = `You are a query classifier for a Couchbase database assistant. Classify the user's question as "simple" or "complex".
 
-1. "simple" - A greeting, general question, or simple clarification that doesn't require database tools or RAG retrieval
-   Examples: "Hello", "What can you do?", "Thanks!", "Can you explain what N1QL is?"
+CRITICAL RULE: Any question about Couchbase, databases, N1QL, SQL++, NoSQL, documents, indexes, clusters, nodes, SDKs, or related technologies MUST be classified as "complex". These questions need RAG document retrieval to provide accurate, grounded answers.
 
-2. "complex" - A question that requires database analysis tools OR document retrieval
-   Examples: "Show me slow queries", "Check cluster health", "Find documents about pricing", "What indexes need optimization?"
+1. "simple" - ONLY greetings, thanks, goodbyes, or meta-questions about the assistant itself
+   Examples: "Hello", "What can you do?", "Thanks!", "Bye"
+
+2. "complex" - ANY question seeking knowledge, information, or analysis. This includes:
+   - Questions about Couchbase features, use cases, architecture, or benefits
+   - Questions about database concepts, performance, or best practices
+   - Questions requiring database tools or document retrieval
+   - "Why", "How", "What is", "Explain", "Describe" questions about technical topics
+   Examples: "Why use Couchbase?", "How does N1QL work?", "What are the benefits of NoSQL?", "Show me slow queries", "Check cluster health"
+
+When in doubt, classify as "complex". It is better to retrieve documents unnecessarily than to miss relevant context.
 
 Respond with ONLY the word "simple" or "complex".`;
 
@@ -48,6 +56,9 @@ export async function classifyNode(state: AgentStateType): Promise<Partial<Agent
     /\b(show|list|get|find|check|analyze|query|search|retrieve)\b/i,
     /\b(slow|expensive|fatal|error|index|cluster|node|vital|performance)\b/i,
     /\b(queries|statements|documents|schema|collection|bucket|scope)\b/i,
+    // Any Couchbase/database-related question should trigger RAG
+    /\b(couchbase|capella|n1ql|sql\+\+|nosql|sdk|memcached|xdcr|eventing)\b/i,
+    /\b(database|db|data\s*model|replication|partition|shard|vector\s*search)\b/i,
   ];
 
   // Fast path for simple queries

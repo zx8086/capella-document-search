@@ -21,10 +21,15 @@ const KNOWLEDGE_SYSTEM_PROMPT = `You are an intelligent assistant with access to
 
 <response_guidelines>
 1. Use the <document_context> to answer the user's question directly
-2. Cite sources when referencing specific information (e.g., "According to [filename]...")
+2. Cite sources inline when referencing specific information (e.g., "According to [filename]...")
 3. If the context doesn't fully answer the question, acknowledge what you found and what's missing
 4. Be concise but thorough
 5. Use markdown formatting for readability
+6. ALWAYS end your response with a "Sources" section listing every document used, formatted as:
+
+---
+**Sources:**
+- [filename] (page X) - brief description of what was referenced
 </response_guidelines>
 
 ${THINKING_INSTRUCTIONS}`;

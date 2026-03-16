@@ -32,7 +32,6 @@ function loadVideo(filename: string): string {
 }
 
 async function _handleVideoEnded() {
-  console.debug("Video ended, moving to next");
   currentVideoIndex = (currentVideoIndex + 1) % videos.length;
   isPlaying = false;
   await loadAndPlayVideo();
@@ -45,32 +44,37 @@ async function loadAndPlayVideo() {
   loadAttempts = 0;
 
   try {
-    console.debug(`Attempting to play video ${currentVideoIndex + 1}`);
     _currentVideoUrl = loadVideo(videos[currentVideoIndex]);
     isPlaying = false;
 
     // Reset the video element
     videoElement.load();
 
-    // Wait for metadata to load with longer timeout and retry logic
+    // Wait for metadata to load with timeout and retry logic
     await new Promise((resolve, reject) => {
       const timeout = setTimeout(() => {
-        videoElement.onloadedmetadata = null;
-        videoElement.onerror = null;
+        if (videoElement) {
+          videoElement.onloadedmetadata = null;
+          videoElement.onerror = null;
+        }
         reject(new Error("Metadata load timeout"));
-      }, 10000); // Increased timeout to 10 seconds
+      }, 10000);
 
       videoElement.onloadedmetadata = () => {
         clearTimeout(timeout);
-        videoElement.onloadedmetadata = null;
-        videoElement.onerror = null;
+        if (videoElement) {
+          videoElement.onloadedmetadata = null;
+          videoElement.onerror = null;
+        }
         resolve(undefined);
       };
 
       videoElement.onerror = () => {
         clearTimeout(timeout);
-        videoElement.onloadedmetadata = null;
-        videoElement.onerror = null;
+        if (videoElement) {
+          videoElement.onloadedmetadata = null;
+          videoElement.onerror = null;
+        }
         reject(new Error("Video load error"));
       };
     });
@@ -84,31 +88,17 @@ async function loadAndPlayVideo() {
     // Play the video with user interaction fallback
     try {
       await videoElement.play();
-      console.debug("Video started playing");
       isPlaying = true;
-      loadAttempts = 0; // Reset attempts on success
+      loadAttempts = 0;
     } catch (playError) {
-      // Handle power-saving restrictions
-      if (playError.name === "AbortError") {
-        console.warn("Video playback was blocked by power-saving mode");
-        // Add attributes to help bypass restrictions
-        videoElement.setAttribute("autoplay", "");
-        videoElement.setAttribute("loop", "");
-        // Retry with reduced promise
-        const playPromise = videoElement.play();
-        if (playPromise !== undefined) {
-          playPromise.catch(() => {
-            console.warn("Autoplay prevented, waiting for user interaction");
-          });
-        }
-      } else {
-        throw playError;
-      }
+      // Autoplay blocked by browser power-saving or policy -- mark as playing
+      // to prevent the $effect from re-triggering an infinite retry loop
+      isPlaying = true;
+      videoElement.setAttribute("autoplay", "");
+      videoElement.setAttribute("loop", "");
+      videoElement.play().catch(() => {});
     }
 
-    // Preload next video
-    const nextIndex = (currentVideoIndex + 1) % videos.length;
-    console.debug(`Preloaded video: ${videos[nextIndex]}`);
   } catch (error) {
     console.error("Error playing video:", error);
     isPlaying = false;
@@ -116,7 +106,6 @@ async function loadAndPlayVideo() {
 
     // Only try next video if we haven't exceeded attempts
     if (loadAttempts < maxLoadAttempts && videos.length > 1) {
-      console.debug(`Trying next video (attempt ${loadAttempts}/${maxLoadAttempts})`);
       currentVideoIndex = (currentVideoIndex + 1) % videos.length;
       // Add small delay before retry
       await new Promise((resolve) => setTimeout(resolve, 1000));
@@ -124,7 +113,6 @@ async function loadAndPlayVideo() {
         await loadAndPlayVideo();
       }
     } else {
-      console.warn("Max load attempts reached or no more videos to try");
       // Reset and try again after longer delay
       setTimeout(() => {
         if (!isExiting && videos.length > 0) {

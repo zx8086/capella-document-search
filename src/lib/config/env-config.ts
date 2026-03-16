@@ -37,7 +37,9 @@ const OpenTelemetryConfigSchema = z.object({
 });
 
 const RagConfigSchema = z.object({
-  RAG_PIPELINE: z.enum(["PINECONE", "CAPELLA", "VECTORIZE", "AWS_KNOWLEDGE_BASE"]).default("PINECONE"),
+  RAG_PIPELINE: z
+    .enum(["PINECONE", "CAPELLA", "VECTORIZE", "AWS_KNOWLEDGE_BASE"])
+    .default("PINECONE"),
   OPENAI_API_KEY: z.string().default(""),
   PINECONE_API_KEY: z.string().default(""),
   PINECONE_INDEX_NAME: z.string().default("platform-engineering-rag"),
