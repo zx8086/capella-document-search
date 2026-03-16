@@ -186,9 +186,6 @@ export default defineConfig(({ mode }): UserConfig => {
       esbuild: {
         target: "esnext",
       },
-      css: {
-        postcss: true,
-      },
     };
 
     if (!config.plugins || !config.server || !config.build) {
