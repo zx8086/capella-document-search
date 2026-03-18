@@ -76,7 +76,6 @@ const config = {
           "https://*.microsoftonline.com",
           "https://graph.microsoft.com",
           "https://*.graph.microsoft.com",
-          "https://api.openai.com",
           "https://*.pinecone.io",
           "https://*.svc.pinecone.io",
           "https://*.shared-services.eu.pvh.cloud",

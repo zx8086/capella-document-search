@@ -55,7 +55,6 @@ const OpenTelemetryConfigSchema = z.object({
 
 const RagConfigSchema = z.object({
   RAG_PIPELINE: z.enum(["PINECONE", "CAPELLA", "VECTORIZE", "AWS_KNOWLEDGE_BASE"]),
-  OPENAI_API_KEY: z.string(),
   PINECONE_API_KEY: z.string(),
   PINECONE_INDEX_NAME: z.string(),
   PINECONE_NAMESPACE: z.string(),
@@ -132,7 +131,6 @@ const defaultConfig: BackendConfig = {
   },
   rag: {
     RAG_PIPELINE: "PINECONE",
-    OPENAI_API_KEY: "",
     PINECONE_API_KEY: "",
     PINECONE_INDEX_NAME: "platform-engineering-rag",
     PINECONE_NAMESPACE: "capella-document-search",
@@ -196,7 +194,6 @@ const envVarMapping = {
   },
   rag: {
     RAG_PIPELINE: "RAG_PIPELINE",
-    OPENAI_API_KEY: "OPENAI_API_KEY",
     PINECONE_API_KEY: "PINECONE_API_KEY",
     PINECONE_INDEX_NAME: "PINECONE_INDEX_NAME",
     PINECONE_NAMESPACE: "PINECONE_NAMESPACE",
@@ -399,9 +396,6 @@ function loadConfigFromEnv(): Partial<BackendConfig> {
         | "CAPELLA"
         | "VECTORIZE"
         | "AWS_KNOWLEDGE_BASE") || defaultConfig.rag.RAG_PIPELINE,
-    OPENAI_API_KEY:
-      (parseEnvVar(getEnvVar(envVarMapping.rag.OPENAI_API_KEY), "string") as string) ||
-      defaultConfig.rag.OPENAI_API_KEY,
     PINECONE_API_KEY:
       (parseEnvVar(getEnvVar(envVarMapping.rag.PINECONE_API_KEY), "string") as string) ||
       defaultConfig.rag.PINECONE_API_KEY,

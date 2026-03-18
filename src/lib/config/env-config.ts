@@ -40,7 +40,6 @@ const RagConfigSchema = z.object({
   RAG_PIPELINE: z
     .enum(["PINECONE", "CAPELLA", "VECTORIZE", "AWS_KNOWLEDGE_BASE"])
     .default("PINECONE"),
-  OPENAI_API_KEY: z.string().default(""),
   PINECONE_API_KEY: z.string().default(""),
   PINECONE_INDEX_NAME: z.string().default("platform-engineering-rag"),
   PINECONE_NAMESPACE: z.string().default("capella-document-search"),
@@ -101,7 +100,6 @@ const defaultConfig: Config = {
   },
   rag: {
     RAG_PIPELINE: "PINECONE",
-    OPENAI_API_KEY: "",
     PINECONE_API_KEY: "",
     PINECONE_INDEX_NAME: "platform-engineering-rag",
     PINECONE_NAMESPACE: "capella-document-search",
@@ -151,7 +149,6 @@ const envVarMapping = {
   },
   rag: {
     RAG_PIPELINE: "RAG_PIPELINE",
-    OPENAI_API_KEY: "OPENAI_API_KEY",
     PINECONE_API_KEY: "PINECONE_API_KEY",
     PINECONE_INDEX_NAME: "PINECONE_INDEX_NAME",
     PINECONE_NAMESPACE: "PINECONE_NAMESPACE",
@@ -296,9 +293,6 @@ function loadConfigFromEnv(): Partial<Config> {
         | "CAPELLA"
         | "VECTORIZE"
         | "AWS_KNOWLEDGE_BASE") || defaultConfig.rag.RAG_PIPELINE,
-    OPENAI_API_KEY:
-      (parseEnvVar(getEnvVar(envVarMapping.rag.OPENAI_API_KEY), "string") as string) ||
-      defaultConfig.rag.OPENAI_API_KEY,
     PINECONE_API_KEY:
       (parseEnvVar(getEnvVar(envVarMapping.rag.PINECONE_API_KEY), "string") as string) ||
       defaultConfig.rag.PINECONE_API_KEY,

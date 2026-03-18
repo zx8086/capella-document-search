@@ -5,7 +5,7 @@ A modern document search application built with Bun, Svelte, and ELysiaJS that e
 ## 🚀 Features
 
 - **Document Search**: Search across Capella scopes and collections
-- **Real-time Chat**: AI-powered chat interface using OpenAI and Pinecone
+- **Real-time Chat**: AI-powered chat interface using AWS Bedrock and Pinecone
 - **High Performance**: Built with Bun runtime and SvelteKit
 - **Observability**: Comprehensive OpenTelemetry integration
 - **Session Replay**: OpenReplay integration for debugging and monitoring
@@ -16,7 +16,6 @@ A modern document search application built with Bun, Svelte, and ELysiaJS that e
 - [Bun](https://bun.sh) (latest version)
 - [Docker](https://www.docker.com/) (for containerized deployment)
 - Capella account and credentials
-- OpenAI API key
 - Pinecone API key
 
 ## 🛠️ Installation
@@ -60,9 +59,6 @@ CLUSTER_ID=your-cluster-id
 BUCKET_ID=your-bucket-id
 AUTH_TOKEN=your-auth-token
 
-# OpenAI Configuration
-OPENAI_API_KEY=your-openai-key
-
 # Pinecone Configuration
 PINECONE_API_KEY=your-pinecone-key
 PINECONE_INDEX_NAME=your-index-name
@@ -79,7 +75,7 @@ SERVICE_NAME=capella-document-search
 Search functionality across Capella scopes and collections with real-time results.
 
 ### AI-Powered Chat
-Integrated chat interface using OpenAI and Pinecone for intelligent document querying.
+Integrated chat interface using AWS Bedrock and Pinecone for intelligent document querying.
 
 ### Session Replay
 Built-in OpenReplay integration for debugging and monitoring user sessions.

@@ -51,7 +51,7 @@ export async function GET({ url, request }) {
           return { embeddings: [0.1, 0.2, 0.3], dimensions: 1536 };
         },
         {
-          provider: "openai",
+          provider: "bedrock",
           operation_type: "embedding",
         }
       );
@@ -69,12 +69,12 @@ export async function GET({ url, request }) {
           return {
             response: `Processed: ${message}`,
             tokens_used: 120,
-            model_version: "gpt-4",
+            model_version: "anthropic.claude-3-5-sonnet",
           };
         },
         {
-          model: "gpt-4",
-          provider: "openai",
+          model: "anthropic.claude-3-5-sonnet",
+          provider: "bedrock",
         }
       );
 

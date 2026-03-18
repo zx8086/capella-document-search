@@ -12,7 +12,6 @@ import { Pinecone } from "@pinecone-database/pinecone";
 import { NodeHttpHandler } from "@smithy/node-http-handler";
 import type { RequestEvent } from "@sveltejs/kit";
 import { json } from "@sveltejs/kit";
-import { OpenAI } from "openai";
 import { backendConfig } from "$backendConfig";
 import { getAllScopes } from "$lib/api";
 import { getAllCollectionsWithTooltips, initializeDatabase } from "$lib/db/dbOperations";
@@ -383,44 +382,6 @@ async function checkOpenReplayEndpoint(fetch: typeof global.fetch): Promise<Chec
     return {
       status: "ERROR",
       message: "Failed to connect to OpenReplay endpoint",
-      responseTime: duration,
-    };
-  }
-}
-
-async function checkOpenAIEndpoint(_fetch: typeof global.fetch): Promise<CheckResult> {
-  const startTime = Date.now();
-  try {
-    const openai = new OpenAI({
-      apiKey: Bun.env.OPENAI_API_KEY,
-    });
-
-    // Simple models list request to check connectivity
-    const _response = await openai.models.list();
-    const duration = Date.now() - startTime;
-
-    return {
-      status: "OK",
-      message: "OpenAI API is responsive",
-      responseTime: duration,
-    };
-  } catch (error) {
-    const duration = Date.now() - startTime;
-    const errorMessage = error instanceof Error ? error.message : String(error);
-
-    // Handle specific error cases
-    if (errorMessage.includes("401")) {
-      return {
-        status: "ERROR",
-        message: "OpenAI API key is invalid",
-        responseTime: duration,
-      };
-    }
-
-    err("OpenAI endpoint health check failed:", error);
-    return {
-      status: "ERROR",
-      message: errorMessage,
       responseTime: duration,
     };
   }
@@ -953,7 +914,6 @@ export async function GET({ fetch, url }: RequestEvent) {
             { name: "Elastic APM Server", check: () => checkElasticAPMEndpoint(fetch) },
             { name: "External Capella Cloud API", check: () => checkCapellaAPI(fetch) },
             { name: "OpenReplay Endpoint", check: () => checkOpenReplayEndpoint(fetch) },
-            { name: "OpenAI API", check: () => checkOpenAIEndpoint(fetch) },
             { name: "Pinecone API", check: () => checkPineconeEndpoint(fetch) },
             { name: "LangSmith API", check: () => checkLangSmithEndpoint(fetch) },
             { name: "OpenTelemetry Logs Endpoint", check: () => checkLogsEndpoint(fetch) },
