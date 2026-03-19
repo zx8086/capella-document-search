@@ -34,6 +34,18 @@ const BUILD_DATE = process.env.BUILD_DATE || new Date().toISOString();
 const ENABLE_OPENTELEMETRY =
   (process.env.ENABLE_OPENTELEMETRY ?? Bun?.env?.ENABLE_OPENTELEMETRY) === "true";
 
+// Checks that only apply to a specific RAG pipeline
+const PIPELINE_SPECIFIC_CHECKS: Record<string, string[]> = {
+  "Pinecone API": ["PINECONE"],
+  "AWS Knowledge Base": ["AWS_KNOWLEDGE_BASE"],
+};
+
+function isCheckRelevant(checkName: string, activePipeline: string): boolean {
+  const pipelines = PIPELINE_SPECIFIC_CHECKS[checkName];
+  if (!pipelines) return true;
+  return pipelines.includes(activePipeline);
+}
+
 function getTelemetryStatus() {
   if (!ENABLE_OPENTELEMETRY) {
     return { enabled: false };
@@ -902,6 +914,8 @@ export async function GET({ fetch, url }: RequestEvent) {
             { name: "GraphQL Endpoint", check: () => checkGraphQLEndpoint(fetch) },
           ].sort((a, b) => a.name.localeCompare(b.name));
 
+          const activePipeline = backendConfig.rag.RAG_PIPELINE;
+
           const detailedChecks = [
             ...simpleChecks,
             { name: "AWS Configuration", check: () => checkAWSConfiguration(fetch) },
@@ -919,7 +933,9 @@ export async function GET({ fetch, url }: RequestEvent) {
             { name: "OpenTelemetry Logs Endpoint", check: () => checkLogsEndpoint(fetch) },
             { name: "OpenTelemetry Metrics Endpoint", check: () => checkMetricsEndpoint(fetch) },
             { name: "OpenTelemetry Traces Endpoint", check: () => checkTracesEndpoint(fetch) },
-          ].sort((a, b) => a.name.localeCompare(b.name));
+          ]
+            .filter(({ name }) => isCheckRelevant(name, activePipeline))
+            .sort((a, b) => a.name.localeCompare(b.name));
 
           // Modify the Promise.all to ensure individual check failures don't stop other checks
           await Promise.allSettled(
@@ -1000,6 +1016,7 @@ export async function GET({ fetch, url }: RequestEvent) {
               commit: COMMIT_HASH,
               buildDate: BUILD_DATE,
             },
+            ragPipeline: activePipeline,
             telemetry: getTelemetryStatus(),
             checks: healthStatus,
             checkType: checkType,

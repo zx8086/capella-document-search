@@ -210,6 +210,12 @@ function _getStatusBackground(status: string): string {
                 Check Type: <span class="font-semibold">{_healthStatus.checkType}</span>
             </p>
 
+            {#if _healthStatus.ragPipeline}
+                <p class="text-md text-gray-700 mb-4">
+                    RAG Pipeline: <span class="font-semibold">{_healthStatus.ragPipeline}</span>
+                </p>
+            {/if}
+
             <!-- Individual Checks -->
             <div class="space-y-4">
                 {#each Object.entries(_healthStatus.checks).sort(([a], [b]) => a.localeCompare(b)) as [service, check]}
