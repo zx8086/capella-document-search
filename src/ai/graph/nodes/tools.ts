@@ -1,6 +1,7 @@
 // src/ai/graph/nodes/tools.ts
 
 import { ToolMessage } from "@langchain/core/messages";
+import { getConnectionStatus } from "$lib/couchbaseConnector";
 import { err, log } from "$utils/unifiedLogger";
 import { toolsByName } from "../../tools";
 import type { AgentStateType, ToolResult } from "../state";
@@ -9,6 +10,15 @@ interface ToolCall {
   name: string;
   args: Record<string, unknown>;
   id: string;
+}
+
+// Track whether a Couchbase connection failure has occurred during this
+// tools node invocation. When the first tool hits a connection error,
+// remaining tools skip the 10s timeout and fail immediately.
+function isCouchbaseConnectionError(errorStr: string): boolean {
+  return /circuit breaker open|unambiguous.?timeout|ECONNREFUSED|connection.?failed/i.test(
+    errorStr
+  );
 }
 
 export async function toolsNode(state: AgentStateType): Promise<Partial<AgentStateType>> {
@@ -34,6 +44,20 @@ export async function toolsNode(state: AgentStateType): Promise<Partial<AgentSta
     toolCallCount: toolCalls.length,
     tools: toolCalls.map((tc) => tc.name),
   });
+
+  // Track if Couchbase became unreachable during this batch
+  let couchbaseDown = false;
+  let couchbaseError = "";
+
+  // Check circuit breaker state before executing any tools
+  const connStatus = getConnectionStatus();
+  if (connStatus.circuitOpen) {
+    couchbaseDown = true;
+    couchbaseError = connStatus.lastError || "Couchbase cluster unreachable";
+    log("[Tools] Circuit breaker is open, Couchbase tools will fail fast", {
+      lastError: connStatus.lastError,
+    });
+  }
 
   for (const toolCall of toolCalls) {
     const toolName = toolCall.name;
@@ -70,6 +94,38 @@ export async function toolsNode(state: AgentStateType): Promise<Partial<AgentSta
         continue;
       }
 
+      // Short-circuit: if Couchbase is down, skip execution and fail fast.
+      // This avoids burning 10s per tool waiting for the same dead connection.
+      if (couchbaseDown) {
+        const failFastMsg = `Couchbase cluster is unreachable. Skipping ${toolName} to avoid unnecessary delay. Error: ${couchbaseError}. All database tools will fail until the connection is restored.`;
+        log("[Tools] Skipping tool due to Couchbase unavailability", { toolName });
+
+        const errorContent = JSON.stringify({
+          success: false,
+          toolName,
+          error: failFastMsg,
+          executionTimeMs: 0,
+          skippedReason: "couchbase_unavailable",
+        });
+
+        toolMessages.push(
+          new ToolMessage({
+            content: errorContent,
+            tool_call_id: toolCallId,
+            name: toolName,
+          })
+        );
+
+        newToolResults.push({
+          toolName,
+          success: false,
+          content: errorContent,
+          executionTimeMs: 0,
+        });
+
+        continue;
+      }
+
       log("[Tools] Executing tool", {
         toolName,
         inputKeys: Object.keys(toolInput || {}),
@@ -86,6 +142,26 @@ export async function toolsNode(state: AgentStateType): Promise<Partial<AgentSta
       });
 
       const resultStr = typeof result === "string" ? result : JSON.stringify(result);
+
+      // Check if this tool result indicates a Couchbase connection failure.
+      // If so, mark Couchbase as down so subsequent tools in this batch fail fast.
+      try {
+        const parsed = JSON.parse(resultStr);
+        if (
+          !parsed.success &&
+          parsed.data?.error &&
+          isCouchbaseConnectionError(parsed.data.error)
+        ) {
+          couchbaseDown = true;
+          couchbaseError = parsed.data.error;
+          log("[Tools] Couchbase connection failure detected, remaining tools will fail fast", {
+            toolName,
+            error: parsed.data.error,
+          });
+        }
+      } catch {
+        // Not JSON or parse error, continue normally
+      }
 
       toolMessages.push(
         new ToolMessage({
@@ -124,6 +200,18 @@ export async function toolsNode(state: AgentStateType): Promise<Partial<AgentSta
         error: errorMessage,
         executionTimeMs: executionTime,
       });
+
+      // Check if this is a Couchbase connection error
+      if (isCouchbaseConnectionError(errorMessage)) {
+        couchbaseDown = true;
+        couchbaseError = errorMessage;
+        log(
+          "[Tools] Couchbase connection failure detected from exception, remaining tools will fail fast",
+          {
+            toolName,
+          }
+        );
+      }
 
       const errorContent = JSON.stringify({
         success: false,

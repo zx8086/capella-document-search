@@ -1,4 +1,5 @@
 <script lang="ts">
+// biome-ignore lint/style/useImportType: DrawerPrimitive is used as a runtime component in the template
 import { Drawer as DrawerPrimitive } from "vaul-svelte";
 
 type $$Props = DrawerPrimitive.Props;

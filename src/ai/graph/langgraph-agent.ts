@@ -210,6 +210,12 @@ export const runAgent = traceable(
   }
 );
 
+// Heartbeat interval to prevent HTTP/2 idle timeouts during long operations.
+// Load balancers and reverse proxies (ALB, Cloudflare, nginx) typically reset
+// idle HTTP/2 streams after 30-60s. Sending periodic heartbeats keeps the
+// stream alive during slow retrieval or tool execution.
+const HEARTBEAT_INTERVAL_MS = 15_000;
+
 // Streaming version for SSE - format matches frontend ChatbotPopup expectations
 export async function* streamAgent(request: ChatRequest): AsyncGenerator<string, void, unknown> {
   const startTime = Date.now();
@@ -262,8 +268,16 @@ export async function* streamAgent(request: ChatRequest): AsyncGenerator<string,
     let streamedContent = "";
     let hasStreamedContent = false;
     let finalResponseText = ""; // Track the final response for fallback
+    let lastYieldTime = Date.now();
 
     for await (const event of stream) {
+      // Send heartbeat if no data has been sent recently to prevent HTTP/2 idle timeout
+      const now = Date.now();
+      if (now - lastYieldTime >= HEARTBEAT_INTERVAL_MS) {
+        yield `${JSON.stringify({ type: "heartbeat", timestamp: now })}\n`;
+        lastYieldTime = now;
+      }
+
       // Emit node execution events as progress updates
       if (event.event === "on_chain_start" && event.name && event.name !== "LangGraph") {
         const nodeName = event.name;
@@ -288,6 +302,7 @@ export async function* streamAgent(request: ChatRequest): AsyncGenerator<string,
           message: progressMessage,
           nodeName,
         })}\n`;
+        lastYieldTime = Date.now();
       }
 
       // Emit node completion events
@@ -296,6 +311,7 @@ export async function* streamAgent(request: ChatRequest): AsyncGenerator<string,
           type: "node_end",
           nodeName: event.name,
         })}\n`;
+        lastYieldTime = Date.now();
       }
 
       // Emit tool execution events
@@ -305,6 +321,7 @@ export async function* streamAgent(request: ChatRequest): AsyncGenerator<string,
           toolName: event.name,
           message: `Executing ${event.name}...`,
         })}\n`;
+        lastYieldTime = Date.now();
       }
 
       if (event.event === "on_tool_end") {
@@ -313,6 +330,7 @@ export async function* streamAgent(request: ChatRequest): AsyncGenerator<string,
           toolName: event.name,
           message: `Completed ${event.name}`,
         })}\n`;
+        lastYieldTime = Date.now();
       }
 
       // Emit LLM token events for streaming text (frontend expects { content: "..." })
@@ -339,6 +357,7 @@ export async function* streamAgent(request: ChatRequest): AsyncGenerator<string,
           yield `${JSON.stringify({
             content: textContent,
           })}\n`;
+          lastYieldTime = Date.now();
         }
       }
 

@@ -530,6 +530,10 @@ async function _handleSubmit() {
     }
   }, CHAT_FAILSAFE_TIMEOUT);
 
+  // Declared at outer scope so error handler can check for partial content
+  let accumulatedResponse = "";
+  let cleanedText = "";
+
   try {
     // Add user message to conversation
     chatStore.addMessage("user", userMessage);
@@ -611,12 +615,10 @@ async function _handleSubmit() {
       throw new Error("Response body reader is null");
     }
 
-    let accumulatedResponse = "";
     let buffer = "";
     const decoder = new TextDecoder();
     let _extractedThinking = "";
     let _cleanedResponse = "";
-    let cleanedText = "";
     let firstContentReceived = false;
 
     console.log("[STREAM] Starting stream processing");
@@ -718,6 +720,11 @@ async function _handleSubmit() {
                 finalResponseLength: data.finalResponse?.length || 0,
               });
 
+              // Heartbeat events keep the HTTP/2 stream alive - acknowledge and skip
+              if (data.type === "heartbeat") {
+                continue;
+              }
+
               if (data.done) {
                 console.log("[DONE] Received done signal", {
                   runId: data.runId,
@@ -755,7 +762,11 @@ async function _handleSubmit() {
               }
 
               if (data.error) {
-                console.error("[ERROR] Received error from server:", data.content);
+                console.error("[ERROR] Received error from server:", {
+                  content: data.content,
+                  errorCode: data.errorCode,
+                  elapsedMs: data.elapsedMs,
+                });
                 const errorContent =
                   data.content || "An error occurred while processing your request.";
                 const formattedError = `[WARNING] **Service Notice**\n\n${errorContent}`;
@@ -969,17 +980,34 @@ async function _handleSubmit() {
     if (error instanceof Error && error.name === "AbortError") {
       // Check if it was a timeout or user-initiated abort
       if (abortController?.signal.reason === "timeout") {
-        errorMessage = `Request timed out after ${CHAT_REQUEST_TIMEOUT / 1000} seconds. This usually happens with very complex queries. Please try:\n• A more specific question\n• Breaking your query into smaller parts\n• Limiting the scope (e.g., "top 5" instead of "all")`;
+        errorMessage = `Request timed out after ${CHAT_REQUEST_TIMEOUT / 1000} seconds. This usually happens with very complex queries. Please try:\n- A more specific question\n- Breaking your query into smaller parts\n- Limiting the scope (e.g., "top 5" instead of "all")`;
         console.log("[TIMEOUT] Request timed out");
       } else {
         errorMessage = "Request was cancelled by user.";
         console.log("[ABORT] Request was aborted by user");
       }
+    } else if (
+      error instanceof Error &&
+      error.message.includes("Failed to read stream after multiple attempts")
+    ) {
+      // Stream disconnected mid-response (HTTP/2 reset, proxy timeout, etc.)
+      const hasPartialContent = !!(cleanedText || accumulatedResponse);
+      errorMessage = hasPartialContent
+        ? "The connection was interrupted while receiving the response. The partial response is shown above. Please try your question again."
+        : "The connection to the chat service was lost while searching the knowledge base. This can happen with complex queries. Please try again.";
+      console.log("[STREAM_DISCONNECT] Stream broken during processing", {
+        hadPartialContent: hasPartialContent,
+        accumulatedLength: accumulatedResponse.length,
+      });
     } else if (error instanceof TypeError && error.message.includes("fetch")) {
       errorMessage =
         "Unable to connect to the chat service. Please check your internet connection and try again.";
-    } else if (error.message?.includes("Failed to fetch")) {
-      errorMessage = "Network error occurred. Please check your connection and try again.";
+    } else if (
+      error instanceof Error &&
+      (error.message.includes("Failed to fetch") || error.message.includes("network error"))
+    ) {
+      errorMessage =
+        "A network error occurred while communicating with the chat service. Please check your connection and try again.";
     }
 
     // Format error with warning icon

@@ -6,46 +6,52 @@ import type { RAGMetadata } from "$lib/rag/types";
 import { err, log } from "$utils/unifiedLogger";
 import type { RequestHandler } from "./$types";
 
+type ErrorCode =
+  | "CONVERSATION_FORMAT"
+  | "VALIDATION"
+  | "RATE_LIMIT"
+  | "TIMEOUT"
+  | "RETRIEVAL"
+  | "NETWORK"
+  | "AUTH"
+  | "FORBIDDEN"
+  | "UNKNOWN";
+
+function categorizeError(errorMessage: string): ErrorCode {
+  if (/conversation must start with a user message/i.test(errorMessage))
+    return "CONVERSATION_FORMAT";
+  if (/ValidationException/i.test(errorMessage)) return "VALIDATION";
+  if (/(throttled|rate limit)/i.test(errorMessage)) return "RATE_LIMIT";
+  if (/(timeout|TimeoutError|ETIMEDOUT|ESOCKETTIMEDOUT)/i.test(errorMessage)) return "TIMEOUT";
+  if (/(retrieval failed|pinecone|knowledge.?base|vector.?search)/i.test(errorMessage))
+    return "RETRIEVAL";
+  if (/(network|connection|ECONNREFUSED|ECONNRESET|socket hang up)/i.test(errorMessage))
+    return "NETWORK";
+  if (/(unauthorized|authentication)/i.test(errorMessage)) return "AUTH";
+  if (/(forbidden|access denied)/i.test(errorMessage)) return "FORBIDDEN";
+  return "UNKNOWN";
+}
+
 function getUserFriendlyErrorMessage(errorMessage: string): string {
-  const errorPatterns = [
-    {
-      pattern: /conversation must start with a user message/i,
-      message: "Please refresh the page and start a new conversation.",
-    },
-    {
-      pattern: /ValidationException/i,
-      message: "Please try rephrasing your question or starting a new conversation.",
-    },
-    {
-      pattern: /(throttled|rate limit)/i,
-      message: "Service is experiencing high demand. Please wait a moment and try again.",
-    },
-    {
-      pattern: /(timeout|TimeoutError)/i,
-      message: "Request timed out. Please try again with a shorter message.",
-    },
-    {
-      pattern: /(network|connection)/i,
-      message: "Network connectivity issue. Please check your connection and try again.",
-    },
-    {
-      pattern: /(unauthorized|authentication)/i,
-      message: "Authentication failed. Please refresh the page and sign in again.",
-    },
-    {
-      pattern: /(forbidden|access denied)/i,
-      message:
-        "You don't have permission to perform this action. Please contact support if this persists.",
-    },
-  ];
+  const code = categorizeError(errorMessage);
 
-  for (const { pattern, message } of errorPatterns) {
-    if (pattern.test(errorMessage)) {
-      return message;
-    }
-  }
+  const messages: Record<ErrorCode, string> = {
+    CONVERSATION_FORMAT: "Please refresh the page and start a new conversation.",
+    VALIDATION: "Please try rephrasing your question or starting a new conversation.",
+    RATE_LIMIT: "Service is experiencing high demand. Please wait a moment and try again.",
+    TIMEOUT:
+      "The request timed out while searching the knowledge base. Please try a more specific question or try again shortly.",
+    RETRIEVAL:
+      "There was a problem searching the knowledge base. The service may be temporarily unavailable. Please try again in a moment.",
+    NETWORK: "A network issue occurred while processing your request. Please try again.",
+    AUTH: "Authentication failed. Please refresh the page and sign in again.",
+    FORBIDDEN:
+      "You don't have permission to perform this action. Please contact support if this persists.",
+    UNKNOWN:
+      "An unexpected error occurred while processing your request. Please try again, and if the problem persists, consider starting a new conversation.",
+  };
 
-  return "I apologize, but I encountered an unexpected error. Please try again, and if the problem persists, consider starting a new conversation.";
+  return messages[code];
 }
 
 export const POST: RequestHandler = async ({ request }) => {
@@ -151,35 +157,53 @@ export const POST: RequestHandler = async ({ request }) => {
             });
           } catch (error) {
             const errorMessage = error instanceof Error ? error.message : String(error);
-            err("[Server] Stream error:", { error: errorMessage });
+            const errorStack = error instanceof Error ? error.stack : undefined;
+            const elapsedMs = Date.now() - startTime;
+            err("[Server] Stream error:", {
+              error: errorMessage,
+              stack: errorStack,
+              elapsedMs,
+              conversationId,
+            });
 
             const userFriendlyError = getUserFriendlyErrorMessage(errorMessage);
-            controller.enqueue(
-              encoder.encode(
-                `${JSON.stringify({
-                  error: true,
-                  content: userFriendlyError,
-                })}\n`
-              )
-            );
-            controller.enqueue(
-              encoder.encode(
-                `${JSON.stringify({
-                  done: true,
-                  error: true,
-                })}\n`
-              )
-            );
-            controller.close();
+            try {
+              controller.enqueue(
+                encoder.encode(
+                  `${JSON.stringify({
+                    error: true,
+                    content: userFriendlyError,
+                    errorCode: categorizeError(errorMessage),
+                    elapsedMs,
+                  })}\n`
+                )
+              );
+              controller.enqueue(
+                encoder.encode(
+                  `${JSON.stringify({
+                    done: true,
+                    error: true,
+                  })}\n`
+                )
+              );
+              controller.close();
+            } catch (enqueueError) {
+              // Stream already closed (e.g., client disconnected) - log but don't re-throw
+              err("[Server] Failed to write error to stream (client likely disconnected)", {
+                originalError: errorMessage,
+                enqueueError:
+                  enqueueError instanceof Error ? enqueueError.message : String(enqueueError),
+              });
+            }
           }
         },
       }),
       {
         headers: {
           "Content-Type": "text/event-stream",
-          "Cache-Control": "no-cache",
-          Connection: "keep-alive",
+          "Cache-Control": "no-cache, no-transform",
           "X-Content-Type-Options": "nosniff",
+          "X-Accel-Buffering": "no",
         },
       }
     );

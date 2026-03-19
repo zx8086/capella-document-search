@@ -1,4 +1,4 @@
-/* src/lib/couchbaseConnector.ts */
+// src/lib/couchbaseConnector.ts
 
 import {
   type Bucket,
@@ -38,12 +38,32 @@ export interface capellaConn {
   };
 }
 
-// Move these to module scope
 let globalCluster: Cluster | null = null;
 let globalPromise: Promise<Cluster> | null = null;
 
-// Initialize connection when module loads
+// Circuit breaker: after a connection failure, reject immediately for this
+// cooldown period instead of attempting another 10s connection that will
+// also fail. This prevents the agent from burning 10s per tool call when
+// the cluster is unreachable.
+const CIRCUIT_BREAKER_COOLDOWN_MS = 30_000;
+let lastFailureTime: number | null = null;
+let lastFailureError: string | null = null;
+
+function isCircuitOpen(): boolean {
+  if (!lastFailureTime) return false;
+  return Date.now() - lastFailureTime < CIRCUIT_BREAKER_COOLDOWN_MS;
+}
+
 async function initializeConnection() {
+  // Circuit breaker: fail fast if we recently failed
+  if (isCircuitOpen()) {
+    const elapsed = Date.now() - (lastFailureTime as number);
+    const remaining = Math.ceil((CIRCUIT_BREAKER_COOLDOWN_MS - elapsed) / 1000);
+    throw new Error(
+      `Couchbase connection unavailable (circuit breaker open, retry in ${remaining}s). Last error: ${lastFailureError}`
+    );
+  }
+
   if (!globalPromise) {
     log("[Init] [CouchbaseConnector] Initializing global connection");
     globalPromise = connect(backendConfig.capella.URL, {
@@ -52,11 +72,18 @@ async function initializeConnection() {
     })
       .then((cluster) => {
         globalCluster = cluster;
+        // Clear circuit breaker on successful connection
+        lastFailureTime = null;
+        lastFailureError = null;
         log("[OK] [CouchbaseConnector] Global connection established");
         return cluster;
       })
       .catch((error) => {
+        const errorMessage = error instanceof Error ? error.message : String(error);
         err("[ERROR] [CouchbaseConnector] Global connection failed:", error);
+        // Trip the circuit breaker
+        lastFailureTime = Date.now();
+        lastFailureError = errorMessage;
         globalPromise = null;
         throw error;
       });
@@ -65,8 +92,8 @@ async function initializeConnection() {
 }
 
 // Start connection immediately
-initializeConnection().catch((err) => {
-  console.error("Initial connection failed:", err);
+initializeConnection().catch((initErr) => {
+  console.error("Initial connection failed:", initErr);
 });
 
 export async function clusterConn() {
@@ -79,6 +106,26 @@ export async function clusterConn() {
   }
 
   return initializeConnection();
+}
+
+/** Check if Couchbase is currently reachable without attempting a connection. */
+export function isConnectionAvailable(): boolean {
+  if (globalCluster) return true;
+  if (globalPromise) return true;
+  return !isCircuitOpen();
+}
+
+/** Get a human-readable connection status for diagnostics. */
+export function getConnectionStatus(): {
+  connected: boolean;
+  circuitOpen: boolean;
+  lastError: string | null;
+} {
+  return {
+    connected: !!globalCluster,
+    circuitOpen: isCircuitOpen(),
+    lastError: lastFailureError,
+  };
 }
 
 export async function closeConnection() {
