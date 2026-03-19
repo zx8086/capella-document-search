@@ -134,12 +134,6 @@ export default defineConfig(({ mode }): UserConfig => {
                 ]
               : []),
           ],
-          // Add output options to make module interop less strict
-          output: {
-            interop: "auto",
-            esModule: true,
-            strict: false,
-          },
         },
         target: "esnext",
         sourcemap: false,
