@@ -1,7 +1,10 @@
 {
   "name": "capella-document-search",
-  "version": "2.1.0",
+  "version": "2.2.0",
   "private": true,
+  "description": "Document search application for Capella scopes and collections. Built with Bun, Svelte, and SvelteKit.",
+  "author": "Simon Owusu",
+  "license": "UNLICENSED",
   "type": "module",
   "scripts": {
     "dev1": "NODE_DEBUG=http BUN_CONFIG_VERBOSE_FETCH=true cp .env.development .env 2>/dev/null || true && bun run svelte-kit sync && bun --bun vite dev",
