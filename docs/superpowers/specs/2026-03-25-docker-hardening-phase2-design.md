@@ -46,25 +46,48 @@ inputs:
 Syntax directive: `# syntax=docker/dockerfile:1`
 
 **Stage 1: deps-base** -- `oven/bun:1.3.11-alpine`
-- Install `ca-certificates` via apk with cache mounts
+- Install `ca-certificates` via apk with BuildKit cache mounts:
+  ```dockerfile
+  RUN --mount=type=cache,target=/var/cache/apk,sharing=locked \
+      --mount=type=cache,target=/var/lib/apk,sharing=locked \
+      apk update && \
+      apk upgrade --no-cache && \
+      apk add --no-cache ca-certificates && \
+      rm -rf /var/cache/apk/*
+  ```
 - No dumb-init needed (Bun on Alpine handles signals natively)
 
 **Stage 2: deps-prod** -- extends deps-base
 - Copy `package.json`, `bun.lock*` (glob -- optional)
-- Run `bun install --frozen-lockfile --production` with cache mounts
+- Run `bun install --frozen-lockfile --production` with Bun install cache mounts:
+  ```dockerfile
+  RUN --mount=type=cache,target=/root/.bun/install/cache,sharing=locked \
+      --mount=type=cache,target=/root/.cache/bun,sharing=locked \
+      bun install --frozen-lockfile --production
+  ```
 
 **Stage 3: builder** -- extends deps-base
 - Copy `package.json`, `bun.lock*`
-- Full `bun install --frozen-lockfile` with cache mounts
+- Full `bun install --frozen-lockfile` with same Bun cache mounts
 - Copy all source files
-- Run build:
-  ```
-  cp bunfig.build.toml bunfig.toml && \
-  bun run svelte-kit sync && \
-  bun run build:no-telemetry
+- Run build with build artifact cache mount:
+  ```dockerfile
+  RUN --mount=type=cache,target=/root/.bun/install/cache,sharing=locked \
+      --mount=type=cache,target=/root/.cache/bun,sharing=locked \
+      --mount=type=cache,target=/tmp/bun-build,sharing=locked \
+      cp bunfig.build.toml bunfig.toml && \
+      bun run svelte-kit sync && \
+      bun run build:no-telemetry
   ```
 - Clean up unnecessary files (.git, .github, node_modules/.cache, tests, docs, coverage, etc.)
 - `mkdir -p build` (ensure artifact path exists)
+
+**Cache hierarchy** (per bun-docker-security-guide):
+- Layer 1 (BuildKit cache mounts): APK packages, Bun install cache, build artifacts -- persists across builds on the same machine
+- Layer 2 (CI dependency cache): Already handled by the existing `actions/cache` in the CI workflow
+- Layer 3 (Registry image cache): Already handled by the existing `cache-from`/`cache-to` in the CI workflow
+
+When only application source changes, Docker skips the deps-prod stage entirely (its inputs -- `package.json` and `bun.lock` -- have not changed). Only the builder stage rebuilds. All three cache layers work together to reduce cold builds from minutes to seconds.
 
 **Stage 4: production** -- `oven/bun:1.3.11-alpine`
 - No binary copies needed (Alpine has Bun installed)
