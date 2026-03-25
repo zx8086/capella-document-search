@@ -1,21 +1,16 @@
 # syntax=docker/dockerfile:1
 
-# -------------------------------------------------------------------
 # Stage 1: deps-base -- Alpine with system dependencies
-# -------------------------------------------------------------------
 FROM oven/bun:1.3.11-alpine AS deps-base
 WORKDIR /app
 
 RUN --mount=type=cache,target=/var/cache/apk,sharing=locked \
     --mount=type=cache,target=/var/lib/apk,sharing=locked \
     apk update && \
-    apk upgrade --no-cache && \
-    apk add --no-cache ca-certificates && \
-    rm -rf /var/cache/apk/*
+    apk upgrade && \
+    apk add ca-certificates
 
-# -------------------------------------------------------------------
 # Stage 2: deps-prod -- Production dependencies only
-# -------------------------------------------------------------------
 FROM deps-base AS deps-prod
 COPY package.json ./
 COPY bun.lock* ./
@@ -23,9 +18,7 @@ RUN --mount=type=cache,target=/root/.bun/install/cache,sharing=locked \
     --mount=type=cache,target=/root/.cache/bun,sharing=locked \
     bun install --frozen-lockfile --production
 
-# -------------------------------------------------------------------
 # Stage 3: builder -- Full install and build
-# -------------------------------------------------------------------
 FROM deps-base AS builder
 COPY package.json ./
 COPY bun.lock* ./
@@ -46,11 +39,12 @@ RUN --mount=type=cache,target=/root/.bun/install/cache,sharing=locked \
            .vscode .idea *.log && \
     mkdir -p build
 
-# -------------------------------------------------------------------
 # Stage 4: production -- Alpine Bun runtime
-# -------------------------------------------------------------------
 FROM oven/bun:1.3.11-alpine AS production
 WORKDIR /app
+
+RUN addgroup -g 65532 -S nonroot && \
+    adduser -u 65532 -S -G nonroot -h /app nonroot
 
 COPY --from=deps-prod --chown=65532:65532 /app/node_modules ./node_modules
 COPY --from=deps-prod --chown=65532:65532 /app/package.json ./package.json

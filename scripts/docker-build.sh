@@ -3,7 +3,7 @@
 # scripts/docker-build.sh
 # Build Docker image with metadata from package.json
 
-set -e
+set -euo pipefail
 
 SERVICE_NAME=$(grep '"name"' package.json | head -1 | cut -d'"' -f4)
 SERVICE_VERSION=$(grep '"version"' package.json | head -1 | cut -d'"' -f4)

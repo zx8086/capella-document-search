@@ -18,11 +18,11 @@ docker images "${IMAGE}" --format "{{.Size}}"
 # 2. Verify nonroot user
 echo ""
 echo "[2/5] Default user"
-USER=$(docker inspect "${IMAGE}" --format '{{.Config.User}}')
-if [ "${USER}" = "65532:65532" ] || [ "${USER}" = "65532" ]; then
-  echo "PASS: Runs as nonroot (${USER})"
+CONTAINER_USER=$(docker inspect "${IMAGE}" --format '{{.Config.User}}')
+if [ "${CONTAINER_USER}" = "65532:65532" ] || [ "${CONTAINER_USER}" = "65532" ]; then
+  echo "PASS: Runs as nonroot (${CONTAINER_USER})"
 else
-  echo "FAIL: Runs as ${USER:-root}"
+  echo "FAIL: Runs as ${CONTAINER_USER:-root}"
 fi
 
 # 3. Check health check is defined

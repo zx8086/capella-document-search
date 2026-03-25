@@ -20,7 +20,7 @@
     "snyk-protect": "snyk-protect",
     "build:dev": "bun run svelte-kit sync && cp .env.development .env 2>/dev/null || true && NODE_ENV=development bun --bun vite build",
     "docker:dev:env": "cp .env.development .env 2>/dev/null || true",
-    "docker:dev:build": "bun run docker:cleanup:dev && VERSION=$(grep '\"version\"' package.json | head -1 | cut -d'\"' -f4) && docker rmi capella-document-search:dev 2>/dev/null || true && DOCKER_BUILDKIT=1 docker build --build-arg NODE_ENV=development --build-arg BUILD_VERSION=${VERSION}-dev --build-arg COMMIT_HASH=$(git rev-parse --short HEAD || echo 'local') --build-arg BUILD_DATE=$(date -u +'%Y-%m-%dT%H:%M:%SZ') -t capella-document-search:dev .",
+    "docker:dev:build": "bun run docker:cleanup:dev && VERSION=$(grep '\"version\"' package.json | head -1 | cut -d'\"' -f4) && (docker rmi capella-document-search:dev 2>/dev/null || true) && DOCKER_BUILDKIT=1 docker build --build-arg NODE_ENV=development --build-arg BUILD_VERSION=${VERSION}-dev --build-arg COMMIT_HASH=$(git rev-parse --short HEAD || echo 'local') --build-arg BUILD_DATE=$(date -u +'%Y-%m-%dT%H:%M:%SZ') -t capella-document-search:dev .",
     "docker:dev": "bun run docker:dev:env && bun run docker:dev:build",
     "docker:dev:run": "bun run docker:cleanup:dev && VERSION=$(grep '\"version\"' package.json | head -1 | cut -d'\"' -f4) && docker run --name capella-search-dev -p 3000:3000 -e NODE_ENV=development -e BUILD_VERSION=${VERSION}-dev -e COMMIT_HASH=$(git rev-parse --short HEAD || echo 'local') -e BUILD_DATE=$(date -u +'%Y-%m-%dT%H:%M:%SZ') capella-document-search:dev",
     "docker:prod:env": "cp .env.production .env 2>/dev/null || true",
