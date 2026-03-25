@@ -61,7 +61,6 @@ const RagConfigSchema = z.object({
   AWS_REGION: z.string(),
   AWS_ACCESS_KEY_ID: z.string(),
   AWS_SECRET_ACCESS_KEY: z.string(),
-  AWS_BEARER_TOKEN_BEDROCK: z.string(),
   BEDROCK_EMBEDDING_MODEL: z.string(),
   BEDROCK_CHAT_MODEL: z.string(),
   KNOWLEDGE_BASE_ID: z.string(),
@@ -137,7 +136,6 @@ const defaultConfig: BackendConfig = {
     AWS_REGION: "eu-central-1",
     AWS_ACCESS_KEY_ID: "",
     AWS_SECRET_ACCESS_KEY: "",
-    AWS_BEARER_TOKEN_BEDROCK: "",
     BEDROCK_EMBEDDING_MODEL: "amazon.titan-embed-text-v1",
     BEDROCK_CHAT_MODEL: "anthropic.claude-3-5-sonnet-20241022-v2:0",
     KNOWLEDGE_BASE_ID: "OSYN5HVWI2",
@@ -200,7 +198,6 @@ const envVarMapping = {
     AWS_REGION: "AWS_REGION",
     AWS_ACCESS_KEY_ID: "AWS_ACCESS_KEY_ID",
     AWS_SECRET_ACCESS_KEY: "AWS_SECRET_ACCESS_KEY",
-    AWS_BEARER_TOKEN_BEDROCK: "AWS_BEARER_TOKEN_BEDROCK",
     BEDROCK_EMBEDDING_MODEL: "BEDROCK_EMBEDDING_MODEL",
     BEDROCK_CHAT_MODEL: "BEDROCK_CHAT_MODEL",
     KNOWLEDGE_BASE_ID: "KNOWLEDGE_BASE_ID",
@@ -414,9 +411,6 @@ function loadConfigFromEnv(): Partial<BackendConfig> {
     AWS_SECRET_ACCESS_KEY:
       (parseEnvVar(getEnvVar(envVarMapping.rag.AWS_SECRET_ACCESS_KEY), "string") as string) ||
       defaultConfig.rag.AWS_SECRET_ACCESS_KEY,
-    AWS_BEARER_TOKEN_BEDROCK:
-      (parseEnvVar(getEnvVar(envVarMapping.rag.AWS_BEARER_TOKEN_BEDROCK), "string") as string) ||
-      defaultConfig.rag.AWS_BEARER_TOKEN_BEDROCK,
     BEDROCK_EMBEDDING_MODEL:
       (parseEnvVar(getEnvVar(envVarMapping.rag.BEDROCK_EMBEDDING_MODEL), "string") as string) ||
       defaultConfig.rag.BEDROCK_EMBEDDING_MODEL,
@@ -489,10 +483,6 @@ try {
           BEDROCK_EMBEDDING_MODEL: backendConfig.rag.BEDROCK_EMBEDDING_MODEL,
           BEDROCK_CHAT_MODEL: backendConfig.rag.BEDROCK_CHAT_MODEL,
           BEDROCK_MAX_TOKENS: backendConfig.rag.BEDROCK_MAX_TOKENS,
-          // Auth method display
-          BEDROCK_AUTH: backendConfig.rag.AWS_BEARER_TOKEN_BEDROCK?.startsWith("ABSK")
-            ? "BEDROCK_API_KEY"
-            : "IAM_CREDENTIALS",
           HAS_IAM_CREDENTIALS: !!(
             backendConfig.rag.AWS_ACCESS_KEY_ID && backendConfig.rag.AWS_SECRET_ACCESS_KEY
           ),

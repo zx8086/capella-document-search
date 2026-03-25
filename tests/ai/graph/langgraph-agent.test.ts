@@ -211,11 +211,16 @@ describe("LangGraph Agent", () => {
     it("should return ChatResponse structure", async () => {
       const { runAgent } = await import("$ai/graph/langgraph-agent");
 
-      // Note: This will try to invoke the actual LLM
-      // In production tests, we'd mock the LLM client
+      // Calls the real LLM -- race against a 3s timeout so the try/catch
+      // fires before bun's 5s test timeout kills the test externally.
       try {
         const request: ChatRequest = { message: "hello" };
-        const response = await runAgent(request);
+        const response = await Promise.race([
+          runAgent(request),
+          new Promise<never>((_, reject) =>
+            setTimeout(() => reject(new Error("LLM not available in test environment")), 3000)
+          ),
+        ]);
 
         expect(response).toHaveProperty("response");
         expect(response).toHaveProperty("context");

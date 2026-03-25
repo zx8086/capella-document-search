@@ -49,7 +49,7 @@ runs:
         # Create directories first
         mkdir -p "${GITHUB_WORKSPACE}/bin"
         mkdir -p "${GITHUB_WORKSPACE}/tmp"
-        
+
         cd "${GITHUB_WORKSPACE}/tmp"
 
         # Detect architecture
@@ -96,21 +96,21 @@ runs:
       shell: bash
       run: |
         echo "Verifying tool installations..."
-        
+
         # Verify cosign
         if "${GITHUB_WORKSPACE}/bin/cosign" version; then
           echo "✅ Cosign installed successfully"
         else
           echo "❌ Cosign installation failed"
         fi
-        
+
         # Verify syft
         if "${GITHUB_WORKSPACE}/bin/syft" --version; then
           echo "✅ Syft installed successfully"
         else
           echo "❌ Syft installation failed"
         fi
-        
+
         echo "Tool verification completed"
       continue-on-error: true
 
@@ -154,7 +154,7 @@ runs:
             - "**/build/**"
             - "**/.github/**"
             - "**/node_modules/**"
-        
+
         # Language settings
         language-settings:
           node:

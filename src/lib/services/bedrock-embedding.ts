@@ -1,28 +1,27 @@
-/* src/lib/services/bedrock-embedding.ts */
+// src/lib/services/bedrock-embedding.ts
+// DEPRECATED: This class is not imported anywhere. Use createBedrockEmbeddings()
+// from src/ai/clients/bedrock-bearer-client.ts instead.
 
 import { BedrockRuntimeClient, InvokeModelCommand } from "@aws-sdk/client-bedrock-runtime";
 import { NodeHttpHandler } from "@smithy/node-http-handler";
 import { err, log } from "$utils/unifiedLogger";
 
+/** @deprecated Use createBedrockEmbeddings() from bedrock-bearer-client.ts */
 export class BedrockEmbeddingService {
   private client: BedrockRuntimeClient;
   private modelId: string;
 
   constructor(region: string = "eu-central-1") {
-    // Build credentials object safely
-    const credentials: any = {
-      accessKeyId: Bun.env.AWS_ACCESS_KEY_ID || "DUMMY",
-      secretAccessKey: Bun.env.AWS_SECRET_ACCESS_KEY || "DUMMY",
-    };
+    const accessKeyId = Bun.env.AWS_ACCESS_KEY_ID;
+    const secretAccessKey = Bun.env.AWS_SECRET_ACCESS_KEY;
 
-    // Only add sessionToken if it exists and is not empty
-    if (Bun.env.AWS_BEARER_TOKEN_BEDROCK?.trim()) {
-      credentials.sessionToken = Bun.env.AWS_BEARER_TOKEN_BEDROCK;
+    if (!accessKeyId || !secretAccessKey) {
+      throw new Error("AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY are required");
     }
 
     this.client = new BedrockRuntimeClient({
       region,
-      credentials,
+      credentials: { accessKeyId, secretAccessKey },
       // Use maxAttempts to handle transient network issues
       maxAttempts: 3,
       // Add retry configuration

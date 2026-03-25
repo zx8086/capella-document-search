@@ -6,11 +6,7 @@ import { Pinecone } from "@pinecone-database/pinecone";
 import { backendConfig } from "$backendConfig";
 import type { RAGContext } from "$lib/rag/types";
 import { err, log } from "$utils/unifiedLogger";
-import {
-  createBedrockEmbeddings,
-  getAuthMethod,
-  getIAMCredentials,
-} from "../../clients/bedrock-bearer-client";
+import { createBedrockEmbeddings, getIAMCredentials } from "../../clients/bedrock-bearer-client";
 import type { AgentStateType } from "../state";
 
 type RAGPipeline = "PINECONE" | "AWS_KNOWLEDGE_BASE" | "CAPELLA" | "VECTORIZE";
@@ -53,14 +49,10 @@ function initializeAWSKnowledgeBaseRetriever(topK: number = 3): AmazonKnowledgeB
 
   log("[Retriever] Initializing AWS Knowledge Base retriever");
 
-  // AWS Knowledge Base requires IAM credentials (does NOT support Bedrock API keys)
   const iamCredentials = getIAMCredentials();
-  const bedrockAuthMethod = getAuthMethod();
 
-  log("[Retriever] AWS auth configuration", {
-    bedrockAuthMethod,
+  log("[Retriever] AWS Knowledge Base auth check", {
     hasIAMCredentials: !!iamCredentials,
-    knowledgeBaseNote: "Knowledge Base requires IAM credentials, not Bedrock API key",
   });
 
   if (!iamCredentials) {

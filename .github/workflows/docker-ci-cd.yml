@@ -71,7 +71,7 @@ jobs:
             type=raw,value=latest,enable={{is_default_branch}}
           labels: |
             org.opencontainers.image.title=capella-document-search
-            org.opencontainers.image.description=Capella Document Search is a web application that allows you to search for documents within Capella scopes and collections. Built with Bun, Svelte, and SvelteKit.
+            org.opencontainers.image.description=Document search application for Capella scopes and collections. Built with Bun, Svelte, and SvelteKit.
             org.opencontainers.image.vendor=Siobytes
             org.opencontainers.image.licenses=MIT
             org.opencontainers.image.url=https://github.com/zx8086/capella-document-search

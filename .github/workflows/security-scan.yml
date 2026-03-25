@@ -19,7 +19,7 @@ jobs:
   code-scan:
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v5
@@ -43,10 +43,10 @@ jobs:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
         run: |
           echo "Running Snyk code scan..."
-          
+
           # Authenticate Snyk
           snyk auth ${{ secrets.SNYK_TOKEN }}
-          
+
           # Run dependency scan (separate from container scan)
           snyk test \
             --package-manager=yarn \
@@ -103,7 +103,7 @@ jobs:
     timeout-minutes: 30
     needs: []
     if: github.event_name != 'pull_request'
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v5
@@ -137,10 +137,10 @@ jobs:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
         run: |
           echo "Running Snyk container scan..."
-          
+
           # Authenticate Snyk
           snyk auth ${{ secrets.SNYK_TOKEN }}
-          
+
           # Run container scan with explicit project name to ensure single run
           snyk container test ${{ env.DOCKER_IMAGE }} \
             --file=Dockerfile \
@@ -186,7 +186,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: [code-scan, container-scan]
     if: always()
-    
+
     steps:
       - name: Security Summary
         run: |
@@ -195,13 +195,13 @@ jobs:
             echo ""
             echo "| Scan Type | Status |"
             echo "|-----------|--------|"
-            
+
             if [[ "${{ needs.code-scan.result }}" == "success" ]]; then
               echo "| 📝 Code Scan | ✅ Completed |"
             else
               echo "| 📝 Code Scan | ❌ Failed |"
             fi
-            
+
             if [[ "${{ needs.container-scan.result }}" == "success" ]]; then
               echo "| 📦 Container Scan | ✅ Completed |"
             elif [[ "${{ github.event_name }}" == "pull_request" ]]; then
@@ -209,10 +209,10 @@ jobs:
             else
               echo "| 📦 Container Scan | ❌ Failed |"
             fi
-            
+
             echo ""
             echo "#### 🔗 Useful Links"
             echo "- [Security Tab](https://github.com/${{ github.repository }}/security)"
             echo "- [Actions Run](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})"
-            
+
           } >> $GITHUB_STEP_SUMMARY

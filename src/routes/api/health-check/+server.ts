@@ -16,6 +16,10 @@ import { backendConfig } from "$backendConfig";
 import { getAllScopes } from "$lib/api";
 import { getAllCollectionsWithTooltips, initializeDatabase } from "$lib/db/dbOperations";
 import { err, log } from "$utils/unifiedLogger";
+import {
+  getCredentialDiagnostics,
+  redactCredential,
+} from "../../../ai/clients/credential-diagnostics";
 import { frontendConfig } from "../../../frontend-config";
 import type { CheckResult } from "../../../models";
 import { getCardinalityStatus } from "../../../otel/cardinality-guard";
@@ -504,14 +508,13 @@ async function checkAWSConfiguration(_fetch: typeof global.fetch): Promise<Check
   const startTime = Date.now();
 
   try {
-    const region = Bun.env.AWS_REGION;
-    const accessKeyId = Bun.env.AWS_ACCESS_KEY_ID;
-    const secretAccessKey = Bun.env.AWS_SECRET_ACCESS_KEY;
-    const knowledgeBaseId = Bun.env.KNOWLEDGE_BASE_ID;
+    const region = backendConfig.rag.AWS_REGION;
+    const accessKeyId = backendConfig.rag.AWS_ACCESS_KEY_ID;
+    const secretAccessKey = backendConfig.rag.AWS_SECRET_ACCESS_KEY;
+    const knowledgeBaseId = backendConfig.rag.KNOWLEDGE_BASE_ID;
 
     const duration = Date.now() - startTime;
 
-    // Check required AWS configuration
     const missingConfigs = [];
     if (!region) missingConfigs.push("AWS_REGION");
     if (!accessKeyId) missingConfigs.push("AWS_ACCESS_KEY_ID");
@@ -521,14 +524,14 @@ async function checkAWSConfiguration(_fetch: typeof global.fetch): Promise<Check
     if (missingConfigs.length > 0) {
       return {
         status: "ERROR",
-        message: `Missing AWS configuration: ${missingConfigs.join(", ")}`,
+        message: `Missing AWS configuration: ${missingConfigs.join(", ")} (key: ${redactCredential(accessKeyId)})`,
         responseTime: duration,
       };
     }
 
     return {
       status: "OK",
-      message: `AWS configuration is complete (Region: ${region})`,
+      message: `AWS configuration is complete (Region: ${region}, Key: ${redactCredential(accessKeyId)})`,
       responseTime: duration,
     };
   } catch (error) {
@@ -544,12 +547,51 @@ async function checkAWSConfiguration(_fetch: typeof global.fetch): Promise<Check
   }
 }
 
+async function checkCredentialConsistency(_fetch: typeof global.fetch): Promise<CheckResult> {
+  const startTime = Date.now();
+
+  try {
+    const diagnostics = getCredentialDiagnostics();
+    const duration = Date.now() - startTime;
+
+    if (diagnostics.consistency.allMatch) {
+      return {
+        status: "OK",
+        message: "All credential sources (backendConfig, Bun.env, process.env) are consistent",
+        responseTime: duration,
+      };
+    }
+
+    const mismatches: string[] = [];
+    if (!diagnostics.consistency.accessKeyIdMatch) mismatches.push("AWS_ACCESS_KEY_ID");
+    if (!diagnostics.consistency.secretAccessKeyMatch) mismatches.push("AWS_SECRET_ACCESS_KEY");
+    if (!diagnostics.consistency.regionMatch) mismatches.push("AWS_REGION");
+
+    log("[HealthCheck] Credential source mismatch detected", diagnostics.sources);
+
+    return {
+      status: "WARNING",
+      message: `Credential sources are inconsistent for: ${mismatches.join(", ")}. Check server logs for source details.`,
+      responseTime: duration,
+    };
+  } catch (error) {
+    const duration = Date.now() - startTime;
+    return {
+      status: "ERROR",
+      message: error instanceof Error ? error.message : String(error),
+      responseTime: duration,
+    };
+  }
+}
+
 async function checkBedrockChatEndpoint(_fetch: typeof global.fetch): Promise<CheckResult> {
   const startTime = Date.now();
 
   try {
-    const region = Bun.env.AWS_REGION;
-    const chatModel = Bun.env.BEDROCK_CHAT_MODEL || "anthropic.claude-3-5-sonnet-20241022-v2:0";
+    const region = backendConfig.rag.AWS_REGION;
+    const chatModel = backendConfig.rag.BEDROCK_CHAT_MODEL;
+    const accessKeyId = backendConfig.rag.AWS_ACCESS_KEY_ID;
+    const secretAccessKey = backendConfig.rag.AWS_SECRET_ACCESS_KEY;
 
     if (!region) {
       return {
@@ -559,32 +601,25 @@ async function checkBedrockChatEndpoint(_fetch: typeof global.fetch): Promise<Ch
       };
     }
 
-    // Build credentials object safely (matching bedrock-chat.ts pattern)
-    const credentials: any = {
-      accessKeyId: Bun.env.AWS_ACCESS_KEY_ID || "DUMMY",
-      secretAccessKey: Bun.env.AWS_SECRET_ACCESS_KEY || "DUMMY",
-    };
-
-    // Only add sessionToken if it exists and is not empty
-    if (Bun.env.AWS_BEARER_TOKEN_BEDROCK?.trim()) {
-      credentials.sessionToken = Bun.env.AWS_BEARER_TOKEN_BEDROCK;
+    if (!accessKeyId || !secretAccessKey) {
+      return {
+        status: "ERROR",
+        message: "AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY are required for Bedrock chat",
+        responseTime: 0,
+      };
     }
 
     const client = new BedrockRuntimeClient({
       region,
-      credentials,
-      // Use maxAttempts to handle transient network issues
+      credentials: { accessKeyId, secretAccessKey },
       maxAttempts: 3,
-      // Add retry configuration
       retryMode: "adaptive",
-      // Use HTTP/1.1 handler to avoid Bun HTTP/2 compatibility issues
       requestHandler: new NodeHttpHandler({
         httpAgent: { keepAlive: false },
         httpsAgent: { keepAlive: false },
       }),
     });
 
-    // Test with a simple health check message
     const command = new ConverseCommand({
       modelId: chatModel,
       messages: [
@@ -618,8 +653,8 @@ async function checkBedrockChatEndpoint(_fetch: typeof global.fetch): Promise<Ch
   } catch (error) {
     const duration = Date.now() - startTime;
     const errorMessage = error instanceof Error ? error.message : String(error);
+    const keyFingerprint = redactCredential(backendConfig.rag.AWS_ACCESS_KEY_ID);
 
-    // Handle specific AWS errors
     if (errorMessage.includes("ValidationException")) {
       return {
         status: "ERROR",
@@ -631,7 +666,7 @@ async function checkBedrockChatEndpoint(_fetch: typeof global.fetch): Promise<Ch
     if (errorMessage.includes("UnauthorizedOperation") || errorMessage.includes("AccessDenied")) {
       return {
         status: "ERROR",
-        message: "AWS credentials lack Bedrock chat permissions",
+        message: `AWS credentials lack Bedrock chat permissions (key: ${keyFingerprint})`,
         responseTime: duration,
       };
     }
@@ -644,10 +679,10 @@ async function checkBedrockChatEndpoint(_fetch: typeof global.fetch): Promise<Ch
       };
     }
 
-    err("Bedrock chat endpoint health check failed:", error);
+    err("Bedrock chat endpoint health check failed:", { error: errorMessage, keyFingerprint });
     return {
       status: "ERROR",
-      message: errorMessage,
+      message: `${errorMessage} (key: ${keyFingerprint})`,
       responseTime: duration,
     };
   }
@@ -657,8 +692,10 @@ async function checkBedrockEmbeddingEndpoint(_fetch: typeof global.fetch): Promi
   const startTime = Date.now();
 
   try {
-    const region = Bun.env.AWS_REGION;
-    const embeddingModel = Bun.env.BEDROCK_EMBEDDING_MODEL || "amazon.titan-embed-text-v1";
+    const region = backendConfig.rag.AWS_REGION;
+    const embeddingModel = backendConfig.rag.BEDROCK_EMBEDDING_MODEL;
+    const accessKeyId = backendConfig.rag.AWS_ACCESS_KEY_ID;
+    const secretAccessKey = backendConfig.rag.AWS_SECRET_ACCESS_KEY;
 
     if (!region) {
       return {
@@ -668,32 +705,25 @@ async function checkBedrockEmbeddingEndpoint(_fetch: typeof global.fetch): Promi
       };
     }
 
-    // Build credentials object safely (matching bedrock-embedding.ts pattern)
-    const credentials: any = {
-      accessKeyId: Bun.env.AWS_ACCESS_KEY_ID || "DUMMY",
-      secretAccessKey: Bun.env.AWS_SECRET_ACCESS_KEY || "DUMMY",
-    };
-
-    // Only add sessionToken if it exists and is not empty
-    if (Bun.env.AWS_BEARER_TOKEN_BEDROCK?.trim()) {
-      credentials.sessionToken = Bun.env.AWS_BEARER_TOKEN_BEDROCK;
+    if (!accessKeyId || !secretAccessKey) {
+      return {
+        status: "ERROR",
+        message: "AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY are required for Bedrock embeddings",
+        responseTime: 0,
+      };
     }
 
     const embeddingClient = new BedrockRuntimeClient({
       region,
-      credentials,
-      // Use maxAttempts to handle transient network issues
+      credentials: { accessKeyId, secretAccessKey },
       maxAttempts: 3,
-      // Add retry configuration
       retryMode: "adaptive",
-      // Use HTTP/1.1 handler to avoid Bun HTTP/2 compatibility issues
       requestHandler: new NodeHttpHandler({
         httpAgent: { keepAlive: false },
         httpsAgent: { keepAlive: false },
       }),
     });
 
-    // Test with a simple text embedding
     const command = new InvokeModelCommand({
       modelId: embeddingModel,
       body: JSON.stringify({
@@ -707,14 +737,11 @@ async function checkBedrockEmbeddingEndpoint(_fetch: typeof global.fetch): Promi
     if (response.body) {
       const responseBody = JSON.parse(new TextDecoder().decode(response.body));
       if (responseBody.embedding && Array.isArray(responseBody.embedding)) {
-        // Different Titan models have different dimensions:
-        // amazon.titan-embed-text-v1 = 1536 dimensions
-        // amazon.titan-embed-text-v2:0 = 1024 dimensions
         const expectedDimensions = embeddingModel.includes("titan-embed-text-v1")
           ? 1536
           : embeddingModel.includes("titan-embed-text-v2")
             ? 1024
-            : 1536; // default
+            : 1536;
         const actualDimensions = responseBody.embedding.length;
 
         if (actualDimensions === expectedDimensions) {
@@ -741,8 +768,8 @@ async function checkBedrockEmbeddingEndpoint(_fetch: typeof global.fetch): Promi
   } catch (error) {
     const duration = Date.now() - startTime;
     const errorMessage = error instanceof Error ? error.message : String(error);
+    const keyFingerprint = redactCredential(backendConfig.rag.AWS_ACCESS_KEY_ID);
 
-    // Handle specific AWS errors
     if (errorMessage.includes("ValidationException")) {
       return {
         status: "ERROR",
@@ -754,7 +781,7 @@ async function checkBedrockEmbeddingEndpoint(_fetch: typeof global.fetch): Promi
     if (errorMessage.includes("UnauthorizedOperation") || errorMessage.includes("AccessDenied")) {
       return {
         status: "ERROR",
-        message: "AWS credentials lack Bedrock embedding permissions",
+        message: `AWS credentials lack Bedrock embedding permissions (key: ${keyFingerprint})`,
         responseTime: duration,
       };
     }
@@ -767,10 +794,10 @@ async function checkBedrockEmbeddingEndpoint(_fetch: typeof global.fetch): Promi
       };
     }
 
-    err("Bedrock embedding endpoint health check failed:", error);
+    err("Bedrock embedding endpoint health check failed:", { error: errorMessage, keyFingerprint });
     return {
       status: "ERROR",
-      message: errorMessage,
+      message: `${errorMessage} (key: ${keyFingerprint})`,
       responseTime: duration,
     };
   }
@@ -780,8 +807,10 @@ async function checkKnowledgeBaseEndpoint(_fetch: typeof global.fetch): Promise<
   const startTime = Date.now();
 
   try {
-    const region = Bun.env.AWS_REGION;
-    const knowledgeBaseId = Bun.env.KNOWLEDGE_BASE_ID;
+    const region = backendConfig.rag.AWS_REGION;
+    const knowledgeBaseId = backendConfig.rag.KNOWLEDGE_BASE_ID;
+    const accessKeyId = backendConfig.rag.AWS_ACCESS_KEY_ID;
+    const secretAccessKey = backendConfig.rag.AWS_SECRET_ACCESS_KEY;
 
     if (!region || !knowledgeBaseId) {
       return {
@@ -791,22 +820,19 @@ async function checkKnowledgeBaseEndpoint(_fetch: typeof global.fetch): Promise<
       };
     }
 
-    // Use the same credentials pattern as the working AWS Knowledge Base provider
-    const credentials: any = {
-      accessKeyId: Bun.env.AWS_ACCESS_KEY_ID,
-      secretAccessKey: Bun.env.AWS_SECRET_ACCESS_KEY,
-    };
-    // Note: Knowledge Base uses different credentials than Bedrock chat/embedding
-    // Do not add sessionToken for Knowledge Base
+    if (!accessKeyId || !secretAccessKey) {
+      return {
+        status: "ERROR",
+        message: "AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY are required for Knowledge Base",
+        responseTime: 0,
+      };
+    }
 
     const knowledgeBaseClient = new BedrockAgentRuntimeClient({
       region,
-      credentials,
-      // Use maxAttempts to handle transient network issues
+      credentials: { accessKeyId, secretAccessKey },
       maxAttempts: 3,
-      // Add retry configuration
       retryMode: "adaptive",
-      // Use HTTP/1.1 handler to avoid Bun HTTP/2 compatibility issues
       requestHandler: new NodeHttpHandler({
         httpAgent: { keepAlive: false },
         httpsAgent: { keepAlive: false },
@@ -865,9 +891,10 @@ async function checkKnowledgeBaseEndpoint(_fetch: typeof global.fetch): Promise<
     }
 
     if (errorMessage.includes("UnauthorizedOperation") || errorMessage.includes("AccessDenied")) {
+      const keyFingerprint = redactCredential(backendConfig.rag.AWS_ACCESS_KEY_ID);
       return {
         status: "ERROR",
-        message: "AWS credentials lack Knowledge Base permissions",
+        message: `AWS credentials lack Knowledge Base permissions (key: ${keyFingerprint})`,
         responseTime: duration,
       };
     }
@@ -919,6 +946,7 @@ export async function GET({ fetch, url }: RequestEvent) {
           const detailedChecks = [
             ...simpleChecks,
             { name: "AWS Configuration", check: () => checkAWSConfiguration(fetch) },
+            { name: "AWS Credential Consistency", check: () => checkCredentialConsistency(fetch) },
             { name: "AWS Bedrock Chat Model", check: () => checkBedrockChatEndpoint(fetch) },
             {
               name: "AWS Bedrock Embedding Model",

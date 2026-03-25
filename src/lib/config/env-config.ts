@@ -44,12 +44,8 @@ const RagConfigSchema = z.object({
   PINECONE_INDEX_NAME: z.string().default("platform-engineering-rag"),
   PINECONE_NAMESPACE: z.string().default("capella-document-search"),
   AWS_REGION: z.string().default("eu-central-1"),
-  // IAM credentials (only needed if NOT using Bedrock API key)
   AWS_ACCESS_KEY_ID: z.string().default(""),
   AWS_SECRET_ACCESS_KEY: z.string().default(""),
-  // Bedrock API key (starts with "ABSK") - preferred for long-lived auth
-  // When set, IAM credentials above are ignored
-  AWS_BEARER_TOKEN_BEDROCK: z.string().default(""),
   BEDROCK_EMBEDDING_MODEL: z.string().default("amazon.titan-embed-text-v1"),
   BEDROCK_CHAT_MODEL: z.string().default("anthropic.claude-3-5-sonnet-20240620-v1:0"),
 });
@@ -106,7 +102,6 @@ const defaultConfig: Config = {
     AWS_REGION: "eu-central-1",
     AWS_ACCESS_KEY_ID: "",
     AWS_SECRET_ACCESS_KEY: "",
-    AWS_BEARER_TOKEN_BEDROCK: "",
     BEDROCK_EMBEDDING_MODEL: "amazon.titan-embed-text-v1",
     BEDROCK_CHAT_MODEL: "anthropic.claude-3-5-sonnet-20241022-v2:0",
   },
@@ -155,7 +150,6 @@ const envVarMapping = {
     AWS_REGION: "AWS_REGION",
     AWS_ACCESS_KEY_ID: "AWS_ACCESS_KEY_ID",
     AWS_SECRET_ACCESS_KEY: "AWS_SECRET_ACCESS_KEY",
-    AWS_BEARER_TOKEN_BEDROCK: "AWS_BEARER_TOKEN_BEDROCK",
     BEDROCK_EMBEDDING_MODEL: "BEDROCK_EMBEDDING_MODEL",
     BEDROCK_CHAT_MODEL: "BEDROCK_CHAT_MODEL",
   },
@@ -311,9 +305,6 @@ function loadConfigFromEnv(): Partial<Config> {
     AWS_SECRET_ACCESS_KEY:
       (parseEnvVar(getEnvVar(envVarMapping.rag.AWS_SECRET_ACCESS_KEY), "string") as string) ||
       defaultConfig.rag.AWS_SECRET_ACCESS_KEY,
-    AWS_BEARER_TOKEN_BEDROCK:
-      (parseEnvVar(getEnvVar(envVarMapping.rag.AWS_BEARER_TOKEN_BEDROCK), "string") as string) ||
-      defaultConfig.rag.AWS_BEARER_TOKEN_BEDROCK,
     BEDROCK_EMBEDDING_MODEL:
       (parseEnvVar(getEnvVar(envVarMapping.rag.BEDROCK_EMBEDDING_MODEL), "string") as string) ||
       defaultConfig.rag.BEDROCK_EMBEDDING_MODEL,

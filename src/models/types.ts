@@ -66,7 +66,6 @@ export interface RAGConfig {
   AWS_REGION: string;
   AWS_ACCESS_KEY_ID: string;
   AWS_SECRET_ACCESS_KEY: string;
-  AWS_BEARER_TOKEN_BEDROCK: string;
   BEDROCK_EMBEDDING_MODEL: string;
   BEDROCK_CHAT_MODEL: string;
 }
