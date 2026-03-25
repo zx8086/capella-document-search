@@ -2,77 +2,105 @@
 
 ## Goal
 
-Harden the Dockerfile to production-grade distroless standards, create local build and security scripts, and fix hardcoded versions in docker scripts -- completing the work deferred from Phase 1 (SIO-611).
+Rewrite the Dockerfile to align with the Docker Factory `bun-ssr` pattern (Scenario 3) so that:
+1. The manual Dockerfile produces the same result the factory will generate
+2. Migration to the automated Docker Factory is seamless
+3. Local docker scripts use `package.json` as the version source of truth
+
+## Docker Factory Alignment
+
+This project will use the Docker Factory `bun-ssr` language config:
+- **Builder image**: `oven/bun:1.3.11-alpine`
+- **Runtime image**: `oven/bun:1.3.11-alpine` (not distroless)
+- **No dumb-init, no musl copies, no binary copies** -- Alpine has everything
+- **Artifact paths**: `build` (SvelteKit adapter-bun output)
+- **Build cmd**: `cp bunfig.build.toml bunfig.toml && bun run svelte-kit sync && bun run build:no-telemetry`
+- **Entrypoint**: `build/index.js`
+
+Future Docker Factory inputs (for reference):
+```yaml
+inputs:
+  language: bun-ssr
+  builder_image: "oven/bun:1.3.11-alpine"
+  runtime_image: "oven/bun:1.3.11-alpine"
+  entrypoint: "build/index.js"
+  build_cmd: >
+    cp bunfig.build.toml bunfig.toml &&
+    bun run svelte-kit sync &&
+    bun run build:no-telemetry
+  dep_files: "package.json bun.lock bunfig.build.toml"
+```
 
 ## Current State
 
-- Dockerfile uses unpinned `oven/bun:canary-alpine`, no distroless stage, no dumb-init, no OCI labels, no health check
+- Dockerfile uses unpinned `oven/bun:canary-alpine`, 2 stages, no OCI labels, no health check
 - No `scripts/docker-build.sh` or `scripts/docker-security-check.sh`
-- Local docker scripts in `package.json` hardcode versions (`0.0.1`, `0.0.1-dev`, `2.1.0`)
+- Local docker scripts hardcode versions (`0.0.1`, `0.0.1-dev`, `2.1.0`)
 - `NODE_DEBUG=http` and `BUN_CONFIG_VERBOSE_FETCH=true` baked into production image
 - Production stage copies entire `/app/` from builder (bloated image)
 
 ## Deliverables
 
-### 1. Dockerfile overhaul
+### 1. Dockerfile rewrite (bun-ssr pattern)
 
-Full rewrite per bun-docker-security-guide multi-stage pattern.
-
-Syntax directive: `# syntax=docker/dockerfile:1` (floating latest stable, per guide convention)
+Syntax directive: `# syntax=docker/dockerfile:1`
 
 **Stage 1: deps-base** -- `oven/bun:1.3.11-alpine`
-- Install `ca-certificates` and `dumb-init` via apk with cache mounts
-- This stage provides system dependencies shared by later stages
+- Install `ca-certificates` via apk with cache mounts
+- No dumb-init needed (Bun on Alpine handles signals natively)
 
 **Stage 2: deps-prod** -- extends deps-base
-- Copy `package.json` and `bun.lock`
+- Copy `package.json`, `bun.lock*` (glob -- optional)
 - Run `bun install --frozen-lockfile --production` with cache mounts
-- The `couchbase` SDK has a postinstall script (`scripts/install.js`) that downloads a platform-specific prebuild (`.node` native addon). On Alpine, it downloads the `linuxmusl` variant which links against musl. This prebuild may require additional shared libraries beyond `libgcc_s` and `libstdc++` (notably `libcrypto`, `libssl`). If the distroless image fails at runtime with missing library errors, either copy the missing libs from deps-base or switch to `gcr.io/distroless/cc-debian12:nonroot` which includes glibc and more libraries.
 
 **Stage 3: builder** -- extends deps-base
+- Copy `package.json`, `bun.lock*`
 - Full `bun install --frozen-lockfile` with cache mounts
 - Copy all source files
-- Copy `bunfig.build.toml` as `bunfig.toml` (required for Bun build config)
-- Run `bun run svelte-kit sync` (generates type stubs and route manifests)
-- Run `bun run build:no-telemetry` (this script sets `NODE_ENV=production` inline, so the builder stage does not need to set it separately)
+- Run build:
+  ```
+  cp bunfig.build.toml bunfig.toml && \
+  bun run svelte-kit sync && \
+  bun run build:no-telemetry
+  ```
+- Clean up unnecessary files (.git, .github, node_modules/.cache, tests, docs, coverage, etc.)
+- `mkdir -p build` (ensure artifact path exists)
 
-**Stage 4: production** -- `gcr.io/distroless/static-debian12:nonroot`
+**Stage 4: production** -- `oven/bun:1.3.11-alpine`
+- No binary copies needed (Alpine has Bun installed)
+- No dumb-init wrapper
+- No musl/shared lib copies
 
 Copy from other stages:
-- Bun binary from `oven/bun:1.3.11-alpine`
-- `dumb-init` from deps-base
-- musl dynamic linker (`/lib/ld-musl-*.so.1`) from deps-base
-- Shared libraries (`libgcc_s.so.1`, `libstdc++.so.6`) from deps-base
-- SSL libraries (`libcrypto.so.*`, `libssl.so.*`) from deps-base -- required by couchbase SDK native addon
 - `node_modules/` from deps-prod
 - `package.json` from deps-prod
 - `build/` from builder
 
-Build args declared as `ARG` and converted to `ENV` in production stage:
-- `BUILD_VERSION` (default: `development`) -- read by health check endpoint via `process.env.BUILD_VERSION`
-- `COMMIT_HASH` (default: `unknown`) -- read by health check endpoint via `process.env.COMMIT_HASH`. This is the short git hash (7 chars) for local builds, full SHA in CI.
-- `BUILD_DATE` -- read by health check endpoint via `process.env.BUILD_DATE`
+All files owned by `65532:65532` (nonroot).
+
+Build args declared as `ARG` and converted to `ENV`:
+- `BUILD_VERSION` (default: `development`) -- read by health check endpoint
+- `COMMIT_HASH` (default: `unknown`) -- read by health check endpoint
+- `BUILD_DATE` -- read by health check endpoint
 - `NODE_ENV` (default: `production`)
 
 Additional ENV: `PORT=3000`, `HOST=0.0.0.0`
 
-OCI metadata ARGs (separate from runtime ARGs above):
-- `SERVICE_NAME`, `SERVICE_VERSION`, `SERVICE_DESCRIPTION`, `SERVICE_AUTHOR`, `SERVICE_LICENSE`
-- `VCS_REF` -- short git hash for OCI `revision` label (same value as `COMMIT_HASH` in local builds)
+OCI metadata ARGs: `SERVICE_NAME`, `SERVICE_VERSION`, `SERVICE_DESCRIPTION`, `SERVICE_AUTHOR`, `SERVICE_LICENSE`, `VCS_REF`
 
-OCI labels block using the `SERVICE_*` and `VCS_REF` ARGs (consumed by the CI pipeline build-args from Phase 1).
+OCI labels block using the `SERVICE_*` and `VCS_REF` ARGs (consumed by CI pipeline build-args from Phase 1).
 
 Runtime configuration:
 - User: `65532:65532` (nonroot)
 - EXPOSE: 3000
-- HEALTHCHECK with extended timeouts for the heavyweight health endpoint:
+- HEALTHCHECK:
   ```dockerfile
   HEALTHCHECK --interval=30s --timeout=30s --start-period=30s --retries=3 \
-      CMD ["/usr/local/bin/bun", "--eval", "fetch('http://localhost:3000/api/health-check').then(r=>r.ok?process.exit(0):process.exit(1)).catch(()=>process.exit(1))"]
+      CMD ["/usr/local/bin/bun", "--eval", \
+      "fetch(\"http://localhost:3000/api/health-check\").then(r=>r.ok?process.exit(0):process.exit(1)).catch(()=>process.exit(1))"]
   ```
-  The `/api/health-check` endpoint (Simple mode, default) calls Internal Collections API, SQLite, and GraphQL with a 15s per-check timeout. The 30s Docker timeout accommodates this. The 30s start-period allows the SvelteKit server to initialize.
-- ENTRYPOINT: `dumb-init --`
-- CMD: `bun run ./build/index.js`
+  30s timeout accommodates the Simple health check mode (15s per-check timeout on 3 concurrent checks). 30s start-period allows SvelteKit server to initialize.
+- ENTRYPOINT: `["/usr/local/bin/bun", "build/index.js"]` (direct, no dumb-init wrapper)
 
 Note: The app uses `svelte-adapter-bun` (not `adapter-node`). The build output at `build/index.js` imports `build/start.js` which calls `Bun.serve()`. The `HOST` and `PORT` env vars are read by the adapter via `env("HOST", "0.0.0.0")` and `env("PORT", "3000")`.
 
@@ -80,8 +108,6 @@ Note: The app uses `svelte-adapter-bun` (not `adapter-node`). The build output a
 - `NODE_DEBUG=http` -- verbose HTTP debug logging
 - `BUN_CONFIG_VERBOSE_FETCH=true` -- verbose fetch logging
 - These remain available via `docker run -e NODE_DEBUG=http` when debugging is needed
-
-**Data directory**: The app uses `src/data/` for SQLite storage (`DB_DATA_DIR` config default). On distroless with read-only filesystem, this requires a tmpfs or volume mount at runtime. The Dockerfile does not create this directory; it is provided at runtime.
 
 ### 2. scripts/docker-build.sh
 
@@ -91,7 +117,7 @@ Extracts `name`, `version`, `description`, `author`, `license` from `package.jso
 
 Additionally passes:
 - `--build-arg BUILD_VERSION="${SERVICE_VERSION}"` -- so the health check reports the correct version
-- `--build-arg COMMIT_HASH="${VCS_REF}"` -- so the health check reports the correct commit
+- `--build-arg COMMIT_HASH="${VCS_REF}"` -- so the health check reports the correct commit (short git hash)
 - `--build-arg BUILD_DATE="${BUILD_DATE}"`
 - `--build-arg VCS_REF="${VCS_REF}"`
 
@@ -103,13 +129,14 @@ Make executable: `chmod +x scripts/docker-build.sh`.
 
 ### 3. scripts/docker-security-check.sh
 
-Per bun-docker-security-guide. Validates:
+Validates:
 1. Image size
 2. Nonroot user (65532:65532)
 3. Health check defined
-4. No shell available (distroless verification)
-5. OCI labels present
-6. CVE scan (Docker Scout, if available)
+4. OCI labels present
+5. CVE scan (Docker Scout, if available)
+
+Note: No "shell availability" check -- Alpine has a shell (unlike distroless). This is expected for the bun-ssr pattern.
 
 Make executable: `chmod +x scripts/docker-security-check.sh`.
 
@@ -117,15 +144,13 @@ Make executable: `chmod +x scripts/docker-security-check.sh`.
 
 Replace all hardcoded versions with dynamic extraction from `package.json`.
 
-**`docker:dev:build`**: Extract version dynamically. Tag as `capella-document-search:dev` with version suffix `-dev`.
+**`docker:dev:build`**: Extract version dynamically. Tag as `capella-document-search:dev`.
 
-**`docker:dev:run`**: Read version dynamically instead of hardcoded `0.0.1-dev`. Add tmpfs mounts for SQLite and tmp.
+**`docker:dev:run`**: Read version dynamically instead of hardcoded `0.0.1-dev`.
 
 **`docker:prod:build`**: Replace with call to `scripts/docker-build.sh`. Remove hardcoded `BUILD_VERSION=0.0.1`.
 
-**`docker:prod:run`**: Replace hardcoded `BUILD_VERSION=2.1.0` with dynamic extraction. Add security flags: `--read-only`, `--cap-drop=ALL`, `--security-opt=no-new-privileges:true`. Add tmpfs mounts:
-- `--tmpfs /tmp:noexec,nosuid,size=100m` (required for Bun and npm packages that write to /tmp)
-- `--tmpfs /app/src/data:noexec,nosuid,size=50m` (SQLite database)
+**`docker:prod:run`**: Replace hardcoded `BUILD_VERSION=2.1.0` with dynamic extraction. Add `--read-only`, `--tmpfs /tmp:noexec,nosuid,size=100m`, `--cap-drop=ALL`, `--security-opt=no-new-privileges:true`.
 
 **`docker:prod:restart`**: Fix reference to non-existent `docker:run:prod` (should be `docker:prod:run`).
 
@@ -141,7 +166,7 @@ Cleanup scripts (`docker:cleanup:dev`, `docker:cleanup:prod`, `docker:stop`, `do
 
 | File | Action | Description |
 |------|--------|-------------|
-| `Dockerfile` | Rewrite | 4-stage distroless build with full hardening |
+| `Dockerfile` | Rewrite | 4-stage Alpine build aligned with Docker Factory bun-ssr pattern |
 | `scripts/docker-build.sh` | Create | Local build script extracting metadata from package.json |
 | `scripts/docker-security-check.sh` | Create | Security validation script |
 | `package.json` | Edit | Fix docker scripts: dynamic versions, security flags, broken references |
@@ -159,20 +184,20 @@ Cleanup scripts (`docker:cleanup:dev`, `docker:cleanup:prod`, `docker:stop`, `do
 
 | Risk | Mitigation |
 |------|------------|
-| Couchbase native addon missing shared libraries | Copy SSL libs (`libcrypto`, `libssl`) from Alpine deps-base. If still fails, run `ldd` on the `.node` file inside the builder to identify all deps. Fallback: switch to `gcr.io/distroless/cc-debian12:nonroot` |
 | SvelteKit build output needs more than `build/` | Start with `build/` + `node_modules/` + `package.json`; add paths if runtime errors |
-| SQLite/Bun writes fail on read-only filesystem | Add both `--tmpfs /tmp` and `--tmpfs /app/src/data` to all docker run scripts |
-| Bun 1.3.11 pin may break if Alpine package versions shift | Pin is stable for reproducible builds; update when intentional |
-| Health check timeouts | 30s timeout + 30s start-period accommodates the heavyweight Simple health check; monitor in production |
+| Couchbase native addon requires additional libs | Alpine runtime has all system libraries -- no native addon risk (unlike distroless) |
+| Alpine image larger than distroless | Acceptable tradeoff (~80-100MB vs ~50-80MB) for simplicity and factory alignment |
+| Health check timeouts | 30s timeout + 30s start-period accommodates heavyweight Simple health check |
 
 ## Acceptance criteria
 
-1. `docker build` produces a working distroless image under 100MB
+1. `docker build` produces a working Alpine image
 2. Container runs as nonroot (65532:65532) verified by `docker inspect`
 3. Health check at `/api/health-check` passes after container startup
-4. `scripts/docker-security-check.sh` passes all 5 non-Scout checks
+4. `scripts/docker-security-check.sh` passes all checks
 5. `bun run docker:build` builds successfully using version from `package.json`
 6. `docker inspect` shows OCI labels with correct version, name, description, author, license
 7. No hardcoded version strings remain in docker scripts
 8. `BUILD_VERSION`, `COMMIT_HASH`, `BUILD_DATE` env vars available at runtime (verified via health check response)
 9. Broken `docker:prod:restart` and `docker:dev:restart` references fixed
+10. Dockerfile structure matches Docker Factory bun-ssr Scenario 3 output (4 stages: deps-base, deps-prod, builder, production on Alpine)
